@@ -1,0 +1,133 @@
+//@version=5
+strategy("Hackathon V3: Institutional Matrix (MTF + Auto-Fibs) + Webhook", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//WEBHOOK CONFIGURATION - MATCHES BOT EXPECTATIONS
+//---------------------------------------------------------------------------------------------------------------------{
+grp_webhook = "🔔 Webhook Configuration"
+enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
+webhook_url = input.string("http://13.236.143.201/webhook/tradingview", "Webhook URL", group=grp_webhook, tooltip="Your bot webhook endpoint")
+webhook_secret = input.string("hybrid_tradingview_cluster_2026_secure", "Webhook Secret", group=grp_webhook, tooltip="Must match bot configuration")
+
+// --- 1. VISUALS & DATE FILTER ---
+show_dash = input.bool(true, title="Show Matrix Dashboard", group="0. Visuals")
+use_date = input.bool(false, title="Filter Date Range", group="0. Visuals")
+start_time = input.time(timestamp("2024-01-01 00:00"), title="Start", group="0. Visuals")
+end_time = input.time(timestamp("2030-01-01 00:00"), title="End", group="0. Visuals")
+
+// --- 2. THE CORE ENGINE (Current Timeframe) ---
+st_len = input.int(10, title="SuperTrend Length", group="1. Core Engine")
+st_fac = input.float(3.0, title="SuperTrend Factor", group="1. Core Engine")
+rsi_len = input.int(14, title="RSI Length", group="1. Core Engine")
+adx_len = input.int(14, title="ADX Length", group="1. Core Engine")
+adx_min = input.int(20, title="Min ADX Strength", group="1. Core Engine")
+
+// --- 3. THE "GOD FILTER" (Higher Timeframe) ---
+// This checks the 60-minute trend to confirm our 5-minute trades
+htf_res = input.timeframe("60", title="Higher Timeframe", group="2. Institutional Filter")
+[st_htf_val, st_htf_dir] = request.security(syminfo.tickerid, htf_res, ta.supertrend(st_fac, st_len))
+
+// --- 4. RISK & FIBONACCI TARGETS ---
+use_trail = input.bool(true, title="Use Trailing Stop", group="3. Risk Management")
+stop_loss_perc = input.float(3.0, title="Stop Loss %", group="3. Risk Management")
+trail_act = input.float(1.0, title="Trail Activation %", group="3. Risk Management")
+trail_off = input.float(1.0, title="Trail Offset %", group="3. Risk Management")
+
+// --- 5. CALCULATIONS ---
+// Standard Indicators
+[st_val, st_dir] = ta.supertrend(st_fac, st_len)
+rsi_val = ta.rsi(close, rsi_len)
+[diplus, diminus, adx_val] = ta.dmi(adx_len, adx_len)
+ema_200 = ta.ema(close, 200)
+
+// Volume Filter
+vol_osc = ta.ema(volume, 5) - ta.ema(volume, 10)
+vol_cond = vol_osc > 0
+
+// --- 6. ADVANCED LOGIC MATRIX ---
+// Condition 1: Current Trend is Good
+bull_trend = st_dir == -1
+bear_trend = st_dir == 1
+
+// Condition 2: "God Filter" (Higher Timeframe) Agrees
+// We only Buy if 1-Hour is Green. We only Sell if 1-Hour is Red.
+htf_bull = st_htf_dir == -1
+htf_bear = st_htf_dir == 1
+
+// Condition 3: Momentum & Strength
+momentum_ok = rsi_val > 45 and rsi_val < 75 // Avoid buying at absolute top
+strength_ok = adx_val > adx_min
+
+// FINAL TRIGGERS
+long_signal = bull_trend and htf_bull and momentum_ok and strength_ok and vol_cond
+short_signal = bear_trend and htf_bear and momentum_ok and strength_ok and vol_cond
+
+// Time Window Check
+can_trade = true
+if use_date
+    can_trade := time >= start_time and time <= end_time
+
+// Variables for SL/TP
+var float long_sl = na
+var float long_tp = na
+var float short_sl = na
+var float short_tp = na
+
+// --- 7. EXECUTION + WEBHOOK ---
+if (long_signal and strategy.position_size == 0 and can_trade)
+    long_sl := strategy.position_avg_price * (1 - stop_loss_perc/100)
+    long_tp := strategy.position_avg_price * (1 + (stop_loss_perc * 1.5)/100) // 1.5:1 RR
+    strategy.entry("LONG SNIPER", strategy.long)
+    
+    if enable_webhook
+        // BOT EXPECTS: strategy, side (BUY/SELL), symbol, timeframe, price, stop_loss, take_profit, secret
+        alert('{"strategy":"institutional_matrix","side":"BUY","symbol":"' + syminfo.ticker + '","timeframe":"' + str.tostring(timeframe.period) + '","price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(long_sl) + ',"take_profit":' + str.tostring(long_tp) + ',"secret":"' + webhook_secret + '"}', alert.freq_once_per_bar_close)
+
+if (short_signal and strategy.position_size == 0 and can_trade)
+    short_sl := strategy.position_avg_price * (1 + stop_loss_perc/100)
+    short_tp := strategy.position_avg_price * (1 - (stop_loss_perc * 1.5)/100) // 1.5:1 RR
+    strategy.entry("SHORT SNIPER", strategy.short)
+    
+    if enable_webhook
+        // BOT EXPECTS: strategy, side (BUY/SELL), symbol, timeframe, price, stop_loss, take_profit, secret
+        alert('{"strategy":"institutional_matrix","side":"SELL","symbol":"' + syminfo.ticker + '","timeframe":"' + str.tostring(timeframe.period) + '","price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(short_sl) + ',"take_profit":' + str.tostring(short_tp) + ',"secret":"' + webhook_secret + '"}', alert.freq_once_per_bar_close)
+
+// Trailing Stop Logic
+if strategy.position_size > 0
+    if use_trail
+        strategy.exit("Exit Long", "LONG SNIPER", stop=long_sl, trail_price=strategy.position_avg_price * (1 + trail_act/100), trail_offset=strategy.position_avg_price * (trail_off/100))
+    else
+        strategy.exit("Exit Long", "LONG SNIPER", stop=long_sl, limit=long_tp)
+
+if strategy.position_size < 0
+    if use_trail
+        strategy.exit("Exit Short", "SHORT SNIPER", stop=short_sl, trail_price=strategy.position_avg_price * (1 - trail_act/100), trail_offset=strategy.position_avg_price * (trail_off/100))
+    else
+        strategy.exit("Exit Short", "SHORT SNIPER", stop=short_sl, limit=short_tp)
+
+// --- 8. VISUALS: THE "HACKATHON" LOOK ---
+// Plot Main SuperTrend
+plot(st_val, color = st_dir == -1 ? color.green : color.red, linewidth=2, title="Main Trend")
+
+// Plot the "God Filter" (HTF Trend) as a Cloud Background
+// Green background = 1 Hour is Bullish. Red background = 1 Hour is Bearish.
+bgcolor(htf_bull ? color.new(color.green, 90) : htf_bear ? color.new(color.red, 90) : na, title="Institutional Trend Cloud")
+
+// Rocket Emojis for Entries
+plotchar(long_signal and strategy.position_size == 0, char="🚀", location=location.belowbar, color=color.lime, size=size.tiny, title="Long Entry")
+plotchar(short_signal and strategy.position_size == 0, char="🔥", location=location.abovebar, color=color.red, size=size.tiny, title="Short Entry")
+
+// --- 9. THE MATRIX DASHBOARD ---
+var table dash = table.new(position.top_right, 2, 6, border_width = 1, border_color = color.gray)
+if show_dash and barstate.islast
+    table.cell(dash, 0, 0, "INSTITUTIONAL MATRIX", bgcolor=color.black, text_color=color.white, text_size=size.small)
+    table.cell(dash, 1, 0, "STATUS", bgcolor=color.black, text_color=color.white, text_size=size.small)
+    
+    table.cell(dash, 0, 1, "5m Trend", bgcolor=color.gray, text_color=color.white)
+    table.cell(dash, 1, 1, st_dir == -1 ? "BULL" : "BEAR", bgcolor=st_dir == -1 ? color.green : color.red, text_color=color.white)
+    
+    table.cell(dash, 0, 2, "1H God Filter", bgcolor=color.gray, text_color=color.white)
+    table.cell(dash, 1, 2, htf_bull ? "BULL" : "BEAR", bgcolor=htf_bull ? color.green : color.red, text_color=color.white)
+    
+    table.cell(dash, 0, 3, "Vol Strength", bgcolor=color.gray, text_color=color.white)
+    table.cell(dash, 1, 3, vol_cond ? "HIGH" : "LOW", bgcolor=vol_cond ? color.green : color.orange, text_color=color.white)

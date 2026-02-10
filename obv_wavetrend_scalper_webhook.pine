@@ -1,0 +1,182 @@
+//@version=5
+strategy("OBV + WaveTrend Scalper - Webhook", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//WEBHOOK CONFIGURATION
+//---------------------------------------------------------------------------------------------------------------------{
+grp_webhook = "🔔 Webhook Configuration"
+enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
+webhook_secret = input.string("obv_wavetrend_scalper_2026_secure", "Webhook Secret", group=grp_webhook, tooltip="Must match bot configuration")
+
+//---------------------------------------------------------------------------------------------------------------------}
+//RISK MANAGEMENT
+//---------------------------------------------------------------------------------------------------------------------{
+grp_risk = "⚠️ Risk Management"
+stop_loss_pct = input.float(1.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1, group=grp_risk, tooltip="Scalper: 0.5-1.5%")
+take_profit_pct = input.float(2.0, "Take Profit %", minval=0.5, maxval=10.0, step=0.5, group=grp_risk, tooltip="Scalper: 1.5-3.0%")
+
+//---------------------------------------------------------------------------------------------------------------------}
+//OBV SETTINGS
+//---------------------------------------------------------------------------------------------------------------------{
+grp_obv = "📊 OBV Parameters"
+obv_ema_period = input.int(20, "OBV EMA Period", minval=5, maxval=100, group=grp_obv, tooltip="Volume trend confirmation")
+
+//---------------------------------------------------------------------------------------------------------------------}
+//WAVETREND SETTINGS
+//---------------------------------------------------------------------------------------------------------------------{
+grp_wt = "🌊 WaveTrend Parameters"
+channel_length = input.int(10, "Channel Length (n1)", minval=1, maxval=50, group=grp_wt, tooltip="Classic: 10")
+average_length = input.int(21, "Average Length (n2)", minval=1, maxval=50, group=grp_wt, tooltip="Classic: 21")
+overbought_level = input.int(60, "Overbought Level", minval=40, maxval=80, group=grp_wt)
+oversold_level = input.int(-60, "Oversold Level", minval=-80, maxval=-40, group=grp_wt)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//OBV LOGIC
+//---------------------------------------------------------------------------------------------------------------------{
+obv = ta.cum(math.sign(ta.change(close)) * volume)
+obv_ema = ta.ema(obv, obv_ema_period)
+obv_increasing = obv > obv_ema
+obv_decreasing = obv < obv_ema
+
+// OBV strength
+obv_distance = obv - obv_ema
+obv_strength = math.abs(obv_distance) / obv_ema
+
+//---------------------------------------------------------------------------------------------------------------------}
+//WAVETREND LOGIC
+//---------------------------------------------------------------------------------------------------------------------{
+ap = hlc3
+esa = ta.ema(ap, channel_length)
+d = ta.ema(math.abs(ap - esa), channel_length)
+ci = (ap - esa) / (0.015 * d)
+tci = ta.ema(ci, average_length)
+
+wt1 = tci
+wt2 = ta.sma(wt1, 4)
+
+// WaveTrend crossovers
+wt_cross_up = ta.crossover(wt1, wt2)
+wt_cross_down = ta.crossunder(wt1, wt2)
+wt_overbought = wt1 > overbought_level
+wt_oversold = wt1 < oversold_level
+
+//---------------------------------------------------------------------------------------------------------------------}
+//CONFIDENCE CALCULATION
+//---------------------------------------------------------------------------------------------------------------------{
+// Base confidence for scalper
+base_conf = 0.75
+
+// OBV volume confirmation strength (0-0.12)
+obv_conf = math.min(obv_strength * 100, 0.12)
+
+// WaveTrend momentum strength (0-0.08)
+wt_momentum = math.abs(wt1 - wt2)
+wt_conf = math.min(wt_momentum / 20, 0.08)
+
+// Position in cycle (better entries near extremes)
+wt_position = 0.0
+if wt_cross_up and wt1 < 0
+    wt_position := math.abs(wt1) / 60 * 0.05  // Better if crossing from oversold
+
+confidence = base_conf + obv_conf + wt_conf + wt_position
+confidence := math.min(confidence, 0.92)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//SIGNAL DETECTION
+//---------------------------------------------------------------------------------------------------------------------{
+// Long: WaveTrend crosses up while OBV shows volume support
+longCondition = wt_cross_up and obv_increasing
+
+// Short: WaveTrend crosses down while OBV shows volume decline
+shortCondition = wt_cross_down and obv_decreasing
+
+// Exit conditions
+exitLong = wt_cross_down or wt_overbought
+exitShort = wt_cross_up or wt_oversold
+
+//---------------------------------------------------------------------------------------------------------------------}
+//STOP LOSS & TAKE PROFIT
+//---------------------------------------------------------------------------------------------------------------------{
+var float long_sl = na
+var float long_tp = na
+var float short_sl = na
+var float short_tp = na
+
+if longCondition
+    long_sl := close * (1 - stop_loss_pct / 100)
+    long_tp := close * (1 + take_profit_pct / 100)
+
+if shortCondition
+    short_sl := close * (1 + stop_loss_pct / 100)
+    short_tp := close * (1 - take_profit_pct / 100)
+
+// Convert timeframe to lowercase for webhook
+tf_lower = timeframe.period == "1D" or timeframe.period == "D" ? "1d" : 
+           timeframe.period == "12H" or timeframe.period == "720" ? "12h" : 
+           timeframe.period == "6H" or timeframe.period == "360" ? "6h" : 
+           timeframe.period == "4H" or timeframe.period == "240" ? "4h" : 
+           timeframe.period == "2H" or timeframe.period == "120" ? "2h" : 
+           timeframe.period == "1H" or timeframe.period == "60" ? "1h" : 
+           timeframe.period == "45" ? "45m" : 
+           timeframe.period == "30" ? "30m" : 
+           timeframe.period == "15" ? "15m" : 
+           timeframe.period == "5" ? "5m" : 
+           timeframe.period == "3" ? "3m" :
+           timeframe.period == "1" ? "1m" : 
+           str.replace_all(str.lower(timeframe.period), " ", "")
+
+//---------------------------------------------------------------------------------------------------------------------}
+//STRATEGY EXECUTION & WEBHOOK
+//---------------------------------------------------------------------------------------------------------------------{
+if (longCondition)
+    strategy.entry("OBV_WT_Long", strategy.long)
+
+if (exitLong)
+    strategy.close("OBV_WT_Long")
+
+if (shortCondition)
+    strategy.entry("OBV_WT_Short", strategy.short)
+
+if (exitShort)
+    strategy.close("OBV_WT_Short")
+
+// WEBHOOK ALERTS - Single line JSON format
+if enable_webhook and longCondition
+    webhook_msg = '{"secret":"' + webhook_secret + '","strategy":"obv_wavetrend_scalper","side":"BUY","symbol":"' + syminfo.ticker + '","timeframe":"' + tf_lower + '","price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(long_sl) + ',"take_profit":' + str.tostring(long_tp) + ',"confidence":' + str.tostring(confidence) + ',"wt1":' + str.tostring(wt1) + ',"wt2":' + str.tostring(wt2) + ',"obv_increasing":true}'
+    alert(webhook_msg, alert.freq_once_per_bar_close)
+
+if enable_webhook and shortCondition
+    webhook_msg = '{"secret":"' + webhook_secret + '","strategy":"obv_wavetrend_scalper","side":"SELL","symbol":"' + syminfo.ticker + '","timeframe":"' + tf_lower + '","price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(short_sl) + ',"take_profit":' + str.tostring(short_tp) + ',"confidence":' + str.tostring(confidence) + ',"wt1":' + str.tostring(wt1) + ',"wt2":' + str.tostring(wt2) + ',"obv_decreasing":true}'
+    alert(webhook_msg, alert.freq_once_per_bar_close)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//VISUALS
+//---------------------------------------------------------------------------------------------------------------------{
+// WaveTrend plotted in separate pane
+hline(overbought_level, "Overbought", color.red, hline.style_dashed)
+hline(oversold_level, "Oversold", color.lime, hline.style_dashed)
+hline(0, "Zero Line", color.gray, hline.style_dotted)
+
+plot(wt1, "WaveTrend 1", color=color.aqua, linewidth=2)
+plot(wt2, "WaveTrend 2", color=color.orange, linewidth=1)
+
+// Buy/Sell signals on chart
+plotshape(longCondition, "Long Signal", shape.triangleup, location.belowbar, color.lime, size=size.small)
+plotshape(shortCondition, "Short Signal", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// OBV trend background
+bgcolor(obv_increasing ? color.new(color.lime, 95) : color.new(color.red, 95), title="OBV Trend")
+
+// Stop Loss & Take Profit levels (only show when in position)
+plot(strategy.position_size > 0 ? long_sl : na, "Long SL", color.red, linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size > 0 ? long_tp : na, "Long TP", color.green, linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size < 0 ? short_sl : na, "Short SL", color.red, linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size < 0 ? short_tp : na, "Short TP", color.green, linewidth=1, style=plot.style_linebr)
+
+// Confidence label
+if longCondition or shortCondition
+    label.new(bar_index, high, "Conf: " + str.tostring(confidence, "#.##"), 
+              color=color.new(color.blue, 80), 
+              textcolor=color.white, 
+              style=label.style_label_down, 
+              size=size.small)

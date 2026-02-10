@@ -1,0 +1,136 @@
+//@version=5
+strategy("SMA Crossover 9/21 - Webhook", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//WEBHOOK CONFIGURATION
+//---------------------------------------------------------------------------------------------------------------------{
+grp_webhook = "🔔 Webhook Configuration"
+enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
+webhook_secret = input.string("sma_crossover_9_21_2026_secure", "Webhook Secret", group=grp_webhook, tooltip="Must match bot configuration")
+
+//---------------------------------------------------------------------------------------------------------------------}
+//RISK MANAGEMENT
+//---------------------------------------------------------------------------------------------------------------------{
+grp_risk = "⚠️ Risk Management"
+stop_loss_pct = input.float(2.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1, group=grp_risk, tooltip="Classic SMA: 1.5-2.5%")
+take_profit_pct = input.float(4.0, "Take Profit %", minval=0.5, maxval=10.0, step=0.5, group=grp_risk, tooltip="Classic SMA: 3-5%")
+
+//---------------------------------------------------------------------------------------------------------------------}
+//SMA SETTINGS
+//---------------------------------------------------------------------------------------------------------------------{
+grp_sma = "📈 SMA Parameters"
+fastLen = input.int(9, "Fast SMA Length", minval=1, maxval=50, group=grp_sma, tooltip="Classic: 9")
+slowLen = input.int(21, "Slow SMA Length", minval=1, maxval=100, group=grp_sma, tooltip="Classic: 21")
+
+//---------------------------------------------------------------------------------------------------------------------}
+//SMA LOGIC
+//---------------------------------------------------------------------------------------------------------------------{
+fastSMA = ta.sma(close, fastLen)
+slowSMA = ta.sma(close, slowLen)
+
+// Crossover detection
+bullishCross = ta.crossover(fastSMA, slowSMA)
+bearishCross = ta.crossunder(fastSMA, slowSMA)
+
+// Distance between SMAs (for confidence)
+sma_distance = math.abs(fastSMA - slowSMA)
+sma_distance_pct = sma_distance / slowSMA
+
+//---------------------------------------------------------------------------------------------------------------------}
+//CONFIDENCE CALCULATION
+//---------------------------------------------------------------------------------------------------------------------{
+// Base confidence for SMA crossover
+base_conf = 0.72
+
+// Trend strength: wider separation = stronger trend (0-0.10)
+trend_strength = math.min(sma_distance_pct / 0.02, 0.10)
+
+// Price position relative to slow SMA (0-0.08)
+price_position = 0.0
+if bullishCross
+    price_position := close > slowSMA ? 0.08 : 0.04
+else if bearishCross
+    price_position := close < slowSMA ? 0.08 : 0.04
+
+// Volume confirmation (if available) (0-0.05)
+vol_conf = volume > ta.sma(volume, 20) ? 0.05 : 0.02
+
+confidence = base_conf + trend_strength + price_position + vol_conf
+confidence := math.min(confidence, 0.90)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//STOP LOSS & TAKE PROFIT
+//---------------------------------------------------------------------------------------------------------------------{
+var float long_sl = na
+var float long_tp = na
+var float short_sl = na
+var float short_tp = na
+
+if bullishCross
+    long_sl := close * (1 - stop_loss_pct / 100)
+    long_tp := close * (1 + take_profit_pct / 100)
+
+if bearishCross
+    short_sl := close * (1 + stop_loss_pct / 100)
+    short_tp := close * (1 - take_profit_pct / 100)
+
+// Convert timeframe to lowercase for webhook
+tf_lower = timeframe.period == "1D" or timeframe.period == "D" ? "1d" : 
+           timeframe.period == "12H" or timeframe.period == "720" ? "12h" : 
+           timeframe.period == "6H" or timeframe.period == "360" ? "6h" : 
+           timeframe.period == "4H" or timeframe.period == "240" ? "4h" : 
+           timeframe.period == "2H" or timeframe.period == "120" ? "2h" : 
+           timeframe.period == "1H" or timeframe.period == "60" ? "1h" : 
+           timeframe.period == "45" ? "45m" : 
+           timeframe.period == "30" ? "30m" : 
+           timeframe.period == "15" ? "15m" : 
+           timeframe.period == "5" ? "5m" : 
+           timeframe.period == "3" ? "3m" :
+           timeframe.period == "1" ? "1m" : 
+           str.replace_all(str.lower(timeframe.period), " ", "")
+
+//---------------------------------------------------------------------------------------------------------------------}
+//STRATEGY EXECUTION & WEBHOOK
+//---------------------------------------------------------------------------------------------------------------------{
+if (bullishCross)
+    strategy.entry("SMA_9/21_Long", strategy.long)
+
+if (bearishCross)
+    strategy.close("SMA_9/21_Long")
+
+// WEBHOOK ALERTS - Single line JSON format
+if enable_webhook and bullishCross
+    webhook_msg = '{"secret":"' + webhook_secret + '","strategy":"sma_crossover_9_21","side":"BUY","symbol":"' + syminfo.ticker + '","timeframe":"' + tf_lower + '","price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(long_sl) + ',"take_profit":' + str.tostring(long_tp) + ',"confidence":' + str.tostring(confidence) + ',"fast_sma":' + str.tostring(fastSMA) + ',"slow_sma":' + str.tostring(slowSMA) + '}'
+    alert(webhook_msg, alert.freq_once_per_bar_close)
+
+if enable_webhook and bearishCross
+    webhook_msg = '{"secret":"' + webhook_secret + '","strategy":"sma_crossover_9_21","side":"SELL","symbol":"' + syminfo.ticker + '","timeframe":"' + tf_lower + '","price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(short_sl) + ',"take_profit":' + str.tostring(short_tp) + ',"confidence":' + str.tostring(confidence) + ',"fast_sma":' + str.tostring(fastSMA) + ',"slow_sma":' + str.tostring(slowSMA) + '}'
+    alert(webhook_msg, alert.freq_once_per_bar_close)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//VISUALS
+//---------------------------------------------------------------------------------------------------------------------{
+// SMA lines
+plot(fastSMA, title="Fast SMA (9)", color=color.blue, linewidth=2)
+plot(slowSMA, title="Slow SMA (21)", color=color.orange, linewidth=2)
+
+// Fill area between SMAs
+fill(plot(fastSMA), plot(slowSMA), color = fastSMA > slowSMA ? color.new(color.green, 90) : color.new(color.red, 90), title="SMA Fill")
+
+// Buy/Sell signals
+plotshape(bullishCross, "Buy Signal", shape.triangleup, location.belowbar, color.lime, size=size.small)
+plotshape(bearishCross, "Sell Signal", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// Stop Loss & Take Profit levels (only show when in position)
+plot(strategy.position_size > 0 ? long_sl : na, "Long SL", color.red, linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size > 0 ? long_tp : na, "Long TP", color.green, linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size < 0 ? short_sl : na, "Short SL", color.red, linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size < 0 ? short_tp : na, "Short TP", color.green, linewidth=1, style=plot.style_linebr)
+
+// Confidence label
+if bullishCross or bearishCross
+    label.new(bar_index, high, "Conf: " + str.tostring(confidence, "#.##"), 
+              color=color.new(color.blue, 80), 
+              textcolor=color.white, 
+              style=label.style_label_down, 
+              size=size.small)

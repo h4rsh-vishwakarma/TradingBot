@@ -1,0 +1,37 @@
+{
+  "enhanced_atr_supertrend": {
+    "name": "Enhanced ATR Supertrend",
+    "description": "Advanced Supertrend with adaptive ATR multiplier and multiple smoothing methods. Signals on trend reversals with volatility confirmation.",
+    "symbol": "SOLUSDT",
+    "timeframe": "15m",
+    "confidence_threshold": 0.82,
+    "tier": "TIER_1_PREMIUM",
+    "risk_reward": 1.67,
+    "features": [
+      "ATR-based volatility trailing stop",
+      "Adaptive multiplier (adjusts to market conditions)",
+      "Multiple ATR smoothing methods (RMA/SMA/EMA/WMA)",
+      "Clean trend reversal detection",
+      "Visual distance from SuperTrend line",
+      "Background fill for trend confirmation"
+    ],
+    "entry_conditions": {
+      "LONG": [
+        "Price closes above upper band (trend reversal)",
+        "SuperTrend flips from bearish to bullish",
+        "Trailing lower band becomes new support",
+        "ATR confirms volatility environment"
+      ],
+      "SHORT": [
+        "Price closes below lower band (trend reversal)",
+        "SuperTrend flips from bullish to bearish",
+        "Trailing upper band becomes new resistance",
+        "ATR confirms volatility environment"
+      ]
+    },
+    "stop_loss": 3.0,
+    "take_profit": 5.0,
+    "position_size": 0.6,
+    "webhook_secret": "hybrid_tradingview_cluster_2026_secure"
+  }
+}
