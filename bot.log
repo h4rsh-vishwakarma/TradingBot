@@ -1,0 +1,47 @@
+2026-02-12 11:26:32,531 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 11:26:34,173 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 11:26:53,594 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'LIMIT', 'quantity': 0.001, 'price': 60000.0, 'timeInForce': 'GTC'}
+2026-02-12 11:26:54,182 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 11:30:34,826 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 11:30:35,706 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 11:33:28,238 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 11:33:29,043 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 11:34:03,015 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 11:34:03,574 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 15:24:25,818 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 15:24:27,745 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 15:27:19,697 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 15:27:21,252 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 15:30:41,655 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 15:30:42,732 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 15:33:55,458 - ERROR - API Keys missing in .env file!
+2026-02-12 15:34:18,035 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 15:34:20,202 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 15:44:05,338 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 15:44:07,003 - ERROR - Binance API Error: Order's notional must be no smaller than 100 (unless you choose reduce only).
+2026-02-12 15:45:03,327 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 15:45:03,798 - ERROR - Binance API Error: Order's notional must be no smaller than 100 (unless you choose reduce only).
+2026-02-12 15:48:18,926 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 15:48:18,927 - ERROR - Unexpected Error: API Secret required for private endpoints
+2026-02-12 15:54:13,605 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 15:54:17,334 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 15:55:47,643 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 15:55:49,114 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 15:59:09,661 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.0}
+2026-02-12 15:59:10,696 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 20:08:35,829 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 20:08:37,822 - ERROR - Binance API Error: Invalid API-key, IP, or permissions for action
+2026-02-12 20:16:33,980 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-12 20:16:34,532 - ERROR - Binance API Error: Order's notional must be no smaller than 100 (unless you choose reduce only).
+2026-02-12 20:18:02,844 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-12 20:18:05,400 - INFO - Order Successful! ID: 12215991721
+2026-02-12 20:18:15,684 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'LIMIT', 'quantity': 0.002, 'price': 100000.0, 'timeInForce': 'GTC'}
+2026-02-12 20:18:16,473 - INFO - Order Successful! ID: 12215994798
+2026-02-12 20:26:19,826 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-12 20:26:20,926 - INFO - Order Successful! ID: 12216143811
+2026-02-12 20:34:49,361 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-12 20:34:49,751 - INFO - Order Successful! ID: 12216305799
+2026-02-12 20:37:40,466 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-12 20:37:41,477 - INFO - Order Successful! ID: 12216360841
+2026-02-12 20:38:40,483 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-12 20:38:40,876 - INFO - Order Successful! ID: 12216379939
