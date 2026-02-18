@@ -1,0 +1,33 @@
+# requirements.txt (root: chetan-main)
+# Scope: Only the 7 scripts you've asked for
+#  - Liquidation Strategy/full_liquidity_7_12.py
+#  - Liquidation Strategy/full_liquidity_7_24.py
+#  - Liquidation Strategy/full_liquidity_7_48_server.py
+#  - Liquidation Strategy/full_liquidity_7_3d_server.py
+#  - Liquidation Strategy/full_liquidity_7_1w_server.py
+#  - Liquidation/oi.py
+#  - Hyperliquid Ensemble Strategy/fr_pep.py
+#
+# CPU-only: No GPU frameworks (e.g., torch/tensorflow) are required or included.
+# If you later add ML code, prefer CPU builds unless you explicitly need CUDA.
+
+# HTTP / APIs
+requests>=2.28.0
+
+# Google Sheets / auth
+gspread>=5.8.0
+oauth2client>=4.1.3           # Used by oi.py and some liquidity scripts
+google-auth>=2.20.0           # Used by fr_pep.py and liquidity scripts (service account)
+google-auth-oauthlib>=1.0.0   # gspread-compatible OAuth flows
+
+# Browser automation / image processing
+selenium>=4.8.0
+# WebDriver Manager downloads a matching ChromeDriver automatically.
+# To force a specific driver, set env var CHROMEDRIVER_VERSION (e.g. 119.0.6045.105).
+webdriver-manager==4.0.2
+Pillow>=9.5.0
+
+# Utilities
+numpy>=1.24.0
+schedule>=1.1.0
+pytz>=2023.3                   # fallback when zoneinfo is unavailable
