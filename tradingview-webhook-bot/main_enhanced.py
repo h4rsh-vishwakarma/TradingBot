@@ -18,6 +18,8 @@ from dotenv import load_dotenv
 
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add parent directory to path (for scripts/ module imports)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from exchange.binance_client import BinanceClient
 from exchange.price_provider import get_price_provider
