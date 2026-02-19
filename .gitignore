@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+build/
+dist/
+venv/
+env/
+.venv
+
+# Logs
+logs/
+*.log
+
+# Sensitive data - DO NOT COMMIT
+.env
+credentials.json
+google_credentials.json
+aws-configs/
+
+# Storage
+storage/**/*.jsonl
+storage/**/*.db
+storage/**/*.json
+storage/archive/
+
+# Config backups
+config/*.backup
+config/*.bak
+config/*.backup*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
+
+# Local backups
+*.local.backup
+*.server.backup

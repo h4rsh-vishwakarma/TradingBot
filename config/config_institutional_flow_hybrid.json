@@ -1,6 +1,6 @@
 {
-  "strategy_name": "squeeze_flow_expansion",
-  "virtual_balance": 500.0,
+  "strategy_name": "institutional_flow_hybrid",
+  "virtual_balance": 1500.0,
   "exchange": {
     "name": "binance",
     "type": "futures",
@@ -8,23 +8,25 @@
   },
   "webhook": {
     "host": "0.0.0.0",
-    "port": 8004,
-    "secret": "squeeze_tradingview_cluster_2026_secure"
+    "port": 8003,
+    "secret": "hybrid_tradingview_cluster_2026_secure"
   },
   "risk": {
     "position_size_type": "percentage",
     "position_size_value": 21.0,
-    "max_positions": 4,
+    "max_positions": 5,
     "max_symbol_exposure": 100.0,
     "stop_loss_buffer_pct": 0.1,
-    "min_position_usd": 100.0
+    "min_position_usd": 100.0,
+    "absolute_max_notional_usd": 2000,
+    "absolute_max_position_pct": 50
   },
   "strategies": {
     "enabled": [
-      "squeeze_flow_expansion"
+      "institutional_flow_hybrid"
     ],
-    "allow_opposite_signals": false,
-    "signal_expiry_seconds": 300
+    "allow_opposite_signals": true,
+    "signal_expiry_seconds": 900
   },
   "trading": {
     "symbols_allowed": [
@@ -46,13 +48,13 @@
     "leverage": 1
   },
   "storage": {
-    "signals_queue": "storage/signals_squeeze_flow_expansion.jsonl",
-    "positions": "storage/positions_squeeze_flow_expansion.jsonl",
-    "balance": "storage/balance_squeeze_flow_expansion.json"
+    "signals_queue": "storage/signals_institutional_flow_hybrid.jsonl",
+    "positions": "storage/positions_institutional_flow_hybrid.jsonl",
+    "balance": "storage/balance_institutional_flow_hybrid.json"
   },
   "logging": {
     "level": "INFO",
-    "file": "logs/bot_squeeze_flow_expansion.log",
+    "file": "logs/bot_institutional_flow_hybrid.log",
     "console": true
   },
   "circuit_breaker": {
