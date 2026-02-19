@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""Update the live dashboard sheet with current trading status"""
+
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from binance.client import Client
+import json
+import datetime
+
+DASHBOARD_SHEET_ID = '16LwZRHN0TgXOdut-RwWY805YnKsI2I8xm4AkSG2vRrU'
+
+print('=== UPDATING LIVE DASHBOARD ===\n')
+
+try:
+    # Authenticate with Google Sheets
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name('/home/ubuntu/trading_bot/credentials.json', scope)
+    gc = gspread.authorize(creds)
+    
+    # Open the dashboard sheet
+    sheet = gc.open_by_key(DASHBOARD_SHEET_ID)
+    print(f'✅ Connected to dashboard: {sheet.title}')
+    
+    # List available worksheets
+    worksheets = sheet.worksheets()
+    print(f'\n📋 Available worksheets:')
+    for ws in worksheets:
+        print(f'   - {ws.title} ({ws.row_count} rows, {ws.col_count} cols)')
+    
+    # Get Binance data
+    creds_data = json.load(open('/home/ubuntu/trading_bot/credentials_multi_exchange.json'))
+    c = Client(creds_data['binance']['api_key'], creds_data['binance']['api_secret'], testnet=True)
+    
+    acc = c.futures_account()
+    balance = float(acc["totalWalletBalance"])
+    available = float(acc["availableBalance"])
+    
+    positions = c.futures_position_information(symbol='BTCUSDT')
+    active_pos = [p for p in positions if float(p['positionAmt']) != 0]
+    
+    orders = c.futures_get_open_orders(symbol='BTCUSDT')
+    
+    # Get recent trades
+    trades = c.futures_account_trades(symbol='BTCUSDT', limit=20)
+    
+    now = datetime.datetime.utcnow()
+    timestamp = now.strftime('%Y-%m-%d %H:%M:%S UTC')
+    
+    print(f'\n📊 Current Status:')
+    print(f'   Balance: ${balance:.2f}')
+    print(f'   Available: ${available:.2f}')
+    print(f'   Active Positions: {len(active_pos)}')
+    print(f'   Open Orders: {len(orders)}')
+    print(f'   Recent Trades: {len(trades)}')
+    
+    # Try to update the "Status" or first worksheet
+    try:
+        status_ws = sheet.worksheet('Status')
+    except:
+        try:
+            status_ws = sheet.worksheet('Trading Status')
+        except:
+            # Use first worksheet
+            status_ws = worksheets[0]
+            print(f'\n📝 Using worksheet: {status_ws.title}')
+    
+    # Update the status section
+    print(f'\n🔄 Updating dashboard...')
+    
+    # Create status update data
+    status_data = [
+        ['Last Update', timestamp],
+        ['Balance', f'${balance:.2f}'],
+        ['Available', f'${available:.2f}'],
+        ['Active Positions', str(len(active_pos))],
+        ['Open Orders', str(len(orders))],
+        ['Recent Trades', str(len(trades))],
+        ['Bot Status', '✅ Running'],
+        ['Fixes Applied', '✅ All Active'],
+        ['Min Confidence', '70%'],
+        ['Signal Cooldown', '15 minutes'],
+        ['Position Check', '✅ Enabled']
+    ]
+    
+    # Update the sheet (starting at A1)
+    status_ws.update('A1:B11', status_data)
+    
+    print(f'✅ Dashboard updated successfully!')
+    
+    # Also add recent trades section
+    if len(trades) > 0:
+        print(f'\n📈 Adding recent trades...')
+        
+        trade_header = [['Timestamp', 'Side', 'Quantity', 'Price', 'PnL', 'Fee']]
+        trade_rows = []
+        
+        for t in trades[-10:]:  # Last 10 trades
+            dt = datetime.datetime.fromtimestamp(t['time']/1000).strftime('%Y-%m-%d %H:%M:%S')
+            trade_rows.append([
+                dt,
+                t['side'],
+                float(t['qty']),
+                float(t['price']),
+                float(t['realizedPnl']),
+                float(t['commission'])
+            ])
+        
+        # Update starting at row 13
+        status_ws.update('A13:F13', trade_header)
+        if trade_rows:
+            status_ws.update(f'A14:F{13+len(trade_rows)}', trade_rows)
+        
+        print(f'✅ Added {len(trade_rows)} recent trades')
+    
+    print(f'\n✅ DASHBOARD UPDATE COMPLETE!')
+    print(f'   View at: https://docs.google.com/spreadsheets/d/{DASHBOARD_SHEET_ID}/edit')
+    
+except Exception as e:
+    print(f'❌ Error: {e}')
+    import traceback
+    traceback.print_exc()

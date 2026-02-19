@@ -1,0 +1,2 @@
+run_id,slippage_bps,commission_pct,sl_pct,tp_pct,size_usd,error,total_trades,net_pnl_usd,profit_factor,win_rate,sharpe
+run_0001,5,0.0002,0.01,0.02,100,unsupported format string passed to Series.__format__,0,0.0,0.0,0.0,0.0

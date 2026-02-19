@@ -1,0 +1,8 @@
+RL model not available: No module named 'torch'. Continuing without RL predictions.
+Traceback (most recent call last):
+  File "/home/ubuntu/tradingview-webhook-mvp/trading_bot/enhanced_trading_bot.py", line 21, in <module>
+    from signal_generator import EnhancedRLSignalGenerator
+  File "/home/ubuntu/tradingview-webhook-mvp/trading_bot/signal_generator.py", line 120, in <module>
+    PROM_AVAILABLE = metrics.PROM_AVAILABLE
+                     ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'metrics' has no attribute 'PROM_AVAILABLE'

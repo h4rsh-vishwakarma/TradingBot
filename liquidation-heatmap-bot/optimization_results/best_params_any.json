@@ -1,0 +1,22 @@
+{
+  "id": "gen9_cross_1052",
+  "sl_type": "fixed",
+  "sl_pct": 0.005,
+  "sl_atr_mult": 2.5,
+  "sl_period": null,
+  "tp_type": "rr",
+  "tp_rr": 3.9000000000000004,
+  "tp_pct": null,
+  "tp_atr_mult": 2.5,
+  "size_usd": 800,
+  "regime": "ranging",
+  "score": 72.91786789913823,
+  "total_pnl": 1018.2959099824861,
+  "total_trades": 2690,
+  "win_rate": 45.61338289962825,
+  "profit_factor": 1.4137319253871137,
+  "max_drawdown": 5.268752460011875,
+  "sharpe_ratio": 1.5767684876587975,
+  "sortino_ratio": 4.051578919643202,
+  "generation": 9
+}
