@@ -61,3 +61,19 @@ Thumbs.db
 # Local backups
 *.local.backup
 *.server.backup
+
+# Liquidation bot runtime files
+liquidation-heatmap-bot/.pytest_cache/
+liquidation-heatmap-bot/__pycache__/
+liquidation-heatmap-bot/.venv/
+liquidation-heatmap-bot/backtest_artifacts/
+liquidation-heatmap-bot/backtester/
+liquidation-heatmap-bot/events/*.jsonl
+liquidation-heatmap-bot/*.log
+liquidation-heatmap-bot/*.log.gz
+liquidation-heatmap-bot/*.png
+liquidation-heatmap-bot/idempotency_store.db
+liquidation-heatmap-bot/trading_events.jsonl
+liquidation-heatmap-bot/tradingview_*.jsonl
+liquidation-heatmap-bot/tradingview_*.jsonl.backup
+liquidation-heatmap-bot/*.tar.gz
