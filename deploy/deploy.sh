@@ -88,14 +88,17 @@ rsync -avz --exclude='.git' \
     -e "ssh -i $SSH_KEY" \
     ./ "$SERVER_USER@$SERVER_IP:/tmp/tradingview-deploy/"
 
-# Stop bots gracefully
+# Stop bots gracefully (using sudo for root processes)
 log_info "Stopping running bots..."
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
     cd ~/tradingview-bot
-    # Find all running bot processes and send SIGTERM
-    pkill -TERM -f 'main_enhanced.py' || true
+    # Find all running bot processes and send SIGTERM (using sudo for root processes)
+    sudo pkill -TERM -f 'main_enhanced.py' || true
     sleep 3
-    log_info 'Bots stopped'
+    # Force kill if still running
+    sudo pkill -KILL -f 'main_enhanced.py' || true
+    sleep 2
+    echo 'Bots stopped'
 "
 
 # Backup current deployment
@@ -119,14 +122,16 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
     cd ~/tradingview-bot
     source venv/bin/activate
 
-    # Read all config files and start bots
+    BOT_COUNT=0
     for config in config/config_*.json; do
-        if [ -f \"\$config\" ]; then
-            strategy_name=\$(basename \"\$config\" .json | sed 's/config_//')
-            echo \"Starting bot for strategy: \$strategy_name\"
-            nohup python main_enhanced.py --config \"\$config\" > \"logs/bot_\${strategy_name}.log\" 2>&1 &
-        fi
+      if [ -f \"\$config\" ]; then
+        strategy_name=\$(basename \"\$config\" .json | sed 's/config_//')
+        echo \"  → Starting \$strategy_name\"
+        nohup python main_enhanced.py --config \"\$config\" > \"logs/bot_\${strategy_name}.log\" 2>&1 &
+        BOT_COUNT=\$((BOT_COUNT + 1))
+      fi
     done
+    echo \"Started \$BOT_COUNT bots\"
 "
 
 # Verify deployment
@@ -140,4 +145,4 @@ log_info "💾 Backup location: $BACKUP_DIR"
 
 # Show recent logs
 log_info "📋 Recent logs:"
-ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "tail -20 ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log"
+ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "tail -10 ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log"

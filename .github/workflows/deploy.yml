@@ -37,17 +37,26 @@ jobs:
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ ubuntu@13.236.143.201:/tmp/tradingview-deploy/
 
-          # Deploy files without restarting bots (bots run as root, need manual restart)
+          # Deploy and restart bots with sudo
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ubuntu@13.236.143.201 << 'ENDSSH'
             set -e
 
             # Backup current deployment
             BACKUP_DIR="$HOME/tradingview-bot.backup_$(date +%Y%m%d_%H%M%S)"
-            echo "Creating backup: $BACKUP_DIR"
+            echo "📦 Creating backup: $BACKUP_DIR"
             cp -r ~/tradingview-bot "$BACKUP_DIR"
 
+            # Stop running bots (using sudo for root processes)
+            echo "🛑 Stopping bots..."
+            sudo pkill -TERM -f 'main_enhanced.py' || true
+            sleep 5
+
+            # Ensure all bots are stopped
+            sudo pkill -KILL -f 'main_enhanced.py' || true
+            sleep 2
+
             # Deploy new files
-            echo "Syncing files..."
+            echo "📤 Syncing files..."
             cd /tmp/tradingview-deploy
             rsync -av --exclude='.git' \
               --exclude='__pycache__' \
@@ -58,23 +67,37 @@ jobs:
 
             rm -rf /tmp/tradingview-deploy
 
-            echo "Files deployed successfully!"
-            echo "NOTE: Bots are running as root and were NOT restarted."
-            echo "To restart bots, SSH into server and run:"
-            echo "  sudo pkill -f main_enhanced.py"
-            echo "  cd ~/tradingview-bot && source venv/bin/activate"
-            echo "  for config in config/config_*.json; do python main_enhanced.py --config \"\$config\" & done"
+            # Restart bots
+            echo "🚀 Restarting bots..."
+            cd ~/tradingview-bot
+            source venv/bin/activate
+
+            BOT_COUNT=0
+            for config in config/config_*.json; do
+              if [ -f "$config" ]; then
+                strategy_name=$(basename "$config" .json | sed 's/config_//')
+                echo "  → Starting $strategy_name"
+                nohup python main_enhanced.py --config "$config" > "logs/bot_${strategy_name}.log" 2>&1 &
+                BOT_COUNT=$((BOT_COUNT + 1))
+              fi
+            done
+
+            echo ""
+            echo "✅ Deployment complete!"
+            echo "📊 Started $BOT_COUNT bots"
           ENDSSH
 
       - name: Verify deployment
         run: |
+          sleep 5
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ubuntu@13.236.143.201 << 'ENDSSH'
-            echo "=== Deployment Files Synced ==="
-            ls -la ~/tradingview-bot/main_enhanced.py
+            echo "=== Deployment Verification ==="
             echo ""
-            echo "=== Active Bot Processes ==="
-            ps aux | grep 'main_enhanced.py' | grep -v grep | wc -l
-            echo "bots running (will use new code on next restart)"
+            echo "Active Bot Processes:"
+            ps aux | grep 'main_enhanced.py' | grep -v grep | wc -l | xargs echo "  Bots running:"
+            echo ""
+            echo "Recent Bot Activity:"
+            tail -3 ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log 2>/dev/null | jq -r '.message' 2>/dev/null || tail -3 ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log
           ENDSSH
 
       - name: Cleanup
