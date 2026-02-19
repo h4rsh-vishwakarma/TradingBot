@@ -110,7 +110,21 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "cp -r ~/tradingview-bot $BACKUP_DIR
 log_info "Deploying new files..."
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
     cd /tmp/tradingview-deploy
-    rsync -av --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' \
+
+    # Move TradingView bot files to root (for server compatibility)
+    if [ -d 'tradingview-webhook-bot' ]; then
+      echo '📦 Restructuring TradingView bot for server...'
+      cp -r tradingview-webhook-bot/* ./
+      cp -r tradingview-webhook-bot/core ./
+      cp -r tradingview-webhook-bot/exchange ./
+      cp -r tradingview-webhook-bot/utils ./
+      cp -r tradingview-webhook-bot/storage ./
+      cp -r tradingview-webhook-bot/alerts ./
+      cp tradingview-webhook-bot/main_enhanced.py ./
+    fi
+
+    rsync -av --exclude='tradingview-webhook-bot' --exclude='.git' \
+        --exclude='__pycache__' --exclude='*.pyc' \
         --exclude='logs/' --exclude='storage/' --exclude='.env' \
         ./ ~/tradingview-bot/
     rm -rf /tmp/tradingview-deploy

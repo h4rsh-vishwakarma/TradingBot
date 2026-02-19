@@ -28,6 +28,10 @@ storage/**/*.jsonl
 storage/**/*.db
 storage/**/*.json
 storage/archive/
+tradingview-webhook-bot/storage/**/*.jsonl
+tradingview-webhook-bot/storage/**/*.db
+tradingview-webhook-bot/storage/**/*.json
+tradingview-webhook-bot/storage/archive/
 
 # Config backups
 config/*.backup

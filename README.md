@@ -161,10 +161,11 @@ Both systems operate on Binance Futures with advanced risk management, real-time
 ## 📁 Repository Structure
 
 ```
-Btc-Layer-Updated-files-main/
+trading-view-indicators/
 │
 ├── 📄 README.md                          # This file
 ├── 📄 PRD_TRADING_SYSTEMS_COMBINED.md   # Product Requirements Document
+├── 📄 REORGANIZATION_PLAN.md             # Reorganization documentation
 │
 ├── 📁 docs/                              # Documentation
 │   ├── LIQUIDATION_STRATEGY_DOCUMENTATION.md
@@ -177,14 +178,61 @@ Btc-Layer-Updated-files-main/
 │   ├── data_sources.py
 │   ├── coinglass_visual_scraper.py
 │   ├── config.py
-│   └── core/
+│   ├── core/                             # Core modules
+│   ├── observability/                    # Event logging & metrics
+│   └── execution/                        # Trade execution
 │
-├── 📁 tradingview-only-bot/              # TradingView webhook system
-│   ├── main_enhanced.py
-│   ├── signal_processor.py
-│   ├── execution_engine.py
-│   ├── risk_controller.py
-│   └── config/
+├── 📁 tradingview-webhook-bot/           # TradingView webhook system
+│   ├── main_enhanced.py                  # Main entry point
+│   ├── core/                             # Trading logic
+│   │   ├── balance_manager.py            # Virtual balance tracking
+│   │   ├── enhanced_order_manager.py     # Order execution
+│   │   ├── order_monitor.py              # Order fill monitoring
+│   │   ├── position_manager.py           # Position state
+│   │   ├── position_size_validator.py    # Position size security
+│   │   ├── risk_manager.py               # Risk calculations
+│   │   ├── signal_processor.py           # Signal validation
+│   │   ├── strategy_engine.py            # Strategy validation
+│   │   ├── webhook_server.py             # Flask webhook receiver
+│   │   └── circuit_breaker.py            # Circuit breaker logic
+│   ├── exchange/                         # Exchange integration
+│   │   ├── binance_client.py             # Binance API wrapper
+│   │   ├── price_provider.py             # Mainnet price fetcher
+│   │   ├── enhanced_order_executor.py    # Order execution
+│   │   └── execution_engine.py           # Testnet execution
+│   ├── utils/                            # Utility modules
+│   │   ├── logger.py                     # Logging setup
+│   │   ├── event_logger.py               # Event logging
+│   │   ├── health_checker.py             # Health monitoring
+│   │   ├── signal_archiver.py            # Signal queue cleanup
+│   │   ├── dashboard_updater.py          # Metrics dashboard
+│   │   ├── instance_lock.py              # Prevent duplicates
+│   │   ├── client_order_id_generator.py  # Order ID generation
+│   │   ├── position_reconciler.py        # Position reconciliation
+│   │   ├── telegram_alerter.py           # Telegram notifications
+│   │   └── helpers.py                    # Helper functions
+│   ├── storage/                          # Persistent data
+│   │   ├── idempotency_store.py          # Idempotency tracking
+│   │   ├── jsonl_queue.py                # Signal queue
+│   │   └── jsonl_consumer.py             # Queue consumer
+│   └── alerts/                           # Alert system
+│       └── telegram_alerts.py            # Telegram integration
+│
+├── 📁 strategies/                        # Pine Script indicators
+│   ├── ema_sma_crossover_webhook.pine
+│   ├── enhanced_atr_supertrend_webhook.pine
+│   ├── institutional_matrix_webhook.pine
+│   ├── lorentzian_classification_webhook.pine
+│   ├── obv_wavetrend_scalper_webhook.pine
+│   ├── sma_crossover_9_21_webhook.pine
+│   ├── squeeze_flow_expansion_webhook.pine
+│   └── supertrend_btc_4h_webhook.pine
+│
+├── 📁 scripts/                           # Utility scripts
+│   ├── analyze_7day.py                   # 7-day analysis
+│   ├── clean_dashboard_7tabs.py          # Dashboard cleanup
+│   ├── clean_dashboard_tab7.py           # Dashboard cleanup
+│   └── kill_switch.py                    # Emergency stop
 │
 ├── 📁 config/                            # Strategy configurations
 │   ├── config_institutional_flow_hybrid.json
@@ -192,9 +240,13 @@ Btc-Layer-Updated-files-main/
 │   ├── config_supertrend_btc_4h.json
 │   └── ...
 │
-├── 📁 scripts/                           # Utility scripts
-├── 📁 strategies/                        # Pine Script indicators
-└── 📁 deploy/                            # Deployment automation
+├── 📁 deploy/                            # Deployment automation
+│   ├── deploy.sh                         # Manual deployment script
+│   └── nginx/                            # Nginx configurations
+│
+└── 📁 .github/
+    └── workflows/
+        └── deploy.yml                    # CI/CD deployment
 ```
 
 ---
