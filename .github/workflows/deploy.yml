@@ -44,7 +44,7 @@ jobs:
             # Backup current deployment
             BACKUP_DIR="$HOME/tradingview-bot.backup_$(date +%Y%m%d_%H%M%S)"
             echo "📦 Creating backup: $BACKUP_DIR"
-            cp -r ~/tradingview-bot "$BACKUP_DIR"
+            cp -r ~/Multi-Strategy-Crypto-Trading-Systems "$BACKUP_DIR"
 
             # Stop running bots (using sudo for root processes)
             echo "🛑 Stopping bots..."
@@ -65,21 +65,21 @@ jobs:
               --exclude='logs/' \
               --exclude='storage/' \
               --exclude='.env' \
-              ./ ~/tradingview-bot/
+              ./ ~/Multi-Strategy-Crypto-Trading-Systems/
 
             rm -rf /tmp/tradingview-deploy
 
             # Fix permissions for logs and storage
             echo "🔧 Fixing permissions..."
-            sudo chown -R ubuntu:ubuntu ~/tradingview-bot/logs/ ~/tradingview-bot/storage/ 2>/dev/null || true
-            sudo chown -R ubuntu:ubuntu ~/tradingview-bot/tradingview-webhook-bot/storage/ 2>/dev/null || true
-            sudo chmod -R 755 ~/tradingview-bot/logs/ 2>/dev/null || true
-            sudo chmod -R 755 ~/tradingview-bot/storage/ 2>/dev/null || true
-            sudo chmod -R 755 ~/tradingview-bot/tradingview-webhook-bot/storage/ 2>/dev/null || true
+            sudo chown -R ubuntu:ubuntu ~/Multi-Strategy-Crypto-Trading-Systems/logs/ ~/Multi-Strategy-Crypto-Trading-Systems/storage/ 2>/dev/null || true
+            sudo chown -R ubuntu:ubuntu ~/Multi-Strategy-Crypto-Trading-Systems/tradingview-webhook-bot/storage/ 2>/dev/null || true
+            sudo chmod -R 755 ~/Multi-Strategy-Crypto-Trading-Systems/logs/ 2>/dev/null || true
+            sudo chmod -R 755 ~/Multi-Strategy-Crypto-Trading-Systems/storage/ 2>/dev/null || true
+            sudo chmod -R 755 ~/Multi-Strategy-Crypto-Trading-Systems/tradingview-webhook-bot/storage/ 2>/dev/null || true
 
             # Restart bots
             echo "🚀 Restarting bots..."
-            cd ~/tradingview-bot
+            cd ~/Multi-Strategy-Crypto-Trading-Systems
             source venv/bin/activate
 
             BOT_COUNT=0
@@ -107,10 +107,10 @@ jobs:
             ps aux | grep 'main_enhanced.py' | grep -v grep | wc -l | xargs echo "  Bots running:"
             echo ""
             echo "Directory Structure:"
-            ls -la ~/tradingview-bot/ | grep -E "tradingview|config|strategies"
+            ls -la ~/Multi-Strategy-Crypto-Trading-Systems/ | grep -E "tradingview|config|strategies"
             echo ""
             echo "Recent Bot Activity:"
-            tail -3 ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log 2>/dev/null | jq -r '.message' 2>/dev/null || tail -3 ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log
+            tail -3 ~/Multi-Strategy-Crypto-Trading-Systems/logs/bot_institutional_flow_hybrid.log 2>/dev/null | jq -r '.message' 2>/dev/null || tail -3 ~/Multi-Strategy-Crypto-Trading-Systems/logs/bot_institutional_flow_hybrid.log
           ENDSSH
 
       - name: Cleanup

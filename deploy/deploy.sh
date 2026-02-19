@@ -9,7 +9,7 @@ set -e  # Exit on error
 # Configuration
 SERVER_USER="ubuntu"
 SERVER_IP="13.236.143.201"
-SERVER_PATH="~/tradingview-bot"
+SERVER_PATH="~/Multi-Strategy-Crypto-Trading-Systems"
 SSH_KEY="$HOME/.ssh/pratik-key-new.pem"
 
 # Colors for output
@@ -91,7 +91,7 @@ rsync -avz --exclude='.git' \
 # Stop bots gracefully (using sudo for root processes)
 log_info "Stopping running bots..."
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
-    cd ~/tradingview-bot
+    cd ~/Multi-Strategy-Crypto-Trading-Systems
     # Find all running bot processes and send SIGTERM (using sudo for root processes)
     sudo pkill -TERM -f 'main_enhanced.py' || true
     sleep 3
@@ -104,7 +104,7 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
 # Backup current deployment
 log_info "Backing up current deployment..."
 BACKUP_DIR="$SERVER_PATH.backup_$(date +%Y%m%d_%H%M%S)"
-ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "cp -r ~/tradingview-bot $BACKUP_DIR"
+ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "cp -r ~/Multi-Strategy-Crypto-Trading-Systems $BACKUP_DIR"
 
 # Deploy new files - keep organized structure
 log_info "Deploying new files..."
@@ -117,14 +117,14 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
         --exclude='logs/' \
         --exclude='storage/' \
         --exclude='.env' \
-        ./ ~/tradingview-bot/
+        ./ ~/Multi-Strategy-Crypto-Trading-Systems/
     rm -rf /tmp/tradingview-deploy
 "
 
 # Fix permissions for logs and storage (important after deployment)
 log_info "Fixing permissions..."
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
-    cd ~/tradingview-bot
+    cd ~/Multi-Strategy-Crypto-Trading-Systems
     sudo chown -R ubuntu:ubuntu logs/ storage/ tradingview-webhook-bot/storage/ 2>/dev/null || true
     sudo chmod -R 755 logs/ storage/ tradingview-webhook-bot/storage/ 2>/dev/null || true
 "
@@ -132,7 +132,7 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
 # Restart bots
 log_info "Restarting bots..."
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
-    cd ~/tradingview-bot
+    cd ~/Multi-Strategy-Crypto-Trading-Systems
     source venv/bin/activate
 
     BOT_COUNT=0
@@ -157,8 +157,8 @@ log_info "📊 Active bots: $BOT_COUNT"
 log_info "💾 Backup location: $BACKUP_DIR"
 
 # Show directory structure
-ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "echo 'Directory structure:' && ls -la ~/tradingview-bot/ | grep -E 'tradingview|config|strategies'"
+ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "echo 'Directory structure:' && ls -la ~/Multi-Strategy-Crypto-Trading-Systems/ | grep -E 'tradingview|config|strategies'"
 
 # Show recent logs
 log_info "📋 Recent logs:"
-ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "tail -10 ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log"
+ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "tail -10 ~/Multi-Strategy-Crypto-Trading-Systems/logs/bot_institutional_flow_hybrid.log"
