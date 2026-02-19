@@ -106,28 +106,27 @@ log_info "Backing up current deployment..."
 BACKUP_DIR="$SERVER_PATH.backup_$(date +%Y%m%d_%H%M%S)"
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "cp -r ~/tradingview-bot $BACKUP_DIR"
 
-# Deploy new files
+# Deploy new files - keep organized structure
 log_info "Deploying new files..."
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
     cd /tmp/tradingview-deploy
-
-    # Move TradingView bot files to root (for server compatibility)
-    if [ -d 'tradingview-webhook-bot' ]; then
-      echo '📦 Restructuring TradingView bot for server...'
-      cp -r tradingview-webhook-bot/* ./
-      cp -r tradingview-webhook-bot/core ./
-      cp -r tradingview-webhook-bot/exchange ./
-      cp -r tradingview-webhook-bot/utils ./
-      cp -r tradingview-webhook-bot/storage ./
-      cp -r tradingview-webhook-bot/alerts ./
-      cp tradingview-webhook-bot/main_enhanced.py ./
-    fi
-
-    rsync -av --exclude='tradingview-webhook-bot' --exclude='.git' \
-        --exclude='__pycache__' --exclude='*.pyc' \
-        --exclude='logs/' --exclude='storage/' --exclude='.env' \
+    rsync -av \
+        --exclude='.git' \
+        --exclude='__pycache__' \
+        --exclude='*.pyc' \
+        --exclude='logs/' \
+        --exclude='storage/' \
+        --exclude='.env' \
         ./ ~/tradingview-bot/
     rm -rf /tmp/tradingview-deploy
+"
+
+# Fix permissions for logs and storage (important after deployment)
+log_info "Fixing permissions..."
+ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
+    cd ~/tradingview-bot
+    sudo chown -R ubuntu:ubuntu logs/ storage/ tradingview-webhook-bot/storage/ 2>/dev/null || true
+    sudo chmod -R 755 logs/ storage/ tradingview-webhook-bot/storage/ 2>/dev/null || true
 "
 
 # Restart bots
@@ -141,7 +140,7 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
       if [ -f \"\$config\" ]; then
         strategy_name=\$(basename \"\$config\" .json | sed 's/config_//')
         echo \"  → Starting \$strategy_name\"
-        nohup python main_enhanced.py --config \"\$config\" > \"logs/bot_\${strategy_name}.log\" 2>&1 &
+        nohup python tradingview-webhook-bot/main_enhanced.py --config \"\$config\" > \"logs/bot_\${strategy_name}.log\" 2>&1 &
         BOT_COUNT=\$((BOT_COUNT + 1))
       fi
     done
@@ -157,14 +156,9 @@ log_info "✅ Deployment completed!"
 log_info "📊 Active bots: $BOT_COUNT"
 log_info "💾 Backup location: $BACKUP_DIR"
 
+# Show directory structure
+ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "echo 'Directory structure:' && ls -la ~/tradingview-bot/ | grep -E 'tradingview|config|strategies'"
+
 # Show recent logs
 log_info "📋 Recent logs:"
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "tail -10 ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log"
-
-# Fix permissions for logs and storage (important after deployment)
-log_info "Fixing permissions..."
-ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
-    cd ~/tradingview-bot
-    sudo chown -R ubuntu:ubuntu logs/ storage/ 2>/dev/null || true
-    sudo chmod -R 755 logs/ storage/ 2>/dev/null || true
-"

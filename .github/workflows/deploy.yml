@@ -55,25 +55,13 @@ jobs:
             sudo pkill -KILL -f 'main_enhanced.py' || true
             sleep 2
 
-            # Deploy new files
+            # Deploy new files - keep the organized structure
             echo "📤 Syncing files..."
             cd /tmp/tradingview-deploy
-
-            # Move TradingView bot files to root (for server compatibility)
-            if [ -d "tradingview-webhook-bot" ]; then
-              echo "📦 Restructuring TradingView bot for server..."
-              cp -r tradingview-webhook-bot/* ./
-              cp -r tradingview-webhook-bot/core ./
-              cp -r tradingview-webhook-bot/exchange ./
-              cp -r tradingview-webhook-bot/utils ./
-              cp -r tradingview-webhook-bot/storage ./
-              cp -r tradingview-webhook-bot/alerts ./
-              cp tradingview-webhook-bot/main_enhanced.py ./
-            fi
-
-            rsync -av --exclude='tradingview-webhook-bot' \
+            rsync -av \
               --exclude='.git' \
               --exclude='__pycache__' \
+              --exclude='*.pyc' \
               --exclude='logs/' \
               --exclude='storage/' \
               --exclude='.env' \
@@ -84,7 +72,10 @@ jobs:
             # Fix permissions for logs and storage
             echo "🔧 Fixing permissions..."
             sudo chown -R ubuntu:ubuntu ~/tradingview-bot/logs/ ~/tradingview-bot/storage/ 2>/dev/null || true
-            sudo chmod -R 755 ~/tradingview-bot/logs/ ~/tradingview-bot/storage/ 2>/dev/null || true
+            sudo chown -R ubuntu:ubuntu ~/tradingview-bot/tradingview-webhook-bot/storage/ 2>/dev/null || true
+            sudo chmod -R 755 ~/tradingview-bot/logs/ 2>/dev/null || true
+            sudo chmod -R 755 ~/tradingview-bot/storage/ 2>/dev/null || true
+            sudo chmod -R 755 ~/tradingview-bot/tradingview-webhook-bot/storage/ 2>/dev/null || true
 
             # Restart bots
             echo "🚀 Restarting bots..."
@@ -96,7 +87,7 @@ jobs:
               if [ -f "$config" ]; then
                 strategy_name=$(basename "$config" .json | sed 's/config_//')
                 echo "  → Starting $strategy_name"
-                nohup python main_enhanced.py --config "$config" > "logs/bot_${strategy_name}.log" 2>&1 &
+                nohup python tradingview-webhook-bot/main_enhanced.py --config "$config" > "logs/bot_${strategy_name}.log" 2>&1 &
                 BOT_COUNT=$((BOT_COUNT + 1))
               fi
             done
@@ -114,6 +105,9 @@ jobs:
             echo ""
             echo "Active Bot Processes:"
             ps aux | grep 'main_enhanced.py' | grep -v grep | wc -l | xargs echo "  Bots running:"
+            echo ""
+            echo "Directory Structure:"
+            ls -la ~/tradingview-bot/ | grep -E "tradingview|config|strategies"
             echo ""
             echo "Recent Bot Activity:"
             tail -3 ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log 2>/dev/null | jq -r '.message' 2>/dev/null || tail -3 ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log
