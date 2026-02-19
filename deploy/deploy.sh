@@ -146,3 +146,11 @@ log_info "💾 Backup location: $BACKUP_DIR"
 # Show recent logs
 log_info "📋 Recent logs:"
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "tail -10 ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log"
+
+# Fix permissions for logs and storage (important after deployment)
+log_info "Fixing permissions..."
+ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
+    cd ~/tradingview-bot
+    sudo chown -R ubuntu:ubuntu logs/ storage/ 2>/dev/null || true
+    sudo chmod -R 755 logs/ storage/ 2>/dev/null || true
+"

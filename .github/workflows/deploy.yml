@@ -67,6 +67,11 @@ jobs:
 
             rm -rf /tmp/tradingview-deploy
 
+            # Fix permissions for logs and storage
+            echo "🔧 Fixing permissions..."
+            sudo chown -R ubuntu:ubuntu ~/tradingview-bot/logs/ ~/tradingview-bot/storage/ 2>/dev/null || true
+            sudo chmod -R 755 ~/tradingview-bot/logs/ ~/tradingview-bot/storage/ 2>/dev/null || true
+
             # Restart bots
             echo "🚀 Restarting bots..."
             cd ~/tradingview-bot
