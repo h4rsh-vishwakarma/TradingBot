@@ -38,6 +38,13 @@ config/*.backup
 config/*.bak
 config/*.backup*
 
+# All backup files
+*.backup
+*.backup*
+*.bak
+*.broken
+*.beforefix
+
 # IDE
 .vscode/
 .idea/
