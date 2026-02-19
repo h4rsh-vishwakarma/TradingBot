@@ -77,3 +77,43 @@ liquidation-heatmap-bot/trading_events.jsonl
 liquidation-heatmap-bot/tradingview_*.jsonl
 liquidation-heatmap-bot/tradingview_*.jsonl.backup
 liquidation-heatmap-bot/*.tar.gz
+
+# Liquidation bot - runtime and generated files
+liquidation-heatmap-bot/events/*.jsonl
+liquidation-heatmap-bot/logs_emitters_backup*.tar.gz
+liquidation-heatmap-bot/*.csv
+liquidation-heatmap-bot/*.log
+liquidation-heatmap-bot/*.log.gz
+liquidation-heatmap-bot/idempotency_store.db
+liquidation-heatmap-bot/trading_events.jsonl
+liquidation-heatmap-bot/tradingview_signals_*.jsonl*
+liquidation-heatmap-bot/*.html
+liquidation-heatmap-bot/credentials*.json*
+liquidation-heatmap-bot/*.backup
+liquidation-heatmap-bot/*.bak
+liquidation-heatmap-bot/*.tar.gz
+
+# Liquidation bot - duplicate trading_bot directory (already in root)
+liquidation-heatmap-bot/trading_bot/
+
+# Liquidation bot - cache and temp
+liquidation-heatmap-bot/__pycache__/
+liquidation-heatmap-bot/.pytest_cache/
+liquidation-heatmap-bot/.venv/
+liquidation-heatmap-bot/*.pyc
+
+# Liquidation bot - runtime subdirectories
+liquidation-heatmap-bot/logs/
+liquidation-heatmap-bot/storage/
+liquidation-heatmap-bot/events_csv/
+liquidation-heatmap-bot/optimization_results/
+liquidation-heatmap-bot/recon/
+liquidation-heatmap-bot/ledger/
+
+# Liquidation bot - spec-kit backup
+liquidation-heatmap-bot/data_sources_speckit_backup/
+liquidation-heatmap-bot/metrics_speckit_backup/
+
+# Liquidation bot - test files
+liquidation-heatmap-bot/test_*.py
+liquidation-heatmap-bot/test*.json
