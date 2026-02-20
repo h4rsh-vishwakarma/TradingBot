@@ -49,20 +49,20 @@ Integrated **Telegram Alerts Router** with:
 └── .env                # API Keys (Protected via .gitignore)
 ```
 ---
-🔧 Setup & Installation
-Clone the repo:
+# 🔧 Setup & Installation
+### Clone the repo:
 
-Bash
+## Bash
 git clone [https://github.com/h4rsh-vishwakarma/TradingBot.git](https://github.com/h4rsh-vishwakarma/TradingBot.git)
 cd TradingBot
 Install Dependencies:
 
-Bash
+## Bash
 pip install -r requirements.txt
 Configure Environment:
 Create a .env file and add:
 
-Code snippet
+## Code snippet
 BINANCE_API_KEY=your_key
 BINANCE_API_SECRET=your_secret
 TELEGRAM_TOKEN=your_bot_token
@@ -70,12 +70,12 @@ TELEGRAM_CHAT_ID=your_chat_id
 Launch the System:
 Run the master startup script or launch components individually:
 
-PowerShell
+## PowerShell
 python -m core.webhook_server    # Terminal 1
 python -m core.signal_processor  # Terminal 2
 python -m core.reconciler        # Terminal 3
 streamlit run ui.py              # Terminal 4
-📘 Operational Runbook
+#📘 Operational Runbook
 Trade Failure: Check storage/event_logs.jsonl for the specific trade_fail event data.
 
 Position Drift: If the Reconciler alerts an unknown position, verify against the Binance Testnet dashboard immediately.
@@ -91,5 +91,6 @@ Webhook Issues: Ensure the public URL (Ngrok) matches the TradingView Alert URL.
 * **Visuals**: It uses a clean folder tree and formatted code blocks .
 
 **Would you like me to also generate the `requirements.txt` content so you can finalize y
+
 
 
