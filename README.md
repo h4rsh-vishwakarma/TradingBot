@@ -82,7 +82,7 @@ Position Drift: If the Reconciler alerts an unknown position, verify against the
 
 Webhook Issues: Ensure the public URL (Ngrok) matches the TradingView Alert URL.
 
----
+
 ---
 
 ### 💡 Why this README works:
@@ -91,6 +91,7 @@ Webhook Issues: Ensure the public URL (Ngrok) matches the TradingView Alert URL.
 * **Visuals**: It uses a clean folder tree and formatted code blocks .
 
 **Would you like me to also generate the `requirements.txt` content so you can finalize y
+
 
 
 
