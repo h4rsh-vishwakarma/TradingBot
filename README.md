@@ -47,7 +47,7 @@ Integrated **Telegram Alerts Router** with:
 ├── storage/            # JSONL logs & Idempotency DB (Local only)
 ├── ui.py               # Streamlit monitoring dashboard
 └── .env                # API Keys (Protected via .gitignore)
-
+```
 🔧 Setup & Installation
 Clone the repo:
 
@@ -90,3 +90,4 @@ Webhook Issues: Ensure the public URL (Ngrok) matches the TradingView Alert URL.
 * **Visuals**: It uses a clean folder tree and formatted code blocks .
 
 **Would you like me to also generate the `requirements.txt` content so you can finalize y
+
