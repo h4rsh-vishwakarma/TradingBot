@@ -3,3 +3,5 @@ python-dotenv
 rich
 questionary
 streamlit
+portalocker
+flask

@@ -45,3 +45,252 @@
 2026-02-12 20:37:41,477 - INFO - Order Successful! ID: 12216360841
 2026-02-12 20:38:40,483 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
 2026-02-12 20:38:40,876 - INFO - Order Successful! ID: 12216379939
+2026-02-14 18:55:02,692 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-14 18:55:02,980 - INFO - Order Successful! ID: 12267849488
+2026-02-16 13:37:08,029 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-16 13:37:08,218 - ERROR - Binance API Error: Order's notional must be no smaller than 100 (unless you choose reduce only).
+2026-02-16 13:37:17,474 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-16 13:37:17,720 - INFO - Order Successful! ID: 12309260958
+2026-02-16 13:37:24,355 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-16 13:37:24,633 - INFO - Order Successful! ID: 12309262579
+2026-02-16 13:38:13,932 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-16 13:38:14,159 - INFO - Order Successful! ID: 12309279356
+2026-02-16 13:47:56,308 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'LIMIT', 'quantity': 0.002, 'price': 1.0, 'timeInForce': 'GTC'}
+2026-02-16 13:47:56,500 - ERROR - Binance API Error: Price less than min price.
+2026-02-16 13:48:07,809 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'LIMIT', 'quantity': 1.0, 'price': 1.0, 'timeInForce': 'GTC'}
+2026-02-16 13:48:08,009 - ERROR - Binance API Error: Price less than min price.
+2026-02-16 13:48:32,126 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'LIMIT', 'quantity': 1.0, 'price': 1.0, 'timeInForce': 'GTC'}
+2026-02-16 13:48:32,331 - ERROR - Binance API Error: Price less than min price.
+2026-02-16 13:48:48,584 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'LIMIT', 'quantity': 0.002, 'price': 1.0, 'timeInForce': 'GTC'}
+2026-02-16 13:48:48,775 - ERROR - Binance API Error: Price less than min price.
+2026-02-16 13:48:54,096 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'LIMIT', 'quantity': 0.001, 'price': 1.0, 'timeInForce': 'GTC'}
+2026-02-16 13:48:54,289 - ERROR - Binance API Error: Price less than min price.
+2026-02-16 13:49:23,932 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'LIMIT', 'quantity': 0.01, 'price': 1.0, 'timeInForce': 'GTC'}
+2026-02-16 13:49:24,104 - ERROR - Binance API Error: Price less than min price.
+2026-02-16 13:49:35,458 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'LIMIT', 'quantity': 0.01, 'price': 1.0, 'timeInForce': 'GTC'}
+2026-02-16 13:49:35,636 - ERROR - Binance API Error: Price less than min price.
+2026-02-16 13:50:44,865 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'LIMIT', 'quantity': 0.002, 'price': 10000.0, 'timeInForce': 'GTC'}
+2026-02-16 13:50:45,043 - ERROR - Binance API Error: Limit price can't be lower than 65217.46.
+2026-02-16 13:51:10,066 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'LIMIT', 'quantity': 0.002, 'price': 100000.0, 'timeInForce': 'GTC'}
+2026-02-16 13:51:10,293 - INFO - Order Successful! ID: 12309503234
+2026-02-19 22:28:26,568 - INFO - Bot is active and listening for signals...
+2026-02-19 22:34:43,491 - INFO - Processing Signal bcf12224-68b1-4887-ba5b-eb038e4d8a2a: BUY 0.002 BTCUSDT
+2026-02-19 22:34:43,491 - ERROR - Trade Execution Failed: place_order() got an unexpected keyword argument 'side'
+2026-02-19 22:40:45,255 - INFO - Bot is active and listening for signals...
+2026-02-19 22:40:52,309 - INFO - Processing Signal a64eeb02-4d5e-44b0-8b9e-41ab7063432c: BUY 0.002 BTCUSDT
+2026-02-19 22:40:52,310 - ERROR - Trade Execution Failed: place_order() missing 1 required positional argument: 'client'
+2026-02-19 22:41:32,599 - INFO - Bot is active and listening for signals...
+2026-02-19 22:41:36,627 - INFO - Processing Signal 7210c74d-13c9-4a20-bc98-9479c1fbfdf6: BUY 0.002 BTCUSDT
+2026-02-19 22:41:36,628 - ERROR - Trade Execution Failed: place_order() missing 1 required positional argument: 'client'
+2026-02-19 22:45:27,763 - INFO - Bot is active and listening for signals...
+2026-02-19 22:45:30,791 - INFO - Processing Signal f6244e9f-7dcd-4749-b4a1-aff5d0385c84: BUY 0.002 BTCUSDT
+2026-02-19 22:45:30,791 - ERROR - Trade Execution Failed: name 'placed_order' is not defined
+2026-02-19 22:46:01,487 - INFO - Bot is active and listening for signals...
+2026-02-19 22:46:04,517 - INFO - Processing Signal 64b21aa4-aaa2-4059-814f-c828cc79071e: BUY 0.002 BTCUSDT
+2026-02-19 22:46:04,517 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-19 22:46:05,669 - INFO - Order Successful! ID: 12396152458
+2026-02-19 22:46:05,669 - INFO - Trade Executed Successfully: 12396152458
+2026-02-19 22:53:30,830 - INFO - Processing Signal 2504ba3a-b84d-416e-9e37-6816646b7b98: BUY 0.002 BTCUSDT
+2026-02-19 22:53:30,831 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-19 22:53:32,660 - INFO - Order Successful! ID: 12396293714
+2026-02-19 22:53:32,660 - INFO - Trade Executed Successfully: 12396293714
+2026-02-19 22:54:07,764 - INFO - Processing Signal 85507f57-846d-4037-aaf2-425816d84496: BUY 0.002 BTCUSDT
+2026-02-19 22:54:07,765 - ERROR - Unexpected Error: Price is required for LIMIT orders
+2026-02-19 22:54:07,766 - ERROR - Trade Execution Failed: Trade failed - check bot.log for API errors
+2026-02-19 22:57:52,194 - INFO - Processing Signal d37629bc-4844-47d6-9c9b-0a7e902e4926: SELL 0.002 BTCUSDT
+2026-02-19 22:57:52,195 - ERROR - Unexpected Error: Price is required for LIMIT orders
+2026-02-19 22:57:52,196 - ERROR - Trade Execution Failed: Trade failed - check bot.log for API errors
+2026-02-19 22:59:38,424 - INFO - Processing Signal 5b982e54-4620-472d-9602-62f815f12978: SELL 0.002 BTCUSDT
+2026-02-19 22:59:38,424 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'SELL', 'type': 'LIMIT', 'quantity': 0.002, 'price': 100000.0, 'timeInForce': 'GTC'}
+2026-02-19 22:59:40,563 - INFO - Order Successful! ID: 12396410685
+2026-02-19 22:59:40,564 - INFO - Trade Executed Successfully: 12396410685
+2026-02-20 10:11:42,244 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-20 10:11:42,436 - ERROR - Binance API Error: Order's notional must be no smaller than 100 (unless you choose reduce only).
+2026-02-20 10:11:58,078 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-20 10:11:58,257 - ERROR - Binance API Error: Order's notional must be no smaller than 100 (unless you choose reduce only).
+2026-02-20 10:12:23,787 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-20 10:12:23,962 - ERROR - Binance API Error: Order's notional must be no smaller than 100 (unless you choose reduce only).
+2026-02-20 10:14:20,784 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-20 10:14:21,013 - INFO - Order Successful! ID: 12408258334
+2026-02-20 10:23:14,317 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-20 10:23:14,501 - ERROR - Binance API Error: Order's notional must be no smaller than 100 (unless you choose reduce only).
+2026-02-20 10:50:12,926 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-20 10:50:13,126 - ERROR - Binance API Error: Order's notional must be no smaller than 100 (unless you choose reduce only).
+2026-02-20 10:50:20,617 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-20 10:50:20,906 - INFO - Order Successful! ID: 12408889048
+2026-02-20 11:50:39,861 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-20 11:50:40,070 - INFO - Order Successful! ID: 12409918947
+2026-02-20 11:57:54,416 - INFO - Bot is active and listening for signals...
+2026-02-20 12:05:30,384 - INFO - Processing Signal 1116fed3-0771-446e-95aa-d80beb5f7fc2: BUY 0.002 BTCUSDT
+2026-02-20 12:05:30,384 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-20 12:05:31,378 - INFO - Order Successful! ID: 12410168399
+2026-02-20 12:05:31,379 - INFO - Trade Executed Successfully: 12410168399
+2026-02-20 12:06:18,489 - INFO - Processing Signal 383bdaf3-3537-42d9-b03b-5d2cc4ceb8b1: BUY 0.002 BTCUSDT
+2026-02-20 12:06:18,489 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-20 12:06:18,882 - INFO - Order Successful! ID: 12410179993
+2026-02-20 12:06:18,882 - INFO - Trade Executed Successfully: 12410179993
+2026-02-20 12:08:55,293 - INFO - Processing Signal 6883dc4a-afa4-4952-9b51-c3424b7f6d89: BUY 0.002 BTCUSDT
+2026-02-20 12:08:55,293 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-20 12:08:55,535 - INFO - Order Successful! ID: 12410225419
+2026-02-20 12:08:55,536 - INFO - Trade Executed Successfully: 12410225419
+2026-02-20 12:08:59,584 - INFO - Processing Signal 33b41307-4cce-4d61-967c-4c42dbccd4a3: BUY 0.002 BTCUSDT
+2026-02-20 12:08:59,585 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-20 12:08:59,834 - INFO - Order Successful! ID: 12410226155
+2026-02-20 12:08:59,835 - INFO - Trade Executed Successfully: 12410226155
+2026-02-20 13:13:51,705 - INFO - Bot is active and listening for signals...
+2026-02-20 13:13:58,751 - INFO - Processing Signal TEST_T4_UNIQUE_99: BUY 0.002 BTCUSDT
+2026-02-20 13:13:58,752 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-20 13:13:59,562 - INFO - Order Successful! ID: 12411296019
+2026-02-20 13:13:59,562 - INFO - Trade Executed Successfully: 12411296019
+2026-02-20 13:32:02,733 - INFO - Bot is active and listening for signals...
+2026-02-20 13:32:14,828 - INFO - Processing Signal TEST_T4_UNIQUE_98: BUY 0.002 BTCUSDT
+2026-02-20 13:32:14,838 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002, 'newClientOrderId': 'TEST_T4_UN_binance_main_1'}
+2026-02-20 13:32:15,738 - INFO - Order Successful! ID: 12411598542
+2026-02-20 13:32:15,745 - INFO - Trade Executed Successfully: 12411598542
+2026-02-20 13:34:22,087 - INFO - Reconciler active. Monitoring exchange state every 15s...
+2026-02-20 13:34:22,830 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.048
+2026-02-20 13:34:38,060 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.048
+2026-02-20 13:34:48,133 - INFO - Processing Signal TEST_T4_UNIQUE_97: BUY 0.002 BTCUSDT
+2026-02-20 13:34:48,140 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002, 'newClientOrderId': 'TEST_T4_UN_binance_main_1'}
+2026-02-20 13:34:48,463 - INFO - Order Successful! ID: 12411640222
+2026-02-20 13:34:48,467 - INFO - Trade Executed Successfully: 12411640222
+2026-02-20 13:34:53,267 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:35:08,491 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:35:23,722 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:35:38,939 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:35:54,152 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:36:09,366 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:36:24,584 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:36:39,797 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:36:54,987 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:37:10,217 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:37:25,430 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:37:40,652 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:37:55,866 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:38:11,159 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:38:26,364 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:38:41,652 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:38:56,872 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:39:12,077 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:39:27,286 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:39:42,517 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:39:57,729 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:40:12,931 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:40:28,283 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:40:43,493 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:40:58,746 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:41:13,958 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:41:29,162 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:41:44,371 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:41:59,583 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:42:14,804 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:42:30,003 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:42:45,213 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:43:00,420 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:43:15,649 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:43:30,869 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:43:46,151 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:44:01,353 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:44:16,561 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:44:31,780 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:44:47,006 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:45:02,224 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:45:17,433 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:45:32,647 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:45:47,864 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:46:03,070 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:46:18,320 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:46:33,519 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:46:48,736 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:47:03,961 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:47:19,177 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:47:34,409 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:47:49,614 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:48:04,824 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:48:20,092 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:48:35,316 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:48:50,551 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:49:05,756 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:49:20,958 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:49:36,185 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:49:51,576 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:50:06,786 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:50:22,003 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:50:37,221 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:50:52,433 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:51:07,654 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:51:22,949 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:51:38,151 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:51:53,382 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:52:08,597 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:52:23,813 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:52:39,022 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:52:54,232 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:53:09,439 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:53:24,672 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:53:39,880 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:53:55,083 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:54:10,300 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:54:25,520 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:54:40,742 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:54:55,965 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:55:11,163 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:55:26,513 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:55:41,728 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:55:56,968 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:56:12,213 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:56:27,420 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:56:42,643 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:56:57,860 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:57:13,055 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:57:28,269 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 13:59:52,256 - INFO - Bot is active and listening for signals...
+2026-02-20 14:11:54,315 - INFO - Bot is active and listening for signals...
+ every 15s...
+2026-02-20 14:11:55,956 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:12:11,181 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:12:26,391 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:12:41,606 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:12:56,814 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:13:12,031 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:13:27,235 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:13:42,466 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:13:57,699 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:14:12,920 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:14:28,197 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:14:43,420 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:14:58,637 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:15:13,849 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:15:29,066 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:15:44,276 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:15:59,490 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:16:14,726 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:16:29,965 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:16:45,183 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:17:00,403 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:17:15,622 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:17:26,438 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.001}
+2026-02-20 14:17:26,644 - ERROR - Binance API Error: Order's notional must be no smaller than 100 (unless you choose reduce only).
+2026-02-20 14:17:30,821 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.050
+2026-02-20 14:17:31,713 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002}
+2026-02-20 14:17:31,938 - INFO - Order Successful! ID: 12412352786
+2026-02-20 14:17:46,029 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:18:01,242 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:18:16,449 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:18:31,653 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:18:46,864 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:19:02,076 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:19:17,376 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:19:32,605 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:19:47,841 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:20:03,063 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:20:18,288 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:20:33,510 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:20:48,771 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:21:03,991 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:21:19,220 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:21:34,448 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:21:49,688 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:22:04,987 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:22:20,198 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-20 14:22:35,421 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052

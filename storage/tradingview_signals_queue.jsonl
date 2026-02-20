@@ -1,0 +1,17 @@
+{"signal_id": "bcf12224-68b1-4887-ba5b-eb038e4d8a2a", "timestamp": "2026-02-19T17:04:43.335345", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
+{"signal_id": "a64eeb02-4d5e-44b0-8b9e-41ab7063432c", "timestamp": "2026-02-19T17:10:51.750049", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
+{"signal_id": "7210c74d-13c9-4a20-bc98-9479c1fbfdf6", "timestamp": "2026-02-19T17:11:36.326829", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
+{"signal_id": "f6244e9f-7dcd-4749-b4a1-aff5d0385c84", "timestamp": "2026-02-19T17:15:30.647182", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
+{"signal_id": "64b21aa4-aaa2-4059-814f-c828cc79071e", "timestamp": "2026-02-19T17:16:03.903632", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
+{"signal_id": "2504ba3a-b84d-416e-9e37-6816646b7b98", "timestamp": "2026-02-19T17:23:30.522703", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
+{"signal_id": "85507f57-846d-4037-aaf2-425816d84496", "timestamp": "2026-02-19T17:24:06.904520", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "LIMIT"}}
+{"signal_id": "d37629bc-4844-47d6-9c9b-0a7e902e4926", "timestamp": "2026-02-19T17:27:51.733506", "payload": {"symbol": "BTCUSDT", "side": "SELL", "type": "LIMIT", "quantity": 0.002}}
+{"signal_id": "5b982e54-4620-472d-9602-62f815f12978", "timestamp": "2026-02-19T17:29:37.928202", "payload": {"symbol": "BTCUSDT", "side": "SELL", "type": "LIMIT", "quantity": 0.002, "price": 100000.0}}
+{"signal_id": "1116fed3-0771-446e-95aa-d80beb5f7fc2", "timestamp": "2026-02-20T06:35:29.961211", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
+{"signal_id": "383bdaf3-3537-42d9-b03b-5d2cc4ceb8b1", "timestamp": "2026-02-20T06:36:17.557154", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
+{"signal_id": "6883dc4a-afa4-4952-9b51-c3424b7f6d89", "timestamp": "2026-02-20T06:38:54.733946", "payload": {"signal_id": "TEST_T4_UNIQUE_99", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}}
+{"signal_id": "33b41307-4cce-4d61-967c-4c42dbccd4a3", "timestamp": "2026-02-20T06:38:59.158556", "payload": {"signal_id": "TEST_T4_UNIQUE_99", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}}
+{"signal_id": "TEST_T4_UNIQUE_99", "timestamp": "2026-02-20T07:43:58.609699+00:00", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
+{"signal_id": "TEST_T4_UNIQUE_99", "timestamp": "2026-02-20T07:44:00.467005+00:00", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
+{"signal_id": "TEST_T4_UNIQUE_98", "timestamp": "2026-02-20T08:02:13.766729+00:00", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
+{"signal_id": "TEST_T4_UNIQUE_97", "timestamp": "2026-02-20T08:04:47.460647+00:00", "payload": {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.002, "type": "MARKET"}}
