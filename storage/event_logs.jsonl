@@ -157,3 +157,35 @@
 {"timestamp": 1771577799.3281357, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
 {"timestamp": 1771577814.5825093, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
 {"timestamp": 1771577829.8076124, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654725.0836043, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654740.3437126, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654755.569637, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654770.7651904, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654785.9851975, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654801.2122376, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654816.4299273, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654831.6359842, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654846.8636034, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654850.8243515, "event": "signal_received", "signal_id": "win_smoke_1150", "data": {"side": "BUY", "symbol": "BTCUSDT"}}
+{"timestamp": 1771654850.8391602, "event": "order_submitted", "signal_id": "win_smoke_1150", "data": {"symbol": "BTCUSDT", "side": "BUY", "qty": 0.002}}
+{"timestamp": 1771654852.012192, "event": "order_ack", "signal_id": "win_smoke_1150", "data": {"orderId": 12434287978}}
+{"timestamp": 1771654862.0839367, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654877.2977297, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654892.5183392, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654907.7361298, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654922.9583135, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654938.1725373, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654953.4005303, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654968.6102884, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654983.8252892, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771654999.0406687, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771655014.270237, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771655029.4919815, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771655044.6977274, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771655059.9192834, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771655075.1572263, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771655090.3626623, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771655105.6245916, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771655120.8564034, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771655136.0687933, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}
+{"timestamp": 1771655151.2832072, "event": "position_snapshot", "signal_id": "SYSTEM", "data": {"active_count": 1}}

@@ -1,0 +1,13 @@
+[Unit]
+Description=TradingBot Webhook Service
+After=network.target
+
+[Service]
+User=h4rsh # Your Windows/Linux username
+WorkingDirectory=D:/Projects/TradingBot/trading_bot
+Environment="PYTHONPATH=D:/Projects/TradingBot/trading_bot"
+ExecStart=D:/Projects/TradingBot/trading_bot/.venv/Scripts/gunicorn --workers 3 --bind 0.0.0.0:5000 wsgi:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

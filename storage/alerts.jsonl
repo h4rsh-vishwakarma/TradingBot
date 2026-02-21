@@ -4,3 +4,4 @@
 {"timestamp": 1771576214.490545, "message": "Test Alert: System is operational!", "alert_key": "test_key"}
 {"timestamp": 1771576435.002127, "message": "Test Alert: System is operational!", "alert_key": "test_key"}
 {"timestamp": 1771577129.4209352, "message": "Test Alert: System is operational!", "alert_key": "test_key"}
+{"timestamp": 1771655742.08251, "message": "Test Alert: Your TradingBot is connected to Windows!", "alert_key": "test_key"}

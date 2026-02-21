@@ -310,3 +310,38 @@
 2026-02-20 14:26:08,890 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
 2026-02-20 14:26:24,105 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
 2026-02-20 14:26:39,332 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.052
+2026-02-21 11:48:44,267 - INFO - Reconciler active. Monitoring exchange state every 15s...
+2026-02-21 11:48:44,277 - INFO - Bot is active and listening for signals...
+2026-02-21 11:48:45,095 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.056
+2026-02-21 11:49:00,352 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.056
+2026-02-21 11:49:15,573 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.056
+2026-02-21 11:49:30,772 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.056
+2026-02-21 11:49:45,989 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.056
+2026-02-21 11:50:01,221 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.056
+2026-02-21 11:50:16,435 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.056
+2026-02-21 11:50:31,645 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.056
+2026-02-21 11:50:46,871 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.056
+2026-02-21 11:50:50,838 - INFO - Processing Signal win_smoke_1150: BUY 0.002 BTCUSDT
+2026-02-21 11:50:50,846 - INFO - Sending Order: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': 0.002, 'newClientOrderId': 'win_smoke__binance_main_1'}
+2026-02-21 11:50:52,011 - INFO - Order Successful! ID: 12434287978
+2026-02-21 11:50:52,016 - INFO - Trade Executed Successfully: 12434287978
+2026-02-21 11:51:02,093 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:51:17,306 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:51:32,527 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:51:47,740 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:52:02,967 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:52:18,181 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:52:33,410 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:52:48,617 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:53:03,833 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:53:19,049 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:53:34,279 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:53:49,500 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:54:04,706 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:54:19,928 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:54:35,166 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:54:50,366 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:55:05,636 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:55:20,863 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:55:36,076 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
+2026-02-21 11:55:51,292 - INFO - AUDIT: Active Position -> BTCUSDT | Size: 1.058
