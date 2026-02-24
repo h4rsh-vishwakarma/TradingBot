@@ -1,0 +1,5 @@
+flask
+ccxt
+python-dotenv
+requests
+

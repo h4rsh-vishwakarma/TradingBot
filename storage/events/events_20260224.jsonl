@@ -1,0 +1,2 @@
+{"timestamp": "2026-02-24T13:33:10.733499+00:00", "event_type": "signal_received", "signal_id": "TV-20260224133310-SMC_LuxAlg-0apn", "strategy": "SMC_LuxAlgo", "side": "buy", "symbol": "BTCUSDT", "metadata": {"price": 63000, "timeframe": "15m", "stop_loss": null, "take_profit": null}}
+{"timestamp": "2026-02-24T13:33:12.899899+00:00", "event_type": "signal_validated", "signal_id": "TV-20260224133310-SMC_LuxAlg-0apn", "valid": false, "errors": ["Strategy 'SMC_LuxAlgo' not enabled", "Invalid side: buy", "Missing or invalid SL/TP"]}

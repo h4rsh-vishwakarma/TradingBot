@@ -1,95 +1,18 @@
-# Python
+# Environments
+venv/
+.env
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-*.egg
-*.egg-info/
-build/
-dist/
-venv/
-env/
-.venv
+
+# Credentials & Keys
+credentials.json
+*.pem
+*.key
+
+# Sensitive Configs (Keep the template, ignore the real one)
+config/*.json
+!config/config_template.json
 
 # Logs
-logs/
 *.log
-
-# Sensitive data - DO NOT COMMIT
-.env
-credentials.json
-google_credentials.json
-
-# Storage
-storage/**/*.jsonl
-storage/**/*.db
-storage/**/*.json
-storage/archive/
-tradingview-webhook-bot/storage/**/*.jsonl
-tradingview-webhook-bot/storage/**/*.db
-tradingview-webhook-bot/storage/**/*.json
-tradingview-webhook-bot/storage/archive/
-
-# Config backups
-config/*.backup
-config/*.bak
-config/*.backup*
-
-# All backup files
-*.backup
-*.backup*
-*.bak
-*.broken
-*.beforefix
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Claude
-.claude/
-
-# Local backups
-*.local.backup
-*.server.backup
-
-# Liquidation bot
-liquidation-heatmap-bot/.pytest_cache/
-liquidation-heatmap-bot/__pycache__/
-liquidation-heatmap-bot/.venv/
-liquidation-heatmap-bot/*.pyc
-liquidation-heatmap-bot/backtest_artifacts/
-liquidation-heatmap-bot/backtester/
-liquidation-heatmap-bot/events/
-liquidation-heatmap-bot/logs/
-liquidation-heatmap-bot/storage/
-liquidation-heatmap-bot/events_csv/
-liquidation-heatmap-bot/optimization_results/
-liquidation-heatmap-bot/recon/
-liquidation-heatmap-bot/ledger/
-liquidation-heatmap-bot/*.jsonl
-liquidation-heatmap-bot/*.csv
-liquidation-heatmap-bot/*.db
-liquidation-heatmap-bot/*.log
-liquidation-heatmap-bot/*.log.gz
-liquidation-heatmap-bot/*.png
-liquidation-heatmap-bot/*.html
-liquidation-heatmap-bot/*.tar.gz
-liquidation-heatmap-bot/tradingview_*.jsonl*
-liquidation-heatmap-bot/logs_emitters_backup*.tar.gz
-liquidation-heatmap-bot/credentials*.json*
-liquidation-heatmap-bot/test_*.py
-liquidation-heatmap-bot/test*.json
-liquidation-heatmap-bot/data_sources_speckit_backup/
-liquidation-heatmap-bot/metrics_speckit_backup/
-
-# Liquidation bot - duplicate trading_bot directory (already in root)
-liquidation-heatmap-bot/trading_bot/
+logs/
