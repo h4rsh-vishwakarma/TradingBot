@@ -1,5 +1,12 @@
-flask
-ccxt
-python-dotenv
-requests
+# Webhook & Server
+flask==3.0.0
+gunicorn==21.2.0
+pydantic==2.10.0
 
+# Trading & Exchange
+ccxt==4.1.0
+requests==2.31.0
+python-dotenv==1.0.0
+
+# Testing & Logic
+pytest==8.0.0
