@@ -1,60 +1,58 @@
-📡 TradingView Webhook Trading Bot - Technical Documentation
-Project: Multi-Strategy TradingView Signal Trading Bot (Production Grade)
+# 📡 TradingView Webhook Trading Bot - Technical Documentation
 
-Last Updated: February 25, 2026
+**Project:** Multi-Strategy TradingView Signal Trading Bot (Production Grade)  
+**Last Updated:** February 25, 2026  
+**Status:** Active Deployment (Branch: `harsh`)  
+**Server:** `ubuntu@ip-172-31-11-197`
 
-Status: Active Deployment (Branch: harsh)
+---
 
-Server: ubuntu@ip-172-31-11-197
+## 📚 Table of Contents
+1. [New Production Features](#-new-production-features)
+2. [System Architecture](#-system-architecture)
+3. [Setup & Deployment](#-setup--deployment)
+4. [Signal Validation (Pydantic v2)](#-signal-validation-pydantic-v2)
+5. [Deterministic Position Ledger](#-deterministic-position-ledger)
+6. [CI/CD & Automation](#-cicd--automation)
+7. [File Structure](#-file-structure)
+8. [Monitoring & Runbook](#-monitoring--runbook)
 
-📚 Table of Contents
-New Production Features
+---
 
-System Architecture
-
-Setup & Deployment
-
-Signal Validation (Pydantic v2)
-
-Deterministic Position Ledger
-
-CI/CD & Automation
-
-Monitoring & Runbook
-
-🚀 New Production Features
+## 🚀 New Production Features
 The system has been hardened with the following enterprise-grade features:
 
-Pydantic v2 Schemas: Strict "Type-Safe" validation for all incoming signals. Malformed data is rejected at the gateway before reaching the engine.
+* **Pydantic v2 Schemas**: Strict "Type-Safe" validation for all incoming signals. Malformed data is rejected at the gateway before reaching the engine.
+* **Deterministic Ledger**: Advanced accounting using **Weighted Average Entry Price (WAEP)** and **Realized PnL** with JSON persistence.
+* **GitHub Actions CI**: Automated testing pipeline that audits Ledger math and Schema integrity on every push to the `harsh` branch.
+* **Atomic JSONL Storage**: Crash-safe signal queuing with offset management to ensure no signal is ever lost or double-processed.
+* **Interactive Telegram Control**: Real-time status reports (`/status`) and emergency stop (`/stop`) capabilities.
 
-Deterministic Ledger: Advanced accounting using Weighted Average Entry Price (WAEP) and Realized PnL with JSON persistence.
+---
 
-GitHub Actions CI: Automated testing pipeline that audits Ledger math and Schema integrity on every push to the harsh branch.
-
-Atomic JSONL Storage: Crash-safe signal queuing with offset management to ensure no signal is ever lost or double-processed.
-
-Interactive Telegram Control: Real-time status reports (/status) and emergency stop (/stop) capabilities.
-
-🏗 System Architecture
+## 🏗 System Architecture
 The bot operates on a decoupled architecture to ensure maximum uptime and reliability:
 
-Webhook Server (Flask/Gunicorn): Receives, validates, and enqueues signals.
 
-JSONL Queue: Serves as a persistent buffer between the web and the trading engine.
 
-Orchestrator (The Engine): Consumes signals, manages risk, executes trades on Binance, and maintains the Ledger.
+* **Webhook Server (Flask/Gunicorn)**: Receives, validates, and enqueues signals.
+* **JSONL Queue**: Serves as a persistent buffer between the web and the trading engine.
+* **Orchestrator (The Engine)**: Consumes signals, manages risk, executes trades on Binance, and maintains the Ledger.
+* **Reconciliation Loop**: Periodically audits the local Ledger against actual Binance positions to detect "drift".
 
-Reconciliation Loop: Periodically audits the local Ledger against actual Binance positions to detect "drift."
+---
 
-⚙️ Setup & Deployment
-1. Installation
-Bash
+## ⚙️ Setup & Deployment
+
+### 1. Installation
+```bash
 # Navigate to project root
 cd /home/ubuntu/Multi-Strategy-Crypto-Trading-Systems
 source venv/bin/activate
 
 # Install Production Requirements
 pip install pydantic flask gunicorn python-dotenv ccxt
+
 2. Service Management (Systemd)
 The bot is managed as two independent background services:
 
@@ -109,7 +107,7 @@ Installs all production dependencies.
 Ledger Integrity Test: Executes test_ledger.py to ensure math logic hasn't regressed.
 
 📁 File Structure
-Plaintext
+```
 /home/ubuntu/Multi-Strategy-Crypto-Trading-Systems/
 ├── schemas/
 │   └── models.py             # Pydantic validation rules
@@ -127,6 +125,7 @@ Plaintext
 │   ├── ledger_state.json     # Persisted PnL Data
 │   └── idempotency.db        # Duplicate trade protection
 └── enhanced_trading_bot_remote.py # Main Bot Orchestrator
+```
 🛠 Monitoring & Runbook
 Log Inspection
 Bash
@@ -140,7 +139,7 @@ Stop Engine: Send /stop via Telegram or run sudo systemctl stop tv-engine.
 
 Data Recovery: If the queue becomes corrupted, the bot will automatically move malformed signals to a Dead Letter Queue (dlq.jsonl) to prevent a total crash.
 
-Developed by: Harsh Vishwakarma
+Developed by: Harsh
 
 Version: 2.6.0 (Production Stable)
 
