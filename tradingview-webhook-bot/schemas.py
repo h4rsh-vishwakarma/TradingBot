@@ -13,25 +13,42 @@ class SignalStatus(str, Enum):
 class OrderStatus(str, Enum):
     PENDING = "pending"
     FILLED = "filled"
-    CANCELLED = "cancelled"
+    CAN_CELLED = "cancelled"
     REJECTED = "rejected"
+
+# --- NEW: Senior ki requirement ke mutabiq Payload Schema ---
+class TradingViewPayload(BaseModel):
+    symbol: str
+    action: str  # buy/sell/long/short
+    quantity: float = Field(gt=0)
+    price: float = Field(gt=0)
+    strategy: str = "default"
+    secret: Optional[str] = None
 
 class SignalEvent(BaseModel):
     signal_id: str
-    strategy_id: str
-    symbol: str
-    action: str  # buy/sell/long/short
-    quantity: float
-    price: float
-    received_at: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
     status: SignalStatus = SignalStatus.RECEIVED
-    raw_payload: Dict[str, Any]
-
-    @field_validator('strategy_id', mode='before') # Updated syntax
+    payload: TradingViewPayload  # Linking the payload model
+    
+    # Validation ke liye strategy_id helper (Agar aapko alag se chahiye)
+    @field_validator('status', mode='before')
     @classmethod
-    def clean_strategy_name(cls, v):
-        if not isinstance(v, str):
-            return v
+    def validate_status(cls, v):
+        if isinstance(v, str):
+            return v.lower()
+        return v
+
+    def model_dump_json(self, **kwargs):
+        # Senior's Atomic Enqueue requirement: mode='json'
+        return self.model_dump(mode='json', **kwargs)
+
+# --- Compatibility Layer ---
+# Agar aapka purana code strategy_id dhund raha hai
+class SignalEventLegacy(SignalEvent):
+    @property
+    def strategy_id(self):
+        v = self.payload.strategy
         if "Smart Money Concepts" in v:
             return "luxalgo_smc"
         return v.lower().replace(" ", "_")

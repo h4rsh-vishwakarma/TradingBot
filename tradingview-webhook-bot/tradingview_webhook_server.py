@@ -6,8 +6,13 @@ from pathlib import Path
 from flask import Flask, request, jsonify
 from datetime import datetime, timezone
 from pydantic import ValidationError
+from dotenv import load_dotenv
 
-# --- PATH FIX START ---
+# --- 1. ENVIRONMENT LOAD ---
+# Ye sabse pehle hona chahiye
+load_dotenv() 
+
+# --- 2. PATH FIX ---
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -25,26 +30,21 @@ except ImportError:
         module = importlib.util.module_from_spec(spec)
         sys.modules["tradingview_webhook_bot"] = module
         spec.loader.exec_module(module)
-# --- PATH FIX END ---
 
-# Import validated storage and new schemas
+# Imports for validation and storage
 from tradingview_webhook_bot.storage.jsonl_queue import append_jsonl
-from schemas.models import TradingViewPayload, SignalEvent, SignalStatus
+# Ensure schemas.py is in the right location for your senior's requirement
+from tradingview_webhook_bot.schemas import TradingViewPayload, SignalEvent, SignalStatus
 
-# Logging setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def create_app(config=None):
-    """
-    Application Factory: Support for Production, Testing, and Pydantic Validation.
-    """
     app = Flask(__name__)
     app.config.update(config or {})
 
     @app.route('/health', methods=['GET'])
     def health():
-        """Basic health check for Nginx/Uptime monitoring."""
         return jsonify({
             "status": "healthy",
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -53,33 +53,32 @@ def create_app(config=None):
 
     @app.route('/webhook/tradingview', methods=['POST'])
     def webhook():
-        """
-        Receives signals, validates via Pydantic, and enqueues.
-        """
-        # Configuration
-        webhook_secret = app.config.get("WEBHOOK_SECRET") or os.getenv("WEBHOOK_SECRET", "default_secret")
-        queue_path = app.config.get("QUEUE_PATH") or os.getenv("QUEUE_PATH", "storage/signals.jsonl")
+        # --- 3. CONFIGURATION FROM ENV ---
+        webhook_secret = os.getenv("WEBHOOK_SECRET", "default_secret")
+        queue_path = os.getenv("QUEUE_PATH", "storage/signals.jsonl")
 
-        # 1. Security Check
-        auth_token = request.headers.get("X-Webhook-Secret")
-        if not auth_token or auth_token != webhook_secret:
-            logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
-            return jsonify({"error": "Unauthorized"}), 401
-
-        # 2. Raw Data Acquisition
+        # 4. RAW DATA ACQUISITION
         raw_data = request.get_json()
         if not raw_data:
             return jsonify({"error": "No JSON payload received"}), 400
 
+        # --- 5. UPDATED SECURITY CHECK (Header OR Payload) ---
+        # TradingView aksar payload mein secret bhejta hai
+        auth_header = request.headers.get("X-Webhook-Secret")
+        auth_payload = raw_data.get("secret") # Check inside JSON
+
+        if not (auth_header == webhook_secret or auth_payload == webhook_secret):
+            logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
+            return jsonify({"error": "Unauthorized"}), 401
+
         try:
-            # 3. Pydantic Validation (Canonical Schema)
-            # This handles type checking, value constraints (qty > 0), and normalization
+            # 6. PYDANTIC VALIDATION
             validated_payload = TradingViewPayload(**raw_data)
 
-            # 4. Signal ID & Event Generation
+            # 7. SIGNAL ID GENERATION
             ts = datetime.now(timezone.utc)
             signal_id = f"TV-{ts.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:8]}"
-            
+
             event = SignalEvent(
                 signal_id=signal_id,
                 timestamp=ts,
@@ -87,12 +86,11 @@ def create_app(config=None):
                 status=SignalStatus.RECEIVED
             )
 
-            # 5. Atomic Enqueue
-            # We use model_dump() to convert the Pydantic object to a serializable dict
+            # 8. ATOMIC ENQUEUE
             success = append_jsonl(queue_path, event.model_dump(mode='json'))
 
             if success:
-                logger.info(f"✅ Signal Validated & Enqueued: {signal_id} | Symbol: {validated_payload.symbol}")
+                logger.info(f"✅ Signal Enqueued: {signal_id} | Symbol: {validated_payload.symbol}")
                 return jsonify({
                     "status": "enqueued",
                     "signal_id": signal_id,
@@ -102,18 +100,16 @@ def create_app(config=None):
                 raise IOError(f"Could not write to {queue_path}")
 
         except ValidationError as e:
-            # Returns 422 Unprocessable Entity for schema mismatches
-            logger.warning(f"❌ Validation Failed for request from {request.remote_addr}: {e.json()}")
-            return jsonify({
-                "error": "Validation Failed",
-                "details": e.errors()
-            }), 422
-            
+            logger.warning(f"❌ Validation Failed: {e.json()}")
+            return jsonify({"error": "Validation Failed", "details": e.errors()}), 422
         except Exception as e:
             logger.error(f"❌ System Error: {str(e)}")
             return jsonify({"error": "Internal Server Error"}), 500
 
     return app
 
+# Add this for Gunicorn/Standalone execution
+app = create_app()
 
-
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
