@@ -1,0 +1,15 @@
+[Unit]
+Description=Trading Engine Orchestrator
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems
+Environment="PATH=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems/venv/bin"
+Environment="PYTHONPATH=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems"
+ExecStart=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems/venv/bin/python3 tradingview-webhook-bot/main_engine.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
