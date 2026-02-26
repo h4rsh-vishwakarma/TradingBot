@@ -3,6 +3,8 @@ import logging
 import os
 from pathlib import Path
 
+# Google Sheets Logger import
+from tradingview_webhook_bot.storage.sheets_logger import GoogleSheetsLogger
 # Absolute imports using the injected module name
 from tradingview_webhook_bot.storage.jsonl_consumer import JsonlOffsetConsumer
 from tradingview_webhook_bot.ledger.positions import PositionLedger
@@ -20,6 +22,9 @@ class Orchestrator:
         self.ledger = PositionLedger(self.ledger_path)
         self.alerts = AlertRouter(self.alerts_path)
         
+        # Service Account JSON key path verify karein
+        self.sheets_logger = GoogleSheetsLogger(json_key="service_account.json")
+        
         self.consumer = JsonlOffsetConsumer(
             queue_path=self.queue_path,
             offset_path=self.offset_path
@@ -32,28 +37,37 @@ class Orchestrator:
         try:
             payload = event.get("payload", {})
             symbol = payload.get("symbol")
-            side = payload.get("action") # 'action' (BUY/SELL) side ban jayega
+            side = payload.get("action") # 'action' (BUY/SELL)
             qty = float(payload.get("quantity", 0))
             price = float(payload.get("price", 0))
+            strategy = payload.get("strategy", "N/A")
 
             if not symbol or not side:
                 return True
 
             logger.info(f"⚡ Executing: {side} {qty} {symbol} @ {price}")
-            
-            # --- FIX START ---
-            # Grep ke mutabik sahi method 'apply_fill' hai
+
+            # 1. Update Ledger
             self.ledger.apply_fill(
-                symbol=symbol, 
-                side=side, 
-                qty=qty, 
+                symbol=symbol,
+                side=side,
+                qty=qty,
                 price=price
             )
-            # --- FIX END ---
-            
-            self.alerts.send(f"✅ Ledger Updated: {side} {symbol}", severity="INFO")
+
+            # 2. Log to Google Sheets
+            self.sheets_logger.log_trade(
+                symbol=symbol,
+                action=side,
+                qty=qty,
+                price=price,
+                strategy=strategy
+            )
+
+            # 3. Send Alert
+            self.alerts.send(f"✅ Ledger & Sheets Updated: {side} {symbol}", severity="INFO")
             return True
-            
+
         except Exception as e:
             logger.error(f"❌ Handle Signal Error: {e}")
             self.alerts.send(f"CRITICAL: Orchestrator error: {str(e)}", severity="CRITICAL")
@@ -66,10 +80,10 @@ class Orchestrator:
             try:
                 # Consumer's poll method calls handle_signal
                 stats = self.consumer.poll(handler=self.handle_signal, batch_size=10)
-                
+
                 if stats.get("processed", 0) > 0:
                     logger.info(f"📊 Engine Stats: {stats}")
-                
+
                 time.sleep(1)
             except Exception as e:
                 logger.error(f"🔄 Loop Error: {e}")
