@@ -125,7 +125,6 @@ Ledger Integrity Test: Executes test_ledger.py to ensure math logic hasn't regre
 │   ├── ledger_state.json     # Persisted PnL Data
 │   └── idempotency.db        # Duplicate trade protection
 └── enhanced_trading_bot_remote.py # Main Bot Orchestrator
-```
 🛠 Monitoring & Runbook
 Log Inspection
 Bash
