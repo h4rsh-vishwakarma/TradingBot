@@ -73,3 +73,40 @@ Verify that the output says: "✅ TEST PASSED: Ledger math is correct!".
 Rotate Secrets: Change the WEBHOOK_SECRET in .env every 90 days.
 
 Update IP: If the server IP changes, update the Webhook URL in all TradingView Alerts.
+
+
+## 7. Trading Modes & Safety Gate
+Bot mein ek built-in safety mechanism hai jo accidental real trades ko rokta hai. Isse .env file ke zariye control kiya jata hai.
+
+A. Operational ModesModeALLOW_REAL_TRADESRUN_MODEDescriptionDevelopmentfalsedevelopmentSirf logs aur ledger update honge. No real trades.StagingfalseproductionProduction environment mein test run (Dry Run).Live TradingtrueproductionREAL MONEY ACTIVE. Bot Binance/Exchange par orders bhejega.
+
+
+B. How to Enable Real Trading
+Agar aapko ledger trading se real trading par switch karna hai:
+
+Stop the Engine:
+
+Bash
+sudo systemctl stop tv-engine
+Update .env Configuration:
+nano .env
+
+Plaintext
+ALLOW_REAL_TRADES=true
+RUN_MODE=production
+Verify Secrets: Ensure BINANCE_API_KEY aur BINANCE_SECRET sahi hain.
+
+Restart & Monitor:
+
+Bash
+sudo systemctl start tv-engine
+# Monitor logs for the 'REAL TRADES ACTIVE' flag
+sudo journalctl -u tv-engine -f
+7. Reconciliation & Maintenance
+Bot har /status request par internal ledger aur exchange balance ko match karta hai.
+
+Manual Recon: Telegram par /status command bhejein.
+
+Drift Alert: Agar ⚠️ Drift Alert aata hai, toh iska matlab hai manual intervention zaroori hai (Internal ledger aur real balance mismatch hai).
+
+Log Rotation: Alerts aur signals storage/*.jsonl mein save hote hain. Mahine mein ek baar purane logs ko archive karne ki salah di jati hai.
