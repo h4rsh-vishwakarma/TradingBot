@@ -2,11 +2,17 @@ import sys
 import os
 import logging
 from pathlib import Path
+from dotenv import load_dotenv
 
-# --- PATH FIX START (Exactly as used in your server file) ---
+# --- PATH FIX START ---
 ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+
+# Explicitly load .env from the root directory
+env_path = ROOT_DIR / ".env"
+load_success = load_dotenv(dotenv_path=env_path)
+# --- PATH FIX END ---
 
 try:
     import tradingview_webhook_bot
@@ -21,28 +27,30 @@ except ImportError:
         module = importlib.util.module_from_spec(spec)
         sys.modules["tradingview_webhook_bot"] = module
         spec.loader.exec_module(module)
-# --- PATH FIX END ---
 
-# AB YAHAN DHYAN DEIN: 
-# Kyunki 'core' folder 'tradingview-webhook-bot' ke andar hai, 
-# hum use hamare inject kiye hue module ke through import karenge.
 try:
     from tradingview_webhook_bot.core.orchestrator import Orchestrator
-    print("✅ Orchestrator loaded successfully.")
+    # print hata kar logging use karein consistent rehne ke liye
 except ImportError as e:
-    print(f"❌ Import failed: {e}")
-    # Fallback: Agar upar waala fail ho toh direct import try karein (folder path add karke)
     sys.path.append(str(ROOT_DIR / "tradingview-webhook-bot"))
     from core.orchestrator import Orchestrator
 
-logging.basicConfig(level=logging.INFO)
+# Setup Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-    print("🎬 Starting Trading Engine (Orchestrator)...")
+    logger.info(f"📁 Root Directory: {ROOT_DIR}")
+    logger.info(f"🔐 .env Load Status: {load_success}")
+    logger.info("🎬 Starting Trading Engine (Orchestrator)...")
+    
     try:
         bot = Orchestrator()
         bot.run()
     except KeyboardInterrupt:
-        print("\n🛑 Engine stopped by user.")
+        logger.info("🛑 Engine stopped by user.")
     except Exception as e:
-        print(f"❌ Engine Crash: {e}")
+        logger.error(f"❌ Engine Crash: {e}")
