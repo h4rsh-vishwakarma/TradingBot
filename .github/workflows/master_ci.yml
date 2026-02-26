@@ -1,0 +1,54 @@
+name: Master Trading CI
+
+on:
+  push:
+    branches: [ "main", "harsh" ]
+  pull_request:
+    branches: [ "main", "harsh" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      # Agar future mein Redis ya DB chahiye toh yahan add kar sakte hain
+      
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest pytest-cov pydantic flask python-dotenv gunicorn
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings.
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run Comprehensive Tests (Pytest)
+      env:
+        WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET || 'test_secret' }}
+        ALLOW_REAL_TRADES: "false"
+        RUN_MODE: "development"
+        QUEUE_PATH: "storage/signals.jsonl"
+        OFFSET_PATH: "storage/signals.offset"
+        LEDGER_PATH: "storage/ledger_state.json"
+      run: |
+        # Ensure storage directory exists for tests
+        mkdir -p storage
+        pytest tests/test_suite.py -v
+
+    - name: Security Scan (Bandit)
+      run: |
+        pip install bandit
+        bandit -r tradingview-webhook-bot/ -x tests/
