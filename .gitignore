@@ -16,3 +16,9 @@ config/*.json
 # Logs
 *.log
 logs/
+
+# Storage & Trading Data
+storage/*.jsonl
+storage/*.json
+storage/*.db
+storage/*.offset
