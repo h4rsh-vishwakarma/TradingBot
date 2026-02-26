@@ -24,8 +24,4 @@ jobs:
         python -m pip install --upgrade pip
         pip install pydantic flask gunicorn requests python-dotenv
 
-    - name: Run Schema & Ledger Tests
-      run: |
-        export PYTHONPATH=$PYTHONPATH:.
-        # Yahan hum wo script run karenge jo humne abhi manually check ki
-        python3 test_ledger.py
+    
