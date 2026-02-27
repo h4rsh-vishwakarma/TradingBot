@@ -3,39 +3,47 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# 1. BASE_DIR determine karein (Project Root)
+# 1. Project Root ki absolute path nikaalein
 BASE_DIR = Path(__file__).resolve().parent
+ROOT_STR = str(BASE_DIR)
 
-# 2. Sabse Pehle Root ko path mein sabse upar (index 0) rakhein
-# Isse 'schemas' folder hamesha mil jayega
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
+# 2. Path Injection (Bulletproof Fix):
+# Hum sys.path ko puri tarah reconstruct kar rahe hain taaki 
+# Project Root (index 0) par rahe aur venv ke paths interfere na karein.
+sys.path = [ROOT_STR, os.path.join(ROOT_STR, "tradingview-webhook-bot")] + [
+    p for p in sys.path if p not in [ROOT_STR, os.path.join(ROOT_STR, "tradingview-webhook-bot")]
+]
 
-# 3. Hyphenated folder ko path mein add karein
-SUB_FOLDER = BASE_DIR / "tradingview-webhook-bot"
-if str(SUB_FOLDER) not in sys.path:
-    sys.path.insert(1, str(SUB_FOLDER))
-
-load_dotenv()
+# 3. Environment variables load karein
+load_dotenv(os.path.join(ROOT_STR, ".env"))
 
 try:
-    # Yahan hum direct module import karenge bina 'tradingview-webhook-bot' prefix ke
-    # Kyunki humne SUB_FOLDER ko path mein daal diya hai
-    from tradingview_webhook_server import create_app
-    print("✅ Webhook Server module loaded correctly.")
+    # Diagnostic Info: Senior-level logging for startup issues
+    print(f"--- Gunicorn Startup Diagnostic ---")
+    print(f"ROOT_DIR: {ROOT_STR}")
+    print(f"SYS.PATH[0]: {sys.path[0]}")
     
+    # Sabse pehle 'schemas' ko as a package verify karein
     import schemas.models
     print("✅ Schemas package verified.")
+
+    # Phir main app load karein bina sub-folder prefix ke
+    from tradingview_webhook_server import create_app
+    app = create_app()
+    print("✅ Webhook Server module loaded correctly.")
+
 except ImportError as e:
-    print(f"❌ Import Error: {e}")
-    print("\n--- Diagnostic Info ---")
-    print(f"ROOT: {BASE_DIR}")
-    print(f"SYS.PATH TOP 3: {sys.path[:3]}")
+    # Day 4 Requirement: Error logging for diagnostic purposes
+    print(f"❌ Critical Import Error: {e}")
+    print(f"Check if {ROOT_STR}/schemas/__init__.py exists!")
+    sys.exit(1)
+except Exception as e:
+    print(f"❌ Unexpected Error during startup: {e}")
     sys.exit(1)
 
-app = create_app()
-
+# Gunicorn entries ke liye 'app' object globally available hai
 if __name__ == "__main__":
+    # Manual testing mode (Day 5 Dry-run check)
     port = int(os.getenv("PORT", 5000))
-    print(f"🚀 Server starting on http://0.0.0.0:{port}")
+    print(f"🚀 Manual Startup on http://0.0.0.0:{port}")
     app.run(host="0.0.0.0", port=port)

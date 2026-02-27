@@ -1,146 +1,111 @@
 import os
+import logging
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 from dotenv import load_dotenv
-from utils.logger import setup_logger
 
-load_dotenv()
-
-logger = setup_logger('binance_client')
+# Using the project's standard logger instead of a custom setup_logger if possible
+logger = logging.getLogger("tradingview_webhook_bot.exchange")
 
 class BinanceClient:
-    """Binance Futures API Client using python-binance library"""
-    
-    def __init__(self, api_key=None, api_secret=None, testnet=False):
+    """
+    Advanced Binance Futures API Client.
+    Supports: Safety Gates, Testnet Staging, and Reconciliation.
+    """
+
+    def __init__(self, api_key=None, api_secret=None, testnet=None):
+        load_dotenv()
+        
+        # Priority: Constructor Arg > Environment Variable
         self.api_key = api_key or os.getenv('BINANCE_API_KEY')
         self.api_secret = api_secret or os.getenv('BINANCE_API_SECRET')
-        self.testnet = testnet or os.getenv('BINANCE_TESTNET', 'False').lower() == 'true'
         
-        # Initialize python-binance Client
-        self.client = Client(self.api_key, self.api_secret, testnet=self.testnet)
-        
-        if self.testnet:
-            logger.info("[TESTNET] Binance Futures TESTNET mode enabled")
+        # Day 3 Requirement: Seamless Testnet/Live switching for Staging
+        if testnet is not None:
+            self.testnet = testnet
         else:
-            logger.info("[LIVE] Binance Futures LIVE mode enabled")
-        
-        # Test connection
+            self.testnet = os.getenv('BINANCE_TESTNET', 'true').lower() == 'true'
+
+        # Day 1 Requirement: ALLOW_REAL_TRADES Safety Gate
+        self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
+
         try:
-            # Test with futures_account() call
-            account = self.client.futures_account()
-            logger.info(f"[OK] Connected to Binance Futures")
-        except BinanceAPIException as e:
-            logger.error(f"[ERROR] Failed to connect to Binance: {e}")
+            self.client = Client(self.api_key, self.api_secret, testnet=self.testnet)
+            
+            # Connectivity Smoke Test
+            self.client.futures_account_balance()
+            mode = "TESTNET" if self.testnet else "LIVE"
+            logger.info(f"✅ Connected to Binance Futures [{mode}] | Real Trades: {self.allow_real}")
+        except Exception as e:
+            logger.error(f"❌ Connection Failed: {e}")
             raise
-    
-    def get_balance(self):
-        """Get USDT balance"""
-        try:
-            account = self.client.futures_account()
-            for asset in account['assets']:
-                if asset['asset'] == 'USDT':
-                    return float(asset['availableBalance'])
-            return 0.0
-        except Exception as e:
-            logger.error(f"Failed to fetch balance: {e}")
-            return 0.0
-    
-    def get_current_price(self, symbol):
-        """Get current market price"""
-        try:
-            ticker = self.client.futures_symbol_ticker(symbol=symbol)
-            return float(ticker['price'])
-        except Exception as e:
-            logger.error(f"Failed to fetch price for {symbol}: {e}")
-            return 0.0
-    
-    def get_positions(self):
-        """Get all open positions"""
+
+    def get_audit_data(self):
+        """
+        Day 4 Requirement: Reconciliation Metrics.
+        Returns a simplified dict of current exchange positions for drift detection.
+        """
         try:
             positions = self.client.futures_position_information()
-            # Filter only positions with non-zero size
-            open_positions = [
-                p for p in positions 
-                if float(p.get('positionAmt', 0)) != 0
-            ]
-            return open_positions
-        except Exception as e:
-            logger.error(f"Failed to fetch positions: {e}")
-            return []
-    
-    def get_position(self, symbol):
-        """Get specific position"""
-        try:
-            positions = self.client.futures_position_information(symbol=symbol)
+            audit_map = {}
             for pos in positions:
-                if float(pos.get('positionAmt', 0)) != 0:
-                    return pos
-            return None
+                amt = float(pos.get('positionAmt', 0))
+                if amt != 0:
+                    audit_map[pos['symbol']] = {
+                        "quantity": amt,
+                        "entry_price": float(pos.get('entryPrice', 0))
+                    }
+            return audit_map
         except Exception as e:
-            logger.error(f"Failed to get position for {symbol}: {e}")
-            return None
-    
-    def set_leverage(self, symbol, leverage):
-        """Set leverage for symbol"""
+            logger.error(f"Failed to fetch audit data: {e}")
+            return {}
+
+    def execute_futures_order(self, symbol, side, quantity, price=None, order_type='MARKET'):
+        """
+        Execute order with strict Day 1 Safety Gate checks.
+        """
+        # --- SAFETY GATE ---
+        if not self.allow_real:
+            logger.warning(f"🚫 SAFETY GATE: Blocked {side} {quantity} {symbol} (Mode: Dry-Run)")
+            return {"status": "SKIPPED", "msg": "Real trades disabled in .env"}
+
         try:
-            self.client.futures_change_leverage(symbol=symbol, leverage=leverage)
-            logger.info(f"[OK] Set leverage to {leverage}x for {symbol}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to set leverage for {symbol}: {e}")
-            return False
-    
-    def set_margin_mode(self, symbol, margin_mode='CROSSED'):
-        """Set margin mode (CROSSED or ISOLATED)"""
-        try:
-            self.client.futures_change_margin_type(symbol=symbol, marginType=margin_mode)
-            logger.info(f"[OK] Set margin mode to {margin_mode} for {symbol}")
-            return True
+            params = {
+                "symbol": symbol,
+                "side": side,
+                "type": order_type,
+                "quantity": quantity,
+            }
+            
+            if order_type == 'LIMIT':
+                params["price"] = str(price)
+                params["timeInForce"] = "GTC"
+
+            logger.info(f"🚀 Executing {order_type} {side} on {symbol}...")
+            response = self.client.futures_create_order(**params)
+            logger.info(f"✅ Order Success: {response.get('orderId')}")
+            return response
+
         except BinanceAPIException as e:
-            # Ignore if already set
-            if 'No need to change' in str(e) or e.code == -4046:
-                return True
-            logger.warning(f"Could not set margin mode for {symbol}: {e}")
-            return False
-    
-    def futures_get_order(self, symbol, orderId):
-        """Get order status"""
-        try:
-            return self.client.futures_get_order(symbol=symbol, orderId=orderId)
-        except Exception as e:
-            logger.error(f"Error getting order {orderId} for {symbol}: {e}")
+            logger.error(f"❌ Order Execution Failed: {e.message}")
+            # Day 4: This should trigger a Critical Alert in Orchestrator
             raise
-    
-    def futures_create_order(self, **params):
-        """Create futures order"""
-        try:
-            return self.client.futures_create_order(**params)
         except Exception as e:
-            logger.error(f"Error creating order: {e}")
+            logger.error(f"❌ Unexpected Execution Error: {e}")
             raise
-    
-    def futures_cancel_order(self, symbol, orderId):
-        """Cancel futures order"""
+
+    def get_account_health(self):
+        """
+        Day 4 Requirement: Basic Metrics (Balance + Margin Ratio)
+        """
         try:
-            return self.client.futures_cancel_order(symbol=symbol, orderId=orderId)
+            acc = self.client.futures_account()
+            return {
+                "available_balance": float(acc.get('availableBalance', 0)),
+                "total_wallet_balance": float(acc.get('totalWalletBalance', 0)),
+                "margin_ratio": float(acc.get('totalMaintMargin', 0)) / float(acc.get('totalMarginBalance', 1)) 
+                if float(acc.get('totalMarginBalance', 0)) > 0 else 0
+            }
         except Exception as e:
-            logger.error(f"Error canceling order {orderId} for {symbol}: {e}")
-            raise
-    
-    def futures_get_open_orders(self, symbol=None):
-        """Get open orders"""
-        try:
-            if symbol:
-                return self.client.futures_get_open_orders(symbol=symbol)
-            return self.client.futures_get_open_orders()
-        except Exception as e:
-            logger.error(f"Error getting open orders: {e}")
-            return []
-    
-    def futures_cancel_all_open_orders(self, symbol):
-        """Cancel all open orders for symbol"""
-        try:
-            return self.client.futures_cancel_all_open_orders(symbol=symbol)
-        except Exception as e:
-            logger.error(f"Error canceling all orders for {symbol}: {e}")
-            raise
+            logger.error(f"Health check failed: {e}")
+            return None

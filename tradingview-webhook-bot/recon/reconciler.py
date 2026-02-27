@@ -1,6 +1,7 @@
 """
-Reconciliation Engine
+Reconciliation Engine (Day 4 Fully Updated)
 Detects drift between the internal ledger and actual exchange balances.
+Supports Pydantic model snapshots from the PositionLedger.
 """
 
 import logging
@@ -9,77 +10,86 @@ from typing import Dict, Any, List
 logger = logging.getLogger(__name__)
 
 class Reconciler:
-    def __init__(self, tolerance: float = 0.0001):
+    def __init__(self, ledger, tolerance: float = 0.0001):
         """
         Args:
-            tolerance: The allowed difference between ledger and exchange
-                       (to account for small rounding errors).
+            ledger: The PositionLedger instance.
+            tolerance: Allowed difference to account for rounding.
         """
+        self.ledger = ledger
         self.tolerance = tolerance
 
-    def reconcile_portfolio(self, ledger_positions: Dict[str, float], exchange_positions: List[Dict]) -> List[Dict[str, Any]]:
+    def reconcile_with_exchange(self, exchange_data: Dict[str, Any]) -> List[str]:
         """
-        Compares all ledger positions against actual exchange positions.
-        Returns a list of incident reports for symbols that are out of sync.
+        Primary entry point for the Automated Reconciliation Loop.
+        Fixes the 'PositionSnapshot' object has no attribute 'get' error.
         """
-        incidents = []
-        
-        # 1. Normalize exchange data into a simple Dict { symbol: qty }
-        # Binance returns long positions as positive and short as negative quantities
-        actual_map = {
-            pos['symbol']: float(pos.get('positionAmt', 0)) 
-            for pos in exchange_positions 
-            if float(pos.get('positionAmt', 0)) != 0
+        # Ledger positions ko extract karein (Pydantic objects ko floats mein convert karke)
+        # PositionSnapshot attributes ko directly access karna zaroori hai
+        ledger_positions = {
+            sym: float(pos_obj.quantity) 
+            for sym, pos_obj in getattr(self.ledger, 'positions', {}).items()
         }
 
-        # 2. Check all symbols present in the Ledger
-        for symbol, expected_qty in ledger_positions.items():
+        # Portfolio comparison logic run karein
+        incidents = self.reconcile_portfolio(ledger_positions, exchange_data)
+        
+        # Alerts generate karein agar drift mile
+        alert_messages = []
+        for incident in incidents:
+            alert_messages.append(self.format_incident(incident['symbol'], incident))
+            
+        return alert_messages
+
+    def reconcile_portfolio(self, ledger_map: Dict[str, float], exchange_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Compares normalized ledger map against exchange data.
+        """
+        incidents = []
+        # Exchange data format: { 'SYMBOL': {'quantity': float} }
+        actual_map = {sym: float(data['quantity']) for sym, data in exchange_data.items()}
+
+        # 1. Check Ledger entries against Exchange
+        for symbol, expected_qty in ledger_map.items():
             actual_qty = actual_map.get(symbol, 0.0)
             report = self.detect_qty_drift(expected_qty, actual_qty)
-            
+
             if not report["is_synced"]:
                 report["symbol"] = symbol
                 incidents.append(report)
-            
-            # Remove from map to see what's left
+
             if symbol in actual_map:
                 del actual_map[symbol]
 
-        # 3. Check for "Ghost Positions" (Exchange has them, Ledger doesn't)
+        # 2. Check for Ghost Positions (Exchange only)
         for symbol, actual_qty in actual_map.items():
-            report = self.detect_qty_drift(0.0, actual_qty)
-            if not report["is_synced"]:
+            if abs(actual_qty) > self.tolerance:
+                report = self.detect_qty_drift(0.0, actual_qty)
                 report["symbol"] = symbol
                 incidents.append(report)
 
         return incidents
 
     def detect_qty_drift(self, ledger_qty: float, exchange_qty: float) -> Dict[str, Any]:
-        """
-        Compares ledger quantity vs exchange quantity.
-        Returns a drift report.
-        """
+        """Calculates the absolute drift and determines sync status."""
         drift = abs(ledger_qty - exchange_qty)
         is_synced = drift <= self.tolerance
 
         return {
             "is_synced": is_synced,
-            "drift": drift,
-            "ledger_qty": ledger_qty,
-            "exchange_qty": exchange_qty,
+            "drift": round(drift, 8),
+            "ledger_qty": round(ledger_qty, 8),
+            "exchange_qty": round(exchange_qty, 8),
             "severity": "CRITICAL" if not is_synced else "OK"
         }
 
     def format_incident(self, symbol: str, report: Dict[str, Any]) -> str:
-        """Formats the drift report for alerts (Telegram/Logs)."""
-        if report["is_synced"]:
-            return f"✅ {symbol} is synced."
-
+        """Formats drift reports for Telegram/Alerting."""
         return (
-            f"🚨 RECONCILIATION ALARM: {symbol} DRIFT DETECTED!\n"
-            f"----------------------------------\n"
-            f"📈 Expected (Ledger): {report['ledger_qty']}\n"
-            f"📉 Actual (Exchange): {report['exchange_qty']}\n"
-            f"❌ Difference: {report['drift']}\n"
-            f"----------------------------------"
+            f"🚨 *RECONCILIATION ALARM: {symbol} DRIFT*\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📈 *Ledger:* `{report['ledger_qty']}`\n"
+            f"📉 *Exchange:* `{report['exchange_qty']}`\n"
+            f"❌ *Diff:* `{report['drift']}`\n"
+            f"━━━━━━━━━━━━━━━━━━"
         )

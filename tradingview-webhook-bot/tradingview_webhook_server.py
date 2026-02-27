@@ -9,10 +9,10 @@ from pydantic import ValidationError
 from dotenv import load_dotenv
 
 # --- 1. ENVIRONMENT LOAD ---
-# Ye sabse pehle hona chahiye
-load_dotenv() 
+load_dotenv()
 
-# --- 2. PATH FIX ---
+# --- 2. PATH RESOLUTION (Senior Standard) ---
+# Handles hyphenated folder names and project root mapping
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -31,12 +31,15 @@ except ImportError:
         sys.modules["tradingview_webhook_bot"] = module
         spec.loader.exec_module(module)
 
-# Imports for validation and storage
+# Core internal imports
 from tradingview_webhook_bot.storage.jsonl_queue import append_jsonl
-# Ensure schemas.py is in the right location for your senior's requirement
 from tradingview_webhook_bot.schemas import TradingViewPayload, SignalEvent, SignalStatus
 
-logging.basicConfig(level=logging.INFO)
+# Day 4: Production Logging Configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 def create_app(config=None):
@@ -48,67 +51,67 @@ def create_app(config=None):
         return jsonify({
             "status": "healthy",
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "version": "1.1.0"
+            "version": "1.1.3"
         }), 200
 
     @app.route('/webhook/tradingview', methods=['POST'])
     def webhook():
-        # --- 3. CONFIGURATION FROM ENV ---
+        # Day 4: Config Load
         webhook_secret = os.getenv("WEBHOOK_SECRET", "default_secret")
         queue_path = os.getenv("QUEUE_PATH", "storage/signals.jsonl")
 
-        # 4. RAW DATA ACQUISITION
         raw_data = request.get_json()
         if not raw_data:
             return jsonify({"error": "No JSON payload received"}), 400
 
-        # --- 5. UPDATED SECURITY CHECK (Header OR Payload) ---
-        # TradingView aksar payload mein secret bhejta hai
+        # Day 4: Security Verification (Header + Payload)
         auth_header = request.headers.get("X-Webhook-Secret")
-        auth_payload = raw_data.get("secret") # Check inside JSON
+        auth_payload = raw_data.get("secret")
 
         if not (auth_header == webhook_secret or auth_payload == webhook_secret):
             logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
             return jsonify({"error": "Unauthorized"}), 401
 
         try:
-            # 6. PYDANTIC VALIDATION
+            # 1. Schema Validation (Matches your Pydantic model)
             validated_payload = TradingViewPayload(**raw_data)
 
-            # 7. SIGNAL ID GENERATION
+            # 2. Unique Signal ID and Timestamp Generation
             ts = datetime.now(timezone.utc)
             signal_id = f"TV-{ts.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:8]}"
 
+            # --- SCHEMA COMPLIANCE FIX ---
+            # Using 'received' to match your Pydantic Enum constraints
             event = SignalEvent(
                 signal_id=signal_id,
                 timestamp=ts,
                 payload=validated_payload,
-                status=SignalStatus.RECEIVED
+                status=SignalStatus.RECEIVED  # Fixed: Match strictly with schemas.py
             )
 
-            # 8. ATOMIC ENQUEUE
+            # 3. Persistence to JSONL Queue
             success = append_jsonl(queue_path, event.model_dump(mode='json'))
 
             if success:
-                logger.info(f"✅ Signal Enqueued: {signal_id} | Symbol: {validated_payload.symbol}")
+                logger.info(f"✅ Signal Recorded: {signal_id} | Symbol: {validated_payload.symbol}")
                 return jsonify({
-                    "status": "enqueued",
+                    "status": "success",
                     "signal_id": signal_id,
                     "timestamp": ts.isoformat()
                 }), 202
             else:
-                raise IOError(f"Could not write to {queue_path}")
+                raise IOError(f"Failed to write to {queue_path}")
 
         except ValidationError as e:
-            logger.warning(f"❌ Validation Failed: {e.json()}")
+            logger.warning(f"❌ Schema Mismatch: {e.json()}")
             return jsonify({"error": "Validation Failed", "details": e.errors()}), 422
         except Exception as e:
-            logger.error(f"❌ System Error: {str(e)}")
+            logger.error(f"❌ Internal Failure: {str(e)}")
             return jsonify({"error": "Internal Server Error"}), 500
 
     return app
 
-# Add this for Gunicorn/Standalone execution
+# Gunicorn entry point
 app = create_app()
 
 if __name__ == "__main__":
