@@ -24,3 +24,5 @@ storage/*.db
 storage/*.offset
 service_account.json
 .env
+service_account.json
+.env
