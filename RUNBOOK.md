@@ -102,7 +102,7 @@ Bash
 sudo systemctl start tv-engine
 # Monitor logs for the 'REAL TRADES ACTIVE' flag
 sudo journalctl -u tv-engine -f
-7. Reconciliation & Maintenance
+## 7. Reconciliation & Maintenance
 Bot har /status request par internal ledger aur exchange balance ko match karta hai.
 
 Manual Recon: Telegram par /status command bhejein.
@@ -110,3 +110,46 @@ Manual Recon: Telegram par /status command bhejein.
 Drift Alert: Agar ⚠️ Drift Alert aata hai, toh iska matlab hai manual intervention zaroori hai (Internal ledger aur real balance mismatch hai).
 
 Log Rotation: Alerts aur signals storage/*.jsonl mein save hote hain. Mahine mein ek baar purane logs ko archive karne ki salah di jati hai.
+
+
+# 🚀 Trading Bot: Quick Maintenance Runbook
+## 1. Daily Health Check (Subah-Sham Check Karein)
+System ki health dekhne ke liye Telegram par ye commands bhejien:
+
+/status: Live balance, Margin Ratio, aur Open Positions dekhne ke liye.
+
+Agar bot reply na de, toh server par check karein: sudo systemctl status tv-engine.
+
+## 2. Restart & Update Commands
+Agar aap code mein koi change karte hain ya system slow lagta hai, toh ye commands use karein:
+
+Engine Update: sudo systemctl restart tv-engine.
+
+Webhook Update: sudo systemctl restart tv-webhook.
+
+Full System Refresh: sudo systemctl restart tv-webhook tv-engine nginx.
+
+## 3. Logs Monitor Kaise Karein?
+Live debugging ke liye in commands ka use karein:
+
+Trading Activity: sudo journalctl -u tv-engine -f.
+
+Incoming Signals: sudo journalctl -u tv-webhook -f.
+
+Errors Only: sudo journalctl -u tv-engine -p err.
+
+## 4. Reconciliation & Drift Fix (CRITICAL)
+Agar Telegram par ⚠️ RECON DRIFT DETECTED! ka alert aaye, toh iska matlab hai ki aapka Ledger aur Binance match nahi kar rahe.
+
+Fix: nano storage/ledger_state.json mein jayein aur quantity ko Binance dashboard ke mutabiq set karein.
+
+Note: Ledger sync karne ke baad engine restart zaroori hai.
+
+## 5. Safety Emergency Stop
+Agar koi galat trade shuru ho jaye aur aap bot ko turant rokna chahte hain:
+
+Bot Stop: sudo systemctl stop tv-engine.
+
+**Binance:** Manual dashboard par jaakar positions close karein.
+
+**Safety Gate:** .env mein ALLOW_REAL_TRADES=false set karein.
