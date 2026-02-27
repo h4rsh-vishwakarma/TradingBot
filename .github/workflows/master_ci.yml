@@ -10,7 +10,7 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    services:
+    #services:
       # Agar future mein Redis ya DB chahiye toh yahan add kar sakte hain
       
     steps:
