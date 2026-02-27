@@ -45,3 +45,13 @@ Agar koi valid trade block ho raha hai aur aap use turant allow karna chahte hai
 Agar Telegram par `⚠️ RECON DRIFT DETECTED!` aata hai:
 1. **Manual Audit**: Google Sheets ledger aur Binance account balance match karein.
 2. **Fix**: Ledger state file (`storage/ledger_state.json`) ko manually update karein agar zaroori ho.
+---
+
+## 🔒 Task F: SSL/HTTPS Setup (Status: Ready for Domain)
+System abhi HTTP par chal raha hai kyunki domain mapping pending hai. Server-level security (Firewall) active hai.
+
+### **Future SSL Steps:**
+1. **Domain Mapping**: Domain `A Record` ko IP `3.27.205.150` par point karein.
+2. **Install SSL**: 
+   `sudo certbot --nginx -d <your-domain>`
+3. **Auto-renewal**: Certbot cronjob ke zariye automatic handled hai.
