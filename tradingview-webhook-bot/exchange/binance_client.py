@@ -22,13 +22,13 @@ class BinanceClient:
         self.api_key = api_key or os.getenv('BINANCE_API_KEY')
         self.api_secret = api_secret or os.getenv('BINANCE_API_SECRET')
 
-        # Day 3: Testnet/Live switching
+        # Testnet/Live switching
         if testnet is not None:
             self.testnet = testnet
         else:
             self.testnet = os.getenv('BINANCE_TESTNET', 'true').lower() == 'true'
 
-        # Day 1: Safety Gate
+        # Safety Gate
         self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
 
         try:
@@ -42,7 +42,7 @@ class BinanceClient:
             raise
 
     def get_audit_data(self):
-        """Day 4: Reconciliation Metrics for drift detection."""
+        """Reconciliation Metrics for drift detection."""
         try:
             positions = self.client.futures_position_information()
             audit_map = {}
@@ -60,24 +60,25 @@ class BinanceClient:
 
     # --- TASK D: HARDENED RETRY LOGIC (Idempotent & Deterministic) ---
     @retry(
-        stop=stop_after_attempt(3), # Max 3 attempts
-        wait=wait_exponential(multiplier=1, min=2, max=10), # 2s, 4s, 8s backoff
-        retry=retry_if_exception_type((BinanceAPIException, ConnectionError)),
+        stop=stop_after_attempt(3), 
+        wait=wait_exponential(multiplier=1, min=2, max=10), 
+        retry=retry_if_exception_type((ConnectionError)), # Only retry on network errors, API errors handled inside
         reraise=True
     )
     def execute_futures_order(self, symbol, side, quantity, price=None, order_type='MARKET', signal_id=None):
         """
-        Task D: Execute order with Idempotency using signal_id as newClientOrderId.
+        Execute order with Idempotency using signal_id as newClientOrderId.
+        Updates: Explicit handling of Duplicate Order IDs (-2011).
         """
-        # --- SAFETY GATE (Day 1) ---
+        # --- SAFETY GATE ---
         if not self.allow_real:
             logger.warning(f"🚫 SAFETY GATE: Blocked {side} {quantity} {symbol} (Mode: Dry-Run)")
             return {"status": "SKIPPED", "msg": "Real trades disabled in .env"}
 
         try:
-            # Task D: Deterministic Client Order ID to prevent duplicate trades
+            # Deterministic Client Order ID to prevent duplicate trades
             client_order_id = signal_id if signal_id else f"bot_{int(time.time())}"
-            
+
             params = {
                 "symbol": symbol,
                 "side": side,
@@ -92,25 +93,34 @@ class BinanceClient:
 
             logger.info(f"🚀 Executing {order_type} {side} on {symbol} (ID: {client_order_id})...")
             response = self.client.futures_create_order(**params)
+            
+            # Standardizing success response
+            response["status"] = "SUCCESS"
             logger.info(f"✅ Order Success: {response.get('orderId')}")
             return response
 
         except BinanceAPIException as e:
-            # Task D: Error Classification (Permanent vs Transient)
-            # Permanent Errors: Invalid symbol (-1121), Insufficient balance (-2019)
-            if e.code in [-1121, -2019, -1102, -1013]: 
-                logger.error(f"❌ Permanent Exchange Error: {e.message}")
-                raise e # Don't retry
-            
-            # Transient Errors: Network/Server issues (Retry logic handles these)
-            logger.warning(f"⚠️ Transient Error: {e.message}. Retrying...")
-            raise e
+            # --- STEP 2: IDEMPOTENCY CHECK ---
+            if e.code == -2011: # Duplicate Order ID
+                logger.warning(f"⚠️ IDEMPOTENCY: Signal {client_order_id} already processed by Binance. Skipping.")
+                return {"status": "SKIPPED", "reason": "duplicate_id", "msg": e.message}
+
+            # --- ERROR CLASSIFICATION ---
+            # Permanent Errors: Invalid symbol (-1121), Insufficient balance (-2019), Bad Quantity (-1013)
+            if e.code in [-1121, -2019, -1102, -1013, -2010]:
+                logger.error(f"❌ Permanent Exchange Error ({e.code}): {e.message}")
+                return {"status": "FAILED", "reason": "permanent", "msg": e.message}
+
+            # Transient Errors: Timeout/Server issues (Handle via manual/retry)
+            logger.warning(f"⚠️ Transient/Unknown Error ({e.code}): {e.message}")
+            return {"status": "FAILED", "reason": "transient", "msg": e.message}
+
         except Exception as e:
             logger.error(f"❌ Unexpected Execution Error: {e}")
-            raise
+            return {"status": "FAILED", "reason": "exception", "msg": str(e)}
 
     def get_account_health(self):
-        """Day 4: Basic Metrics (Balance + Margin Ratio)"""
+        """Basic Metrics (Balance + Margin Ratio)"""
         try:
             acc = self.client.futures_account()
             return {

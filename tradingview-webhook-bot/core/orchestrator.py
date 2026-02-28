@@ -101,7 +101,7 @@ class Orchestrator:
         return False
 
     def handle_signal(self, event: dict) -> bool:
-        """Processes signals and routes alerts to the correct channels"""
+        """Processes signals with Step 2 Idempotency Logic"""
         try:
             current_status = event.get("status")
             if current_status not in ["received", "enqueued", "processing"]:
@@ -119,25 +119,46 @@ class Orchestrator:
                 self.alerts.send(f"⚠️ Policy Block: Trade for {symbol} suppressed.", severity="WARNING", channel="SYSTEM")
                 return True
 
+            # --- STEP 2: EXECUTION WITH IDEMPOTENCY ---
             execution_res = self.exchange.execute_futures_order(symbol, side, qty, price, signal_id=signal_id)
+            exec_status = execution_res.get("status")
 
-            if execution_res and execution_res.get("status") != "FAILED":
+            if exec_status == "SUCCESS":
                 self.processed_count += 1
-                if execution_res.get("status") != "SKIPPED":
-                    self.ledger.apply_fill(symbol, side, qty, price)
-                    self.sheets_logger.log_trade(
-                        symbol=symbol, action=side, qty=qty, price=price,
-                        strategy=payload.get("strategy", "Auto")
-                    )
+                self.ledger.apply_fill(symbol, side, qty, price)
+                self.sheets_logger.log_trade(
+                    symbol=symbol, action=side, qty=qty, price=price,
+                    strategy=payload.get("strategy", "Auto")
+                )
                 self.alerts.send(f"✅ Processed {side} {symbol} (Signal: {signal_id})", channel="TRADES")
-            return True
+                return True
+
+            elif exec_status == "SKIPPED":
+                # Handle Idempotency / Safety Skip (No alert needed for duplicate)
+                logger.info(f"⏭️ Signal {signal_id} Skipped. Reason: {execution_res.get('reason')}")
+                return True
+
+            elif exec_status == "FAILED":
+                # Handle Hard Failures
+                reason = execution_res.get("reason", "unknown")
+                msg = execution_res.get("msg", "No details")
+                
+                logger.error(f"❌ Execution Failed [{reason}]: {msg}")
+                self.alerts.send(f"🚨 EXECUTION FAILED: {side} {symbol}\nReason: {reason}\n{msg}", severity="CRITICAL", channel="SYSTEM")
+                
+                # Only move to DLQ if it's not a permanent rejection (e.g. timeout)
+                if reason != "permanent":
+                    self.move_to_dlq(event, f"Binance Failure: {reason} - {msg}")
+                
+                return True
+
+            return False
 
         except Exception as e:
-            err_msg = f"❌ Critical Failure: {e}"
+            err_msg = f"❌ Critical Orchestration Failure: {e}"
             logger.error(f"{err_msg} | Moving to DLQ")
             self.move_to_dlq(event, str(e))
             self.check_dlq_threshold()
-            # Email Fail-Safe for critical processing crashes
             self.send_email_alert("Signal Processing Crash", f"Event ID: {event.get('signal_id')}\nError: {e}")
             return True
 
