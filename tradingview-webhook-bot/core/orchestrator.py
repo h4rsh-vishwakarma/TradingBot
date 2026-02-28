@@ -1,6 +1,7 @@
-import time, logging, os, json, sys
+import time, logging, os, json, sys, smtplib
 from datetime import datetime, timedelta
 from pathlib import Path
+from email.mime.text import MIMEText
 
 # --- 1. PATH RESOLUTION ---
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -35,6 +36,13 @@ class Orchestrator:
         self.run_mode = os.getenv("RUN_MODE", "development")
         self.dlq_path = os.getenv("DLQ_PATH", "storage/dlq.jsonl")
 
+        # Email Config
+        self.email_sender = os.getenv("EMAIL_SENDER")
+        self.email_password = os.getenv("EMAIL_PASSWORD")
+        self.email_receiver = os.getenv("EMAIL_RECEIVER")
+        self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+        self.smtp_port = int(os.getenv("SMTP_PORT", 587))
+
         # Policy & Metrics
         self.allowed_symbols = os.getenv("ALLOWED_SYMBOLS", "BTCUSDT,ETHUSDT").split(",")
         self.manual_overrides = {}
@@ -53,6 +61,26 @@ class Orchestrator:
         self.sheets_logger = GoogleSheetsLogger(json_key="service_account.json")
         self.consumer = JsonlOffsetConsumer(os.getenv("QUEUE_PATH"), os.getenv("OFFSET_PATH"))
         self.exchange = BinanceClient()
+
+    def send_email_alert(self, subject: str, body: str):
+        """Sends a high-priority fail-safe email alert."""
+        if not all([self.email_sender, self.email_password, self.email_receiver]):
+            logger.warning("📧 Email credentials missing. Skipping email alert.")
+            return
+
+        try:
+            msg = MIMEText(body)
+            msg['Subject'] = f"🚨 Bot Critical: {subject}"
+            msg['From'] = self.email_sender
+            msg['To'] = self.email_receiver
+
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.email_sender, self.email_password)
+                server.send_message(msg)
+                logger.info(f"📧 Fail-safe email sent: {subject}")
+        except Exception as e:
+            logger.error(f"❌ Failed to send email alert: {e}")
 
     def get_dlq_size(self):
         """Returns count of failed signals in DLQ file"""
@@ -86,36 +114,31 @@ class Orchestrator:
             price = float(payload.get("price", 0))
             signal_id = event.get("signal_id")
 
-            # --- SAFETY GATE ---
             if not self.is_gate_open(symbol):
                 logger.warning(f"🚨 POLICY BLOCK: {side} {symbol}")
-                # Policy blocks stay in the SYSTEM channel for developers
                 self.alerts.send(f"⚠️ Policy Block: Trade for {symbol} suppressed.", severity="WARNING", channel="SYSTEM")
                 return True
 
-            # --- EXECUTION ---
             execution_res = self.exchange.execute_futures_order(symbol, side, qty, price, signal_id=signal_id)
 
-            # --- ACCOUNTING & METRICS ---
             if execution_res and execution_res.get("status") != "FAILED":
                 self.processed_count += 1
-
                 if execution_res.get("status") != "SKIPPED":
                     self.ledger.apply_fill(symbol, side, qty, price)
                     self.sheets_logger.log_trade(
                         symbol=symbol, action=side, qty=qty, price=price,
                         strategy=payload.get("strategy", "Auto")
                     )
-
-                # ROUTING: Send successful trade alerts to the TRADES group
                 self.alerts.send(f"✅ Processed {side} {symbol} (Signal: {signal_id})", channel="TRADES")
-
             return True
 
         except Exception as e:
-            logger.error(f"❌ Critical Failure: {e} | Moving to DLQ")
+            err_msg = f"❌ Critical Failure: {e}"
+            logger.error(f"{err_msg} | Moving to DLQ")
             self.move_to_dlq(event, str(e))
             self.check_dlq_threshold()
+            # Email Fail-Safe for critical processing crashes
+            self.send_email_alert("Signal Processing Crash", f"Event ID: {event.get('signal_id')}\nError: {e}")
             return True
 
     def move_to_dlq(self, event: dict, error_msg: str):
@@ -134,13 +157,14 @@ class Orchestrator:
             logger.critical(f"🔥 FAILED TO WRITE TO DLQ: {dlq_err}")
 
     def check_dlq_threshold(self):
-        """Alerts SYSTEM channel on rapid failures"""
+        """Alerts SYSTEM channel and Email on rapid failures"""
         now = datetime.now()
         cutoff = now - timedelta(seconds=self.dlq_threshold_window)
         self.recent_failures = [t for t in self.recent_failures if t > cutoff]
         if len(self.recent_failures) >= self.dlq_threshold_count:
-            # Critical errors stay in the SYSTEM channel
-            self.alerts.send(f"🚨 *CRITICAL DLQ BURST DETECTED!*", severity="CRITICAL", channel="SYSTEM")
+            msg = f"🚨 *CRITICAL DLQ BURST DETECTED!* ({len(self.recent_failures)} failures in window)"
+            self.alerts.send(msg, severity="CRITICAL", channel="SYSTEM")
+            self.send_email_alert("Rapid DLQ Burst", msg)
 
     def process_commands(self):
         """Processes interactive Telegram commands from the SYSTEM channel"""
@@ -166,28 +190,23 @@ class Orchestrator:
         last_recon_time = time.time()
 
         while True:
-            # 1. Poll Signals
             self.consumer.poll(handler=self.handle_signal, batch_size=10)
-
-            # 2. Process Telegram Commands
             self.process_commands()
 
             current_time = time.time()
-            
-            # 3. SILENT HEARTBEAT (Every 15 mins)
             if current_time - self.last_heartbeat > 900:
-                # Log health internally; stop sending to Telegram to avoid spam
                 logger.info(f"💓 Internal Heartbeat | Processed: {self.processed_count} | DLQ: {self.get_dlq_size()}")
                 self.last_heartbeat = current_time
 
-            # 4. Periodic Reconciliation (Every 15 mins)
             if current_time - last_recon_time > 900:
                 try:
                     exchange_data = self.exchange.get_audit_data()
                     drifts = self.reconciler.reconcile_with_exchange(exchange_data)
-                    if drifts: 
-                        self.alerts.send(f"⚠️ RECON DRIFT DETECTED!", severity="CRITICAL", channel="SYSTEM")
-                except Exception as e: 
+                    if drifts:
+                        msg = f"⚠️ RECON DRIFT DETECTED! System and Exchange positions do not match."
+                        self.alerts.send(msg, severity="CRITICAL", channel="SYSTEM")
+                        self.send_email_alert("Reconciliation Drift", msg)
+                except Exception as e:
                     logger.error(f"Recon Failed: {e}")
                 last_recon_time = current_time
 
