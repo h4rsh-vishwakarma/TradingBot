@@ -34,14 +34,14 @@ class Orchestrator:
         self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
         self.run_mode = os.getenv("RUN_MODE", "development")
         self.dlq_path = os.getenv("DLQ_PATH", "storage/dlq.jsonl")
-        
-        # Task C & G: Policy & Metrics
+
+        # Policy & Metrics
         self.allowed_symbols = os.getenv("ALLOWED_SYMBOLS", "BTCUSDT,ETHUSDT").split(",")
         self.manual_overrides = {}
         self.processed_count = 0
         self.last_heartbeat = time.time()
 
-        # Task B: DLQ Thresholds
+        # DLQ Thresholds
         self.dlq_threshold_count = int(os.getenv("DLQ_THRESHOLD", "5"))
         self.dlq_threshold_window = int(os.getenv("DLQ_WINDOW_SECONDS", "60"))
         self.recent_failures = []
@@ -55,7 +55,7 @@ class Orchestrator:
         self.exchange = BinanceClient()
 
     def get_dlq_size(self):
-        """Task G Metrics: Returns count of failed signals in DLQ file"""
+        """Returns count of failed signals in DLQ file"""
         try:
             if not os.path.exists(self.dlq_path): return 0
             with open(self.dlq_path, "r") as f:
@@ -63,17 +63,17 @@ class Orchestrator:
         except: return 0
 
     def is_gate_open(self, symbol: str) -> bool:
-        """Task C: Safety Gate Logic"""
+        """Safety Gate Logic with manual override support"""
         if self.allow_real: return True
         if symbol in self.manual_overrides:
             if time.time() < self.manual_overrides[symbol]: return True
-            else: 
+            else:
                 del self.manual_overrides[symbol]
                 logger.info(f"🔒 Override expired for {symbol}")
         return False
 
     def handle_signal(self, event: dict) -> bool:
-        """Processes signals and updates Task G metrics"""
+        """Processes signals and routes alerts to the correct channels"""
         try:
             current_status = event.get("status")
             if current_status not in ["received", "enqueued", "processing"]:
@@ -89,37 +89,37 @@ class Orchestrator:
             # --- SAFETY GATE ---
             if not self.is_gate_open(symbol):
                 logger.warning(f"🚨 POLICY BLOCK: {side} {symbol}")
-                self.alerts.send(f"⚠️ Policy Block: Trade for {symbol} suppressed.", severity="WARNING")
+                # Policy blocks stay in the SYSTEM channel for developers
+                self.alerts.send(f"⚠️ Policy Block: Trade for {symbol} suppressed.", severity="WARNING", channel="SYSTEM")
                 return True
 
             # --- EXECUTION ---
             execution_res = self.exchange.execute_futures_order(symbol, side, qty, price, signal_id=signal_id)
 
-            # --- ACCOUNTING & METRICS (Task G) ---
-            # Hum isse 'processed' tabhi maante hain jab execution fail na ho (Dry-run skip is considered a process success)
+            # --- ACCOUNTING & METRICS ---
             if execution_res and execution_res.get("status") != "FAILED":
-                self.processed_count += 1 
-                
-                # Agar trade skip nahi hua (real fill ya dry-run logic update)
+                self.processed_count += 1
+
                 if execution_res.get("status") != "SKIPPED":
                     self.ledger.apply_fill(symbol, side, qty, price)
                     self.sheets_logger.log_trade(
                         symbol=symbol, action=side, qty=qty, price=price,
                         strategy=payload.get("strategy", "Auto")
                     )
-                
-                self.alerts.send(f"✅ Processed {side} {symbol} (Signal: {signal_id})")
-            
+
+                # ROUTING: Send successful trade alerts to the TRADES group
+                self.alerts.send(f"✅ Processed {side} {symbol} (Signal: {signal_id})", channel="TRADES")
+
             return True
 
         except Exception as e:
             logger.error(f"❌ Critical Failure: {e} | Moving to DLQ")
             self.move_to_dlq(event, str(e))
             self.check_dlq_threshold()
-            return True 
+            return True
 
     def move_to_dlq(self, event: dict, error_msg: str):
-        """Task B & E: DLQ Storage"""
+        """Storage for failed signals"""
         try:
             now = datetime.now()
             self.recent_failures.append(now)
@@ -134,15 +134,16 @@ class Orchestrator:
             logger.critical(f"🔥 FAILED TO WRITE TO DLQ: {dlq_err}")
 
     def check_dlq_threshold(self):
-        """Task B: Alert on rapid failures"""
+        """Alerts SYSTEM channel on rapid failures"""
         now = datetime.now()
         cutoff = now - timedelta(seconds=self.dlq_threshold_window)
         self.recent_failures = [t for t in self.recent_failures if t > cutoff]
         if len(self.recent_failures) >= self.dlq_threshold_count:
-            self.alerts.send(f"🚨 *CRITICAL DLQ BURST DETECTED!*", severity="CRITICAL")
+            # Critical errors stay in the SYSTEM channel
+            self.alerts.send(f"🚨 *CRITICAL DLQ BURST DETECTED!*", severity="CRITICAL", channel="SYSTEM")
 
     def process_commands(self):
-        """Task G: Command Processing"""
+        """Processes interactive Telegram commands from the SYSTEM channel"""
         commands = self.alerts.get_updates()
         if not commands: return
         for cmd_text in commands:
@@ -152,30 +153,31 @@ class Orchestrator:
                     parts = cmd.split()
                     symbol = parts[1].upper()
                     self.manual_overrides[symbol] = time.time() + 3600
-                    self.alerts.reply(f"⚡ *OVERRIDE:* `{symbol}` opened for 60m.")
-                except: self.alerts.reply("❌ Usage: `/override SYMBOL`")
+                    self.alerts.reply(f"⚡ *OVERRIDE:* `{symbol}` opened for 60m.", channel="SYSTEM")
+                except: self.alerts.reply("❌ Usage: `/override SYMBOL`", channel="SYSTEM")
             elif cmd == "/status":
                 health = self.exchange.get_account_health()
                 msg = f"📊 *Live Status*\n- Processed: {self.processed_count}\n- DLQ Size: {self.get_dlq_size()}"
                 if health: msg += f"\n- Balance: ${health['available_balance']:.2f}"
-                self.alerts.reply(msg)
+                self.alerts.reply(msg, channel="SYSTEM")
 
     def run(self):
         logger.info(f"🚀 Engine Live | Mode: {self.run_mode} | Real: {self.allow_real}")
         last_recon_time = time.time()
-        
+
         while True:
             # 1. Poll Signals
             self.consumer.poll(handler=self.handle_signal, batch_size=10)
-            
+
             # 2. Process Telegram Commands
             self.process_commands()
 
             current_time = time.time()
-            # 3. Task G: Heartbeat (Every 15 mins)
+            
+            # 3. SILENT HEARTBEAT (Every 15 mins)
             if current_time - self.last_heartbeat > 900:
-                stats = f"💓 *Engine Heartbeat*\n- Processed: {self.processed_count}\n- DLQ Size: {self.get_dlq_size()}"
-                self.alerts.send(stats, severity="INFO")
+                # Log health internally; stop sending to Telegram to avoid spam
+                logger.info(f"💓 Internal Heartbeat | Processed: {self.processed_count} | DLQ: {self.get_dlq_size()}")
                 self.last_heartbeat = current_time
 
             # 4. Periodic Reconciliation (Every 15 mins)
@@ -183,8 +185,10 @@ class Orchestrator:
                 try:
                     exchange_data = self.exchange.get_audit_data()
                     drifts = self.reconciler.reconcile_with_exchange(exchange_data)
-                    if drifts: self.alerts.send(f"⚠️ RECON DRIFT DETECTED!", severity="CRITICAL")
-                except Exception as e: logger.error(f"Recon Failed: {e}")
+                    if drifts: 
+                        self.alerts.send(f"⚠️ RECON DRIFT DETECTED!", severity="CRITICAL", channel="SYSTEM")
+                except Exception as e: 
+                    logger.error(f"Recon Failed: {e}")
                 last_recon_time = current_time
 
             time.sleep(1)
