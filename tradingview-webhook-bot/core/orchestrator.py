@@ -34,7 +34,7 @@ class Orchestrator:
         # --- 3. CONFIGURATION LOAD ---
         self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
         self.run_mode = os.getenv("RUN_MODE", "development")
-        self.dlq_path = os.getenv("DLQ_PATH", "storage/dlq.jsonl")
+        self.dlq_path = os.getenv("DL_PATH", "storage/dlq.jsonl")
 
         # Email Config
         self.email_sender = os.getenv("EMAIL_SENDER")
@@ -63,17 +63,14 @@ class Orchestrator:
         self.exchange = BinanceClient()
 
     def send_email_alert(self, subject: str, body: str):
-        """Sends a high-priority fail-safe email alert."""
         if not all([self.email_sender, self.email_password, self.email_receiver]):
             logger.warning("📧 Email credentials missing. Skipping email alert.")
             return
-
         try:
             msg = MIMEText(body)
             msg['Subject'] = f"🚨 Bot Critical: {subject}"
             msg['From'] = self.email_sender
             msg['To'] = self.email_receiver
-
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls()
                 server.login(self.email_sender, self.email_password)
@@ -83,7 +80,6 @@ class Orchestrator:
             logger.error(f"❌ Failed to send email alert: {e}")
 
     def get_dlq_size(self):
-        """Returns count of failed signals in DLQ file"""
         try:
             if not os.path.exists(self.dlq_path): return 0
             with open(self.dlq_path, "r") as f:
@@ -91,7 +87,6 @@ class Orchestrator:
         except: return 0
 
     def is_gate_open(self, symbol: str) -> bool:
-        """Safety Gate Logic with manual override support"""
         if self.allow_real: return True
         if symbol in self.manual_overrides:
             if time.time() < self.manual_overrides[symbol]: return True
@@ -109,10 +104,18 @@ class Orchestrator:
 
             payload = event.get("payload", {})
             symbol = payload.get("symbol")
-            side = payload.get("action")
+            
+            # --- FIXED: Lowercase to Uppercase Conversion ---
+            raw_side = payload.get("action", "")
+            side = raw_side.upper() if raw_side else None # 'sell' becomes 'SELL'
+            
             qty = float(payload.get("quantity", 0))
             price = float(payload.get("price", 0))
             signal_id = event.get("signal_id")
+
+            if not side or side not in ["BUY", "SELL"]:
+                logger.error(f"⚠️ INVALID ACTION: {side} for signal {signal_id}")
+                return True
 
             if not self.is_gate_open(symbol):
                 logger.warning(f"🚨 POLICY BLOCK: {side} {symbol}")
@@ -134,22 +137,16 @@ class Orchestrator:
                 return True
 
             elif exec_status == "SKIPPED":
-                # Handle Idempotency / Safety Skip (No alert needed for duplicate)
                 logger.info(f"⏭️ Signal {signal_id} Skipped. Reason: {execution_res.get('reason')}")
                 return True
 
             elif exec_status == "FAILED":
-                # Handle Hard Failures
                 reason = execution_res.get("reason", "unknown")
                 msg = execution_res.get("msg", "No details")
-                
                 logger.error(f"❌ Execution Failed [{reason}]: {msg}")
                 self.alerts.send(f"🚨 EXECUTION FAILED: {side} {symbol}\nReason: {reason}\n{msg}", severity="CRITICAL", channel="SYSTEM")
-                
-                # Only move to DLQ if it's not a permanent rejection (e.g. timeout)
                 if reason != "permanent":
                     self.move_to_dlq(event, f"Binance Failure: {reason} - {msg}")
-                
                 return True
 
             return False
@@ -163,7 +160,6 @@ class Orchestrator:
             return True
 
     def move_to_dlq(self, event: dict, error_msg: str):
-        """Storage for failed signals"""
         try:
             now = datetime.now()
             self.recent_failures.append(now)
@@ -178,7 +174,6 @@ class Orchestrator:
             logger.critical(f"🔥 FAILED TO WRITE TO DLQ: {dlq_err}")
 
     def check_dlq_threshold(self):
-        """Alerts SYSTEM channel and Email on rapid failures"""
         now = datetime.now()
         cutoff = now - timedelta(seconds=self.dlq_threshold_window)
         self.recent_failures = [t for t in self.recent_failures if t > cutoff]
@@ -188,10 +183,9 @@ class Orchestrator:
             self.send_email_alert("Rapid DLQ Burst", msg)
 
     def process_commands(self):
-        """Processes interactive Telegram commands from the SYSTEM channel"""
-        commands = self.alerts.get_updates()
-        if not commands: return
-        for cmd_text in commands:
+        updates = self.alerts.get_updates()
+        if not updates: return
+        for cmd_text in updates:
             cmd = cmd_text.lower().strip()
             if cmd.startswith("/override"):
                 try:
@@ -209,16 +203,13 @@ class Orchestrator:
     def run(self):
         logger.info(f"🚀 Engine Live | Mode: {self.run_mode} | Real: {self.allow_real}")
         last_recon_time = time.time()
-
         while True:
             self.consumer.poll(handler=self.handle_signal, batch_size=10)
             self.process_commands()
-
             current_time = time.time()
             if current_time - self.last_heartbeat > 900:
                 logger.info(f"💓 Internal Heartbeat | Processed: {self.processed_count} | DLQ: {self.get_dlq_size()}")
                 self.last_heartbeat = current_time
-
             if current_time - last_recon_time > 900:
                 try:
                     exchange_data = self.exchange.get_audit_data()
@@ -230,7 +221,6 @@ class Orchestrator:
                 except Exception as e:
                     logger.error(f"Recon Failed: {e}")
                 last_recon_time = current_time
-
             time.sleep(1)
 
 if __name__ == "__main__":
