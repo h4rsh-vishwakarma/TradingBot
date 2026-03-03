@@ -28,3 +28,5 @@ service_account.json
 .env
 service_account.json
 .env
+storage/ledger_state.json
+storage/ledger_state.json.bak
