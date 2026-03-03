@@ -1,0 +1,1 @@
+Tue Mar  3 06:15:40 UTC 2026 - tradingview_webhook_bot.exchange - WARNING - 🚫 SAFETY GATE: Blocked SELL 0.001 BTCUSDT (Mode: Dry-Run)
