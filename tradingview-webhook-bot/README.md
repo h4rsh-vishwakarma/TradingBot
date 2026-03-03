@@ -130,7 +130,32 @@ Log Inspection
 Bash
 # Monitor Webhook Traffic
 sudo journalctl -u tv-webhook -f
+# 📖 Trading Bot Operator Runbook
 
+### 🚨 1. Service Down Alert
+If you receive a Telegram alert saying a service is **DOWN**:
+1. SSH into the EC2 instance.
+2. Restart the failed service:
+   - `sudo systemctl restart tv-engine`
+   - `sudo systemctl restart tv-webhook`
+3. Check logs for the cause: `sudo journalctl -u tv-engine -f -n 50`
+
+### ⚠️ 2. DLQ (Dead Letter Queue) Alert
+If signals are failing and landing in the DLQ:
+1. Run the inspector to see the error: `python3 dlq_inspector.py`
+2. **If it's a network error:** Fix connectivity and run `python3 dlq_replay.py`
+3. **If it's a Pydantic/Validation error:** Update your signal mapping in the orchestrator before replaying.
+
+### 🔄 3. Reconciliation Drift
+If you see a "RECON DRIFT" alert (local ledger doesn't match Binance):
+1. The bot automatically fixes this on restart using `sync_ledger.py`.
+2. Manual fix: `python3 sync_ledger.py`.
+
+### 🔐 4. Rotating Secrets
+If API keys are compromised:
+1. Update `tradingview-webhook-bot/.env` with new keys.
+2. Restart both services.
+3. Verify connection: `sudo journalctl -u tv-engine -f | grep "Connected to Binance"`.
 # Monitor Trade Executions
 sudo journalctl -u tv-engine -f
 Emergency Procedures

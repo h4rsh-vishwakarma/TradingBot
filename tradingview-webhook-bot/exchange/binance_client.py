@@ -60,15 +60,15 @@ class BinanceClient:
 
     # --- TASK D: HARDENED RETRY LOGIC (Idempotent & Deterministic) ---
     @retry(
-        stop=stop_after_attempt(3), 
-        wait=wait_exponential(multiplier=1, min=2, max=10), 
-        retry=retry_if_exception_type((ConnectionError)), # Only retry on network errors, API errors handled inside
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        # Updated to retry on network errors OR raised transient exceptions
+        retry=retry_if_exception_type((ConnectionError, RuntimeError)), 
         reraise=True
     )
     def execute_futures_order(self, symbol, side, quantity, price=None, order_type='MARKET', signal_id=None):
         """
-        Execute order with Idempotency using signal_id as newClientOrderId.
-        Updates: Explicit handling of Duplicate Order IDs (-2011).
+        Execute order with Idempotency and Selective Retries.
         """
         # --- SAFETY GATE ---
         if not self.allow_real:
@@ -93,27 +93,33 @@ class BinanceClient:
 
             logger.info(f"🚀 Executing {order_type} {side} on {symbol} (ID: {client_order_id})...")
             response = self.client.futures_create_order(**params)
-            
+
             # Standardizing success response
             response["status"] = "SUCCESS"
             logger.info(f"✅ Order Success: {response.get('orderId')}")
             return response
 
         except BinanceAPIException as e:
-            # --- STEP 2: IDEMPOTENCY CHECK ---
+            # --- 1. IDEMPOTENCY CHECK ---
             if e.code == -2011: # Duplicate Order ID
-                logger.warning(f"⚠️ IDEMPOTENCY: Signal {client_order_id} already processed by Binance. Skipping.")
+                logger.warning(f"⚠️ IDEMPOTENCY: Signal {client_order_id} already on Binance. Skipping.")
                 return {"status": "SKIPPED", "reason": "duplicate_id", "msg": e.message}
 
-            # --- ERROR CLASSIFICATION ---
-            # Permanent Errors: Invalid symbol (-1121), Insufficient balance (-2019), Bad Quantity (-1013)
+            # --- 2. TRANSIENT ERRORS (Triggering Retry) ---
+            # Rate limits (429) or Server Overload (5xx)
+            if e.http_status in [429, 500, 502, 503, 504]:
+                logger.warning(f"🔄 TRANSIENT API ERROR ({e.code}): {e.message}. Triggering Retry...")
+                raise RuntimeError(f"Transient Binance Failure: {e.message}")
+
+            # --- 3. PERMANENT ERRORS (Stop Execution) ---
+            # Invalid symbol (-1121), Insufficient balance (-2019), Bad Quantity (-1013)
             if e.code in [-1121, -2019, -1102, -1013, -2010]:
-                logger.error(f"❌ Permanent Exchange Error ({e.code}): {e.message}")
+                logger.error(f"❌ PERMANENT API ERROR ({e.code}): {e.message}")
                 return {"status": "FAILED", "reason": "permanent", "msg": e.message}
 
-            # Transient Errors: Timeout/Server issues (Handle via manual/retry)
-            logger.warning(f"⚠️ Transient/Unknown Error ({e.code}): {e.message}")
-            return {"status": "FAILED", "reason": "transient", "msg": e.message}
+            # Fallback for other API errors
+            logger.warning(f"⚠️ UNKNOWN API ERROR ({e.code}): {e.message}")
+            return {"status": "FAILED", "reason": "unknown_api", "msg": e.message}
 
         except Exception as e:
             logger.error(f"❌ Unexpected Execution Error: {e}")
