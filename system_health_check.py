@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 # Paths
 BASE_DIR = Path("/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems")
-ENV_PATH = BASE_DIR / "tradingview-webhook-bot" / ".env"
+ENV_PATH = BASE_DIR / "tradingview_webhook_bot" / ".env"
 DLQ_FILE = BASE_DIR / "storage" / "dead_letter.jsonl"
 
 load_dotenv(dotenv_path=ENV_PATH)

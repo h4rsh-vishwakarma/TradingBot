@@ -1,4 +1,0 @@
-ts,run_id,session_id,fill_id,order_id,px,qty,fee,pnl_close,r_multiple,exit_type,hold_duration_s
-2026-01-06T05:30:55.909374+00:00,2643b0cc-9548-4dd8-829e-35693aa87414,e30ad766-3640-47f7-8c8c-d5e97e6eccda,fill_663b9a4c,ord_0c9d1d89,93695.1,0.002,0.0,0.0,None,None,None
-2026-01-06T05:31:55.977676+00:00,2643b0cc-9548-4dd8-829e-35693aa87414,e30ad766-3640-47f7-8c8c-d5e97e6eccda,fill_83075698,ord_38507c24,93706.1,0.002,0.0,0.0,None,None,None
-2026-01-06T05:32:56.072513+00:00,2643b0cc-9548-4dd8-829e-35693aa87414,e30ad766-3640-47f7-8c8c-d5e97e6eccda,fill_5024a382,ord_2910cb4c,93699.2,0.002,0.0,0.0,None,None,None

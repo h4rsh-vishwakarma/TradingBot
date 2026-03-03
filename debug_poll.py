@@ -5,7 +5,7 @@ import importlib.util
 
 # --- 1. HYPHEN FOLDER PATH FIX ---
 ROOT_DIR = Path(__file__).resolve().parent
-folder_path = ROOT_DIR / "tradingview-webhook-bot"
+folder_path = ROOT_DIR / "tradingview_webhook_bot"
 
 if folder_path.exists():
     spec = importlib.util.spec_from_file_location(
@@ -15,7 +15,7 @@ if folder_path.exists():
     module = importlib.util.module_from_spec(spec)
     sys.modules["tradingview_webhook_bot"] = module
     spec.loader.exec_module(module)
-    print("✅ Module 'tradingview-webhook-bot' loaded successfully.")
+    print("✅ Module 'tradingview_webhook_bot' loaded successfully.")
 else:
     print(f"❌ Folder not found: {folder_path}")
     sys.exit(1)

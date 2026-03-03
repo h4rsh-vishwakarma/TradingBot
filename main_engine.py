@@ -18,7 +18,7 @@ try:
     import tradingview_webhook_bot
 except ImportError:
     import importlib.util
-    folder_path = ROOT_DIR / "tradingview-webhook-bot"
+    folder_path = ROOT_DIR / "tradingview_webhook_bot"
     if folder_path.exists():
         spec = importlib.util.spec_from_file_location(
             "tradingview_webhook_bot",
@@ -32,7 +32,7 @@ try:
     from tradingview_webhook_bot.core.orchestrator import Orchestrator
     # print hata kar logging use karein consistent rehne ke liye
 except ImportError as e:
-    sys.path.append(str(ROOT_DIR / "tradingview-webhook-bot"))
+    sys.path.append(str(ROOT_DIR / "tradingview_webhook_bot"))
     from core.orchestrator import Orchestrator
 
 # Setup Logging

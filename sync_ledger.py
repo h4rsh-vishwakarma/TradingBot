@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # --- PATH CONFIGURATION ---
 # We use absolute paths so systemd can find files regardless of current directory
 BASE_DIR = Path("/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems")
-ENV_PATH = BASE_DIR / "tradingview-webhook-bot" / ".env"
+ENV_PATH = BASE_DIR / "tradingview_webhook_bot" / ".env"
 LEDGER_PATH = BASE_DIR / "storage/ledger_state.json"
 
 # Explicitly load .env from the absolute path

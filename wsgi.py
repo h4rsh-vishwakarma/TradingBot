@@ -10,8 +10,8 @@ ROOT_STR = str(BASE_DIR)
 # 2. Path Injection (Bulletproof Fix):
 # Hum sys.path ko puri tarah reconstruct kar rahe hain taaki 
 # Project Root (index 0) par rahe aur venv ke paths interfere na karein.
-sys.path = [ROOT_STR, os.path.join(ROOT_STR, "tradingview-webhook-bot")] + [
-    p for p in sys.path if p not in [ROOT_STR, os.path.join(ROOT_STR, "tradingview-webhook-bot")]
+sys.path = [ROOT_STR, os.path.join(ROOT_STR, "tradingview_webhook_bot")] + [
+    p for p in sys.path if p not in [ROOT_STR, os.path.join(ROOT_STR, "tradingview_webhook_bot")]
 ]
 
 # 3. Environment variables load karein

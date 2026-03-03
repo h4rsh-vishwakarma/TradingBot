@@ -15,7 +15,7 @@ try:
 except ImportError:
     # If the folder has a hyphen, we manually load it
     import importlib.util
-    folder_path = os.path.join(root_path, "tradingview-webhook-bot")
+    folder_path = os.path.join(root_path, "tradingview_webhook_bot")
     spec = importlib.util.spec_from_file_location("tradingview_webhook_bot", os.path.join(folder_path, "__init__.py"))
     module = importlib.util.module_from_spec(spec)
     sys.modules["tradingview_webhook_bot"] = module

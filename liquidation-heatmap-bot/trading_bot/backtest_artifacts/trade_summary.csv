@@ -1,1 +1,0 @@
-trade_id,decision_time,exec_time,side,entry_price,exit_price,qty,pnl_usd,r_multiple,time_in_trade_s,exit_reason,edge_bps_at_entry,cluster_width_bps,cluster_intensity_z
