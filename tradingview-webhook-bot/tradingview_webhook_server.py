@@ -3,6 +3,7 @@ import os
 import uuid
 import logging
 import sqlite3
+import pandas as pd
 from pathlib import Path
 from flask import Flask, request, jsonify
 from datetime import datetime, timezone
@@ -12,7 +13,7 @@ from dotenv import load_dotenv
 # --- 1. ENVIRONMENT LOAD ---
 load_dotenv()
 
-# --- 2. PATH RESOLUTION ---
+# --- 2. PATH RESOLUTION (Senior Standard) ---
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -20,45 +21,58 @@ if str(ROOT_DIR) not in sys.path:
 # Database Path
 DB_PATH = os.path.join(ROOT_DIR, 'storage/trading_system.db')
 
-# Internal imports
+try:
+    import tradingview_webhook_bot
+except ImportError:
+    import importlib.util
+    folder_path = ROOT_DIR / "tradingview-webhook-bot"
+    if folder_path.exists():
+        spec = importlib.util.spec_from_file_location(
+            "tradingview_webhook_bot",
+            str(folder_path / "__init__.py")
+        )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["tradingview_webhook_bot"] = module
+        spec.loader.exec_module(module)
+
+# Core internal imports
 from tradingview_webhook_bot.storage.jsonl_queue import append_jsonl
 from tradingview_webhook_bot.schemas import TradingViewPayload, SignalEvent, SignalStatus
 
-# Logging Config
+# Production Logging Configuration
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("WEBHOOK_SERVER")
 
-# --- NEW: DATABASE LOGGER FUNCTION ---
+# --- 3. DATABASE LOGGER HELPER ---
 def log_event_to_db(signal_id, payload_dict):
-    """Logs the received signal into the analytics database for Day 1 QBA."""
+    """Saves webhook signal data into SQLite for performance tracking."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        strategy_id = payload_dict.get("strategy_id", "Default_Strategy")
+        strat_id = payload_dict.get("strategy_id", "Default_Strategy")
         symbol = payload_dict.get("symbol", "Unknown")
         side = payload_dict.get("action", "Unknown").upper()
         qty = float(payload_dict.get("quantity", 0))
         price = float(payload_dict.get("price", 0))
+        run_id = payload_dict.get("run_id", "LIVE_SESSION")
 
-        # Ensure strategy and run entry exists
-        cursor.execute("INSERT OR IGNORE INTO strategies (id, name) VALUES (?, ?)", (strategy_id, strategy_id))
+        cursor.execute("INSERT OR IGNORE INTO strategies (id, name) VALUES (?, ?)", (strat_id, strat_id))
         cursor.execute("INSERT OR IGNORE INTO runs (id, strategy_id, symbol, mode) VALUES (?, ?, ?, 'FORWARD')", 
-                       ("LIVE_SESSION", strategy_id, symbol))
+                       (run_id, strat_id, symbol))
 
-        # Record the 'intent' in trades table (marked as a signal received)
         cursor.execute('''INSERT INTO trades (run_id, timestamp, side, qty, price) 
                           VALUES (?, ?, ?, ?, ?)''', 
-                       ("LIVE_SESSION", datetime.now(timezone.utc).isoformat(), side, qty, price))
+                       (run_id, datetime.now(timezone.utc).isoformat(), side, qty, price))
         
         conn.commit()
         conn.close()
-        logger.info(f"💾 Signal {signal_id} logged to database.")
+        logger.info(f"💾 DB Log Success: {strat_id} | {side} {symbol}")
     except Exception as e:
-        logger.error(f"⚠️ DB Logging Error: {e}")
+        logger.error(f"⚠️ DB Logging Failed: {e}")
 
 def create_app(config=None):
     app = Flask(__name__)
@@ -69,8 +83,30 @@ def create_app(config=None):
         return jsonify({
             "status": "healthy",
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "version": "1.1.4" # Incremented version
+            "version": "1.1.5",
+            "db_found": os.path.exists(DB_PATH)
         }), 200
+
+    # --- DAY 3: ANALYTICS ENDPOINTS ---
+    @app.route('/analytics/summary', methods=['GET'])
+    def get_summary():
+        """Returns strategy performance summary from DB."""
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            query = """
+            SELECT r.strategy_id, r.symbol, r.mode, 
+                   COUNT(t.id) as total_signals, 
+                   SUM(t.pnl) as realized_pnl
+            FROM trades t
+            JOIN runs r ON t.run_id = r.id
+            GROUP BY r.strategy_id
+            """
+            df = pd.read_sql_query(query, conn)
+            conn.close()
+            return jsonify(df.to_dict(orient='records')), 200
+        except Exception as e:
+            logger.error(f"Analytics Error: {e}")
+            return jsonify({"error": str(e)}), 500
 
     @app.route('/webhook/tradingview', methods=['POST'])
     def webhook():
@@ -89,10 +125,7 @@ def create_app(config=None):
             return jsonify({"error": "Unauthorized"}), 401
 
         try:
-            # 1. Schema Validation
             validated_payload = TradingViewPayload(**raw_data)
-
-            # 2. Unique Signal ID and Timestamp
             ts = datetime.now(timezone.utc)
             signal_id = f"TV-{ts.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:8]}"
 
@@ -100,14 +133,13 @@ def create_app(config=None):
                 signal_id=signal_id,
                 timestamp=ts,
                 payload=validated_payload,
-                status=SignalStatus.RECEIVED 
+                status=SignalStatus.RECEIVED
             )
 
-            # 3. Persistence to JSONL Queue (Current logic)
             success = append_jsonl(queue_path, event.model_dump(mode='json'))
 
             if success:
-                # 4. NEW: LOG TO DATABASE FOR ANALYTICS
+                # SQL Logging integration
                 log_event_to_db(signal_id, raw_data)
                 
                 logger.info(f"✅ Signal Recorded: {signal_id} | Symbol: {validated_payload.symbol}")
@@ -128,6 +160,7 @@ def create_app(config=None):
 
     return app
 
+# Gunicorn entry point
 app = create_app()
 
 if __name__ == "__main__":
