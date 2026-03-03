@@ -33,7 +33,7 @@ class BinanceClient:
 
         try:
             self.client = Client(self.api_key, self.api_secret, testnet=self.testnet)
-            # Smoke Test
+            # Smoke Test to verify keys/connection
             self.client.futures_account_balance()
             mode = "TESTNET" if self.testnet else "LIVE"
             logger.info(f"✅ Connected to Binance Futures [{mode}] | Real Trades: {self.allow_real}")
@@ -62,8 +62,8 @@ class BinanceClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        # Updated to retry on network errors OR raised transient exceptions
-        retry=retry_if_exception_type((ConnectionError, RuntimeError)), 
+        # Retry only on network/connectivity or transient runtime errors
+        retry=retry_if_exception_type((ConnectionError, RuntimeError)),
         reraise=True
     )
     def execute_futures_order(self, symbol, side, quantity, price=None, order_type='MARKET', signal_id=None):
@@ -73,7 +73,7 @@ class BinanceClient:
         # --- SAFETY GATE ---
         if not self.allow_real:
             logger.warning(f"🚫 SAFETY GATE: Blocked {side} {quantity} {symbol} (Mode: Dry-Run)")
-            return {"status": "SKIPPED", "msg": "Real trades disabled in .env"}
+            return {"status": "SKIPPED", "msg": "SAFETY GATE: Real trades disabled"}
 
         try:
             # Deterministic Client Order ID to prevent duplicate trades
@@ -108,12 +108,13 @@ class BinanceClient:
             # --- 2. TRANSIENT ERRORS (Triggering Retry) ---
             # Rate limits (429) or Server Overload (5xx)
             if e.http_status in [429, 500, 502, 503, 504]:
-                logger.warning(f"🔄 TRANSIENT API ERROR ({e.code}): {e.message}. Triggering Retry...")
+                logger.warning(f"🔄 TRANSIENT API ERROR ({e.code}): {e.message}. Raising for Retry...")
+                # We raise RuntimeError so @retry decorator can catch it
                 raise RuntimeError(f"Transient Binance Failure: {e.message}")
 
             # --- 3. PERMANENT ERRORS (Stop Execution) ---
             # Invalid symbol (-1121), Insufficient balance (-2019), Bad Quantity (-1013)
-            if e.code in [-1121, -2019, -1102, -1013, -2010]:
+            if e.code in [-1121, -2019, -1102, -1013, -2010, -2014]:
                 logger.error(f"❌ PERMANENT API ERROR ({e.code}): {e.message}")
                 return {"status": "FAILED", "reason": "permanent", "msg": e.message}
 
@@ -122,6 +123,10 @@ class BinanceClient:
             return {"status": "FAILED", "reason": "unknown_api", "msg": e.message}
 
         except Exception as e:
+            # CRITICAL: Allow RuntimeError to bubble up to @retry
+            if isinstance(e, RuntimeError):
+                raise e
+            
             logger.error(f"❌ Unexpected Execution Error: {e}")
             return {"status": "FAILED", "reason": "exception", "msg": str(e)}
 
