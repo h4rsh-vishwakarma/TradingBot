@@ -13,25 +13,26 @@ class SignalStatus(str, Enum):
 class OrderStatus(str, Enum):
     PENDING = "pending"
     FILLED = "filled"
-    CAN_CELLED = "cancelled"
+    CANCELLED = "cancelled"
     REJECTED = "rejected"
 
-# --- NEW: Senior ki requirement ke mutabiq Payload Schema ---
+# --- UPDATED: Payload Schema to include Indicators & Strategy ID ---
 class TradingViewPayload(BaseModel):
     symbol: str
-    action: str  # buy/sell/long/short
+    action: str  # buy/sell/long/short/tp
     quantity: float = Field(gt=0)
     price: float = Field(gt=0)
-    strategy: str = "default"
+    strategy: str = "default"  # Legacy support
+    strategy_id: Optional[str] = "default"  # New field for reporting
+    indicator: Optional[str] = "N/A"        # New field for technicals
     secret: Optional[str] = None
 
 class SignalEvent(BaseModel):
     signal_id: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     status: SignalStatus = SignalStatus.RECEIVED
-    payload: TradingViewPayload  # Linking the payload model
-    
-    # Validation ke liye strategy_id helper (Agar aapko alag se chahiye)
+    payload: TradingViewPayload 
+
     @field_validator('status', mode='before')
     @classmethod
     def validate_status(cls, v):
@@ -40,15 +41,14 @@ class SignalEvent(BaseModel):
         return v
 
     def model_dump_json(self, **kwargs):
-        # Senior's Atomic Enqueue requirement: mode='json'
         return self.model_dump(mode='json', **kwargs)
 
 # --- Compatibility Layer ---
-# Agar aapka purana code strategy_id dhund raha hai
 class SignalEventLegacy(SignalEvent):
     @property
     def strategy_id(self):
-        v = self.payload.strategy
+        # Prefer strategy_id if provided, else fallback to strategy
+        v = self.payload.strategy_id or self.payload.strategy
         if "Smart Money Concepts" in v:
             return "luxalgo_smc"
         return v.lower().replace(" ", "_")

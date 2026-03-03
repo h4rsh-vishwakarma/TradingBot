@@ -105,15 +105,14 @@ class BinanceClient:
                 logger.warning(f"⚠️ IDEMPOTENCY: Signal {client_order_id} already on Binance. Skipping.")
                 return {"status": "SKIPPED", "reason": "duplicate_id", "msg": e.message}
 
-            # --- 2. TRANSIENT ERRORS (Triggering Retry) ---
+            # --- 2. TRANSIENT ERRORS (FIXED: Using status_code instead of http_status) ---
             # Rate limits (429) or Server Overload (5xx)
-            if e.http_status in [429, 500, 502, 503, 504]:
+            status_code = getattr(e, 'status_code', 0)
+            if status_code in [429, 500, 502, 503, 504]:
                 logger.warning(f"🔄 TRANSIENT API ERROR ({e.code}): {e.message}. Raising for Retry...")
-                # We raise RuntimeError so @retry decorator can catch it
                 raise RuntimeError(f"Transient Binance Failure: {e.message}")
 
             # --- 3. PERMANENT ERRORS (Stop Execution) ---
-            # Invalid symbol (-1121), Insufficient balance (-2019), Bad Quantity (-1013)
             if e.code in [-1121, -2019, -1102, -1013, -2010, -2014]:
                 logger.error(f"❌ PERMANENT API ERROR ({e.code}): {e.message}")
                 return {"status": "FAILED", "reason": "permanent", "msg": e.message}
@@ -123,10 +122,8 @@ class BinanceClient:
             return {"status": "FAILED", "reason": "unknown_api", "msg": e.message}
 
         except Exception as e:
-            # CRITICAL: Allow RuntimeError to bubble up to @retry
             if isinstance(e, RuntimeError):
                 raise e
-            
             logger.error(f"❌ Unexpected Execution Error: {e}")
             return {"status": "FAILED", "reason": "exception", "msg": str(e)}
 

@@ -4,7 +4,6 @@ from pathlib import Path
 from email.mime.text import MIMEText
 
 # --- 1. PATH RESOLUTION ---
-# Ensure the root directory is in sys.path for local imports
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
@@ -18,7 +17,6 @@ from tradingview_webhook_bot.exchange.binance_client import BinanceClient
 
 # --- 2. LOGGING CONFIGURATION ---
 class SensitiveFilter(logging.Filter):
-    """Filters sensitive keys from logs to prevent accidental exposure."""
     def filter(self, record):
         msg = str(record.msg)
         secrets = [os.getenv("WEBHOOK_SECRET"), os.getenv("BINANCE_API_KEY"), os.getenv("BINANCE_API_SECRET")]
@@ -36,19 +34,16 @@ class Orchestrator:
         # --- 3. CONFIGURATION LOAD ---
         self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
         self.run_mode = os.getenv("RUN_MODE", "production")
-        self.dlq_path = "storage/dead_letter.jsonl" # Path for failed signals
+        self.dlq_path = "storage/dead_letter.jsonl"
 
-        # Policy & Metrics
         self.processed_count = 0
         self.last_heartbeat = time.time()
         self.manual_overrides = {}
 
-        # DLQ Thresholds for burst detection
         self.dlq_threshold_count = int(os.getenv("DLQ_THRESHOLD", "5"))
         self.dlq_threshold_window = int(os.getenv("DLQ_WINDOW_SECONDS", "60"))
         self.recent_failures = []
 
-        # Core Component Initialization
         self.ledger = PositionLedger(os.getenv("LEDGER_PATH", "storage/ledger_state.json"))
         self.alerts = AlertRouter(os.getenv("ALERTS_LOG", "storage/alerts.jsonl"))
         self.reconciler = Reconciler(self.ledger)
@@ -57,7 +52,6 @@ class Orchestrator:
         self.exchange = BinanceClient()
 
     def get_dlq_size(self):
-        """Returns the number of signals currently in the DLQ."""
         try:
             if not os.path.exists(self.dlq_path): return 0
             with open(self.dlq_path, "r") as f:
@@ -65,7 +59,6 @@ class Orchestrator:
         except: return 0
 
     def check_queue_lag(self, signal_timestamp: float):
-        """Detects if signals are processing with excessive delay."""
         current_time = time.time()
         lag = current_time - signal_timestamp
         if lag > 60:
@@ -75,7 +68,6 @@ class Orchestrator:
         return lag
 
     def process_commands(self):
-        """Processes remote commands from Telegram (e.g., /status)."""
         updates = self.alerts.get_updates()
         if not updates: return
         for cmd_text in updates:
@@ -87,24 +79,31 @@ class Orchestrator:
                 self.alerts.reply(msg, channel="SYSTEM")
 
     def handle_signal(self, event: dict) -> bool:
-        """Core signal handler with normalization and hardened execution."""
+        """Core signal handler with Normalization and Rich Alerts."""
         try:
-            # 1. Metrics Check
             received_at = event.get("received_at", time.time())
             self.check_queue_lag(received_at)
 
             payload = event.get("payload", {})
             
-            # 2. Normalization
+            # --- NORMALIZATION ---
             raw_symbol = payload.get("symbol", "").upper()
             symbol = "BTCUSDT" if raw_symbol in ["BTCUSD", "BTC"] else raw_symbol
-            side = payload.get("action", "").upper()
+            
+            # Action Mapping
+            original_action = payload.get("action", "").upper()
+            # Force "TP" or "EXIT" to "SELL" for exchange logic (assuming closing a Long)
+            side = "SELL" if original_action in ["SELL", "TP", "EXIT"] else "BUY"
             
             qty = float(payload.get("quantity", 0))
             price = float(payload.get("price", 0))
             signal_id = event.get("signal_id")
 
-            # 3. Hardened Execution
+            # Strategy & Indicators
+            strat_id = payload.get("strategy_id") or payload.get("strategy") or "Bot"
+            indicator = payload.get("indicator", "N/A")
+
+            # --- EXECUTION ---
             execution_res = self.exchange.execute_futures_order(symbol, side, qty, price, signal_id=signal_id)
             exec_status = execution_res.get("status")
 
@@ -112,7 +111,22 @@ class Orchestrator:
                 self.processed_count += 1
                 self.ledger.apply_fill(symbol, side, qty, price)
                 self.sheets_logger.log_trade(symbol=symbol, action=side, qty=qty, price=price)
-                self.alerts.send(f"✅ Executed {side} {symbol} (ID: {signal_id})", channel="TRADES")
+
+                # --- RICH TELEGRAM ALERT ---
+                if original_action == "TP": emoji = "🎯"
+                elif side == "BUY": emoji = "🟢"
+                else: emoji = "🔴"
+
+                rich_msg = (
+                    f"{emoji} **Bot Alert ({strat_id})**\n\n"
+                    f"✅ **Executed:** {original_action} {symbol}\n"
+                    f"💰 **Price:** {price}\n"
+                    f"📊 **Indicator:** {indicator}\n"
+                    f"📦 **Qty:** {qty}\n"
+                    f"🆔 **ID:** `{signal_id}`"
+                )
+
+                self.alerts.send(rich_msg, channel="TRADES")
                 return True
 
             elif exec_status == "FAILED":
@@ -129,7 +143,6 @@ class Orchestrator:
             return True
 
     def move_to_dlq(self, event: dict, error_msg: str):
-        """Saves failed events for later inspection/replay."""
         try:
             now = datetime.now()
             self.recent_failures.append(now)
@@ -141,7 +154,6 @@ class Orchestrator:
             logger.critical(f"🔥 DLQ WRITE FAILURE: {dlq_err}")
 
     def check_dlq_threshold(self):
-        """Alerts if too many signals fail in a short window."""
         now = datetime.now()
         cutoff = now - timedelta(seconds=self.dlq_threshold_window)
         self.recent_failures = [t for t in self.recent_failures if t > cutoff]
@@ -149,23 +161,15 @@ class Orchestrator:
             self.alerts.send("🚨 *CRITICAL DLQ BURST DETECTED!*", severity="CRITICAL", channel="SYSTEM")
 
     def run(self):
-        """Main loop managing polling, commands, and periodic tasks."""
         logger.info(f"🚀 Engine Live | Mode: {self.run_mode} | Real: {self.allow_real}")
         last_recon = time.time()
         while True:
-            # 1. Process Signal Queue
             self.consumer.poll(handler=self.handle_signal, batch_size=5)
-            
-            # 2. Handle External Commands
             self.process_commands()
-            
-            # 3. Heartbeat & Health Logging
             current_time = time.time()
             if current_time - self.last_heartbeat > 900:
                 logger.info(f"💓 Heartbeat | Processed: {self.processed_count} | DLQ: {self.get_dlq_size()}")
                 self.last_heartbeat = current_time
-            
-            # 4. 15-Minute Reconciliation Check
             if current_time - last_recon > 900:
                 try:
                     exchange_data = self.exchange.get_audit_data()
@@ -173,7 +177,6 @@ class Orchestrator:
                 except Exception as e:
                     logger.error(f"Recon Error: {e}")
                 last_recon = current_time
-            
             time.sleep(1)
 
 if __name__ == "__main__":
