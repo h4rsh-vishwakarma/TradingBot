@@ -30,3 +30,6 @@ service_account.json
 .env
 storage/ledger_state.json
 storage/ledger_state.json.bak
+storage/*.db
+storage/*.csv
+storage/test_performance.csv

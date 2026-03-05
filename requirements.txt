@@ -1,14 +1,48 @@
-# Webhook & Server
+# Core Frameworks
 flask==3.0.0
 gunicorn==21.2.0
 pydantic==2.10.0
+pydantic-core
+pydantic-settings
 
 # Trading & Exchange
 ccxt
+python-binance
 requests==2.31.0
 python-dotenv==1.0.0
+tenacity
 
-# Testing & Logic
-pytest==8.0.0
+# Google Sheets & Auth
+gspread
+google-auth
+google-auth-oauthlib
+oauth2client
+
+# Data Science & Maths
 pandas==2.2.0
 numpy==1.26.4
+scipy
+matplotlib
+sqlalchemy
+pyarrow
+
+# Async & Networking
+aiohttp
+aiosignal
+aiodns
+uvloop
+async-timeout
+urllib3
+certifi
+chardet
+charset-normalizer
+cryptography
+coincurve
+
+# Utils
+click
+colorama
+rich
+pytz
+six
+typing-extensions
