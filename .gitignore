@@ -33,3 +33,21 @@ storage/ledger_state.json.bak
 storage/*.db
 storage/*.csv
 storage/test_performance.csv
+
+# Security & Secrets
+.env
+service_account.json
+*.pem
+aws-configs/
+
+# Databases & Data
+storage/*.db
+storage/*.csv
+storage/*.jsonl
+*.db
+*.jsonl
+
+# Python artifacts
+__pycache__/
+*.pyc
+venv/
