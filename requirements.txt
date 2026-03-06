@@ -46,3 +46,7 @@ rich
 pytz
 six
 typing-extensions
+gspread
+oauth2client
+gspread
+oauth2client

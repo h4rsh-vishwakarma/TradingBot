@@ -37,8 +37,7 @@ storage/test_performance.csv
 # Security & Secrets
 .env
 service_account.json
-*.pem
-aws-configs/
+
 
 # Databases & Data
 storage/*.db

@@ -1,19 +1,10 @@
-version: '3.8'
 services:
-  webhook:
-    build: .
-    ports:
-      - "5000:5000"
-    env_file: .env
-    volumes:
-      - ./storage:/app/storage
-    command: gunicorn --bind 0.0.0.0:5000 "tradingview_webhook_bot.tradingview_webhook_server:app"
-    restart: always
-
   orchestrator:
     build: .
-    env_file: .env
+    container_name: tradingview_webhook_bot-orchestrator-1
     volumes:
-      - ./storage:/app/storage
-    command: python -m tradingview_webhook_bot.core.orchestrator
+      - .:/app
+    ports:
+      - "5000:5000"
     restart: always
+    env_file: .env
