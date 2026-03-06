@@ -19,31 +19,7 @@ Both systems operate on Binance Futures with advanced risk management, real-time
 
 ## 🎯 Trading Systems
 
-### 1. Liquidation Heatmap Bot
-
-**Strategy:** Identifies and trades liquidation clusters using multi-source data aggregation.
-
-**Key Features:**
-- ✅ Real-time liquidation heatmap scraping (Coinglass)
-- ✅ Multi-timeframe cluster detection (12h, 24h, 48h, 3d, 1week)
-- ✅ DBSCAN clustering algorithm for density analysis
-- ✅ Open Interest + Funding Rate + LSR confirmation
-- ✅ 5-layer signal validation system
-- ✅ Advanced R-based position sizing
-
-**Performance:**
-- Current BTC Price Analysis: $66,423 - $68,210 ✅
-- Data Points: 428 liquidation levels across 5 timeframes
-- Clusters Detected: 10 major liquidation zones
-- Signal Generation: Active with fresh OI/FR/LSR data
-
-**Location:** `/home/ubuntu/tradingview-webhook-mvp/trading_bot/`
-
-📖 **[Read Full Documentation →](docs/LIQUIDATION_STRATEGY_DOCUMENTATION.md)**
-
----
-
-### 2. TradingView Webhook Bot
+###  TradingView Webhook Bot
 
 **Strategy:** Receives and executes signals from TradingView indicators via HTTP webhooks.
 
@@ -74,7 +50,6 @@ Both systems operate on Binance Futures with advanced risk management, real-time
 **Location:** `/home/ubuntu/tradingview-bot/`
 
 📖 **[Read Full Documentation →](docs/TRADINGVIEW_BOT_DOCUMENTATION.md)**  
-📖 **[Liquidation Heatmap Bot Details →](docs/LIQUIDATION_HEATMAP_BOT.md)**
 
 ---
 
@@ -325,15 +300,9 @@ nohup bash run_oi_funding_loop.sh > logs/oi_funding.log 2>&1 &
 📄 **[Product Requirements Document](PRD_TRADING_SYSTEMS_COMBINED.md)**  
 Comprehensive PRD covering both trading systems, architecture, and roadmap.
 
-📄 **[Liquidation Strategy Documentation](docs/LIQUIDATION_STRATEGY_DOCUMENTATION.md)**  
-Complete technical documentation for liquidation heatmap trading bot.
 
 📄 **[TradingView Bot Documentation](docs/TRADINGVIEW_BOT_DOCUMENTATION.md)**  
 Full guide for TradingView webhook integration and multi-strategy setup.
-
-📄 **[Liquidation Heatmap Bot Details](docs/LIQUIDATION_HEATMAP_BOT.md)**  
-Component breakdown and architecture of liquidation bot system.
-
 ### Setup Guides
 
 - [HTTPS Setup Guide](HTTPS_SETUP_GUIDE.md)
@@ -384,14 +353,6 @@ Component breakdown and architecture of liquidation bot system.
 ## 📊 Performance Metrics
 
 ### Liquidation Heatmap Bot
-
-| Metric | Value |
-|--------|-------|
-| Data Sources | 3 (Coinglass, Binance OI, Binance FR) |
-| Liquidation Points | 428 across 5 timeframes |
-| Clusters Detected | 10 major zones |
-| Signal Validation Layers | 5 (cluster + OI + FR + LSR + multi-TF) |
-| Current Status | ✅ Signals generating |
 
 ### TradingView Webhook Bot
 
