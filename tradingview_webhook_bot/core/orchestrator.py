@@ -5,15 +5,18 @@ from email.mime.text import MIMEText
 from dotenv import load_dotenv
 
 # --- 1. PATH RESOLUTION & ENV LOAD ---
-# Hum .env ko base directory se load kar rahe hain
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-# Agar .env file 'tradingview_webhook_bot' folder ke bahar hai
 ENV_PATH = BASE_DIR.parent / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+# New Imports
+from tradingview_webhook_bot.storage.idempotency_store import IdempotencyStore
+from tradingview_webhook_bot.core.schemas import SignalPayload
+
+# Existing Imports
 from tradingview_webhook_bot.storage.sheets_logger import GoogleSheetsLogger
 from tradingview_webhook_bot.storage.jsonl_consumer import JsonlOffsetConsumer
 from tradingview_webhook_bot.ledger.positions import PositionLedger
@@ -41,6 +44,7 @@ class Orchestrator:
         self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
         self.run_mode = os.getenv("RUN_MODE", "production")
         self.dlq_path = "storage/dead_letter.jsonl"
+        self.idempotency_db = os.getenv("IDEMPOTENCY_DB_PATH", "storage/idempotency.db")
 
         self.processed_count = 0
         self.last_heartbeat = time.time()
@@ -50,18 +54,21 @@ class Orchestrator:
         self.dlq_threshold_window = int(os.getenv("DLQ_WINDOW_SECONDS", "60"))
         self.recent_failures = []
 
-        # Default values provide safety against NoneType errors
         self.ledger_path = os.getenv("LEDGER_PATH", "storage/ledger_state.json")
         self.alerts_log = os.getenv("ALERTS_LOG", "storage/alerts.jsonl")
         self.queue_path = os.getenv("QUEUE_PATH", "storage/signals.jsonl")
         self.offset_path = os.getenv("OFFSET_PATH", "storage/signals.offset")
 
+        # --- INITIALIZATION ---
         self.ledger = PositionLedger(self.ledger_path)
         self.alerts = AlertRouter(self.alerts_log)
         self.reconciler = Reconciler(self.ledger)
         self.sheets_logger = GoogleSheetsLogger(json_key="service_account.json")
         self.consumer = JsonlOffsetConsumer(self.queue_path, self.offset_path)
         self.exchange = BinanceClient()
+        
+        # 🔑 Initialize Idempotency Store
+        self.idempotency = IdempotencyStore(self.idempotency_db)
 
     def get_dlq_size(self):
         try:
@@ -86,31 +93,45 @@ class Orchestrator:
             cmd = cmd_text.lower().strip()
             if cmd == "/status":
                 health = self.exchange.get_account_health()
-                msg = f"📊 *Live Status*\n- Processed: {self.processed_count}\n- DLQ Size: {self.get_dlq_size()}"
+                msg = f"📊 Live Status\n- Processed: {self.processed_count}\n- DLQ Size: {self.get_dlq_size()}"
                 if health: msg += f"\n- Balance: ${health['available_balance']:.2f}"
                 self.alerts.reply(msg, channel="SYSTEM")
 
     def handle_signal(self, event: dict) -> bool:
-        """Core signal handler with Normalization and Rich Alerts."""
+        """Core signal handler with Normalization and Idempotency."""
         try:
+            signal_id = event.get("signal_id")
+            
+            # 🛡️ 1. IDEMPOTENCY CHECK (Don't process if already seen)
+            if self.idempotency.is_seen(signal_id):
+                logger.info(f"⏭️ Skipping already processed signal: {signal_id}")
+                return True
+
             received_at = event.get("received_at", time.time())
             self.check_queue_lag(received_at)
 
-            payload = event.get("payload", {})
+            payload_raw = event.get("payload", {})
+            
+            # 📝 2. SCHEMA VALIDATION
+            try:
+                # Validate using Pydantic
+                valid_payload = SignalPayload(**payload_raw)
+                payload = valid_payload.dict()
+            except Exception as schema_err:
+                logger.error(f"❌ Schema Validation Failed: {schema_err}")
+                self.move_to_dlq(event, f"Schema Error: {schema_err}")
+                return True
 
             # --- NORMALIZATION ---
             raw_symbol = payload.get("symbol", "").upper()
             symbol = "BTCUSDT" if raw_symbol in ["BTCUSD", "BTC"] else raw_symbol
 
-            # Action Mapping
             original_action = payload.get("action", "").upper()
             side = "SELL" if original_action in ["SELL", "TP", "EXIT"] else "BUY"
 
             qty = float(payload.get("quantity", 0))
             price = float(payload.get("price", 0))
-            signal_id = event.get("signal_id")
 
-            # Strategy & Indicators
             strat_id = payload.get("strategy_id") or payload.get("strategy") or "Bot"
             indicator = payload.get("indicator", "N/A")
 
@@ -119,28 +140,29 @@ class Orchestrator:
             exec_status = execution_res.get("status")
 
             if exec_status == "SUCCESS":
+                # 🛡️ 3. MARK AS SEEN (Only after successful execution)
+                self.idempotency.mark_seen(signal_id)
+                
                 self.processed_count += 1
                 self.ledger.apply_fill(symbol, side, qty, price)
                 self.sheets_logger.log_trade(symbol=symbol, action=side, qty=qty, price=price)
 
-                # --- RICH TELEGRAM ALERT ---
                 emoji = "🎯" if original_action == "TP" else ("🟢" if side == "BUY" else "🔴")
-
                 rich_msg = (
-                    f"{emoji} **Bot Alert ({strat_id})**\n\n"
-                    f"✅ **Executed:** {original_action} {symbol}\n"
-                    f"💰 **Price:** {price}\n"
-                    f"📊 **Indicator:** {indicator}\n"
-                    f"📦 **Qty:** {qty}\n"
-                    f"🆔 **ID:** `{signal_id}`"
+                    f"{emoji} Bot Alert ({strat_id})\n\n"
+                    f"✅ Executed: {original_action} {symbol}\n"
+                    f"💰 Price: {price}\n"
+                    f"📊 Indicator: {indicator}\n"
+                    f"📦 Qty: {qty}\n"
+                    f"🆔 ID: {signal_id}"
                 )
 
                 self.alerts.send(rich_msg, channel="TRADES")
                 return True
 
             elif exec_status == "FAILED":
-                self.alerts.send(f"❌ **Trade Failed**\nSymbol: {symbol}\nReason: {reason}", severity="CRITICAL", channel="SYSTEM")
                 reason = execution_res.get("reason", "unknown")
+                self.alerts.send(f"❌ Trade Failed\nSymbol: {symbol}\nReason: {reason}", severity="CRITICAL", channel="SYSTEM")
                 if reason != "permanent":
                     self.move_to_dlq(event, f"Exchange Failure: {reason}")
                 return True
