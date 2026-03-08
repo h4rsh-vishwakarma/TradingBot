@@ -1,5 +1,0 @@
-Trade #,Type,Signal,Date/Time,Price,Contracts,Profit,Profit %,Cum. Profit,Cum. Profit %
-1,Entry Long,Long,2024-03-01T10:00:00Z,60000,1,,,0,0
-2,Exit Long,Close,2024-03-01T15:00:00Z,62000,1,2000,3.33,2000,3.33
-3,Entry Short,Short,2024-03-02T09:00:00Z,61500,1,,,2000,3.33
-4,Exit Short,Close,2024-03-02T12:00:00Z,61000,1,500,0.81,2500,4.14
