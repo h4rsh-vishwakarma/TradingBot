@@ -2,9 +2,15 @@ import time, logging, os, json, sys, smtplib
 from datetime import datetime, timedelta
 from pathlib import Path
 from email.mime.text import MIMEText
+from dotenv import load_dotenv
 
-# --- 1. PATH RESOLUTION ---
+# --- 1. PATH RESOLUTION & ENV LOAD ---
+# Hum .env ko base directory se load kar rahe hain
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+# Agar .env file 'tradingview_webhook_bot' folder ke bahar hai
+ENV_PATH = BASE_DIR.parent / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
+
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
@@ -44,11 +50,17 @@ class Orchestrator:
         self.dlq_threshold_window = int(os.getenv("DLQ_WINDOW_SECONDS", "60"))
         self.recent_failures = []
 
-        self.ledger = PositionLedger(os.getenv("LEDGER_PATH", "storage/ledger_state.json"))
-        self.alerts = AlertRouter(os.getenv("ALERTS_LOG", "storage/alerts.jsonl"))
+        # Default values provide safety against NoneType errors
+        self.ledger_path = os.getenv("LEDGER_PATH", "storage/ledger_state.json")
+        self.alerts_log = os.getenv("ALERTS_LOG", "storage/alerts.jsonl")
+        self.queue_path = os.getenv("QUEUE_PATH", "storage/signals.jsonl")
+        self.offset_path = os.getenv("OFFSET_PATH", "storage/signals.offset")
+
+        self.ledger = PositionLedger(self.ledger_path)
+        self.alerts = AlertRouter(self.alerts_log)
         self.reconciler = Reconciler(self.ledger)
         self.sheets_logger = GoogleSheetsLogger(json_key="service_account.json")
-        self.consumer = JsonlOffsetConsumer(os.getenv("QUEUE_PATH"), os.getenv("OFFSET_PATH"))
+        self.consumer = JsonlOffsetConsumer(self.queue_path, self.offset_path)
         self.exchange = BinanceClient()
 
     def get_dlq_size(self):
@@ -85,16 +97,15 @@ class Orchestrator:
             self.check_queue_lag(received_at)
 
             payload = event.get("payload", {})
-            
+
             # --- NORMALIZATION ---
             raw_symbol = payload.get("symbol", "").upper()
             symbol = "BTCUSDT" if raw_symbol in ["BTCUSD", "BTC"] else raw_symbol
-            
+
             # Action Mapping
             original_action = payload.get("action", "").upper()
-            # Force "TP" or "EXIT" to "SELL" for exchange logic (assuming closing a Long)
             side = "SELL" if original_action in ["SELL", "TP", "EXIT"] else "BUY"
-            
+
             qty = float(payload.get("quantity", 0))
             price = float(payload.get("price", 0))
             signal_id = event.get("signal_id")
@@ -113,9 +124,7 @@ class Orchestrator:
                 self.sheets_logger.log_trade(symbol=symbol, action=side, qty=qty, price=price)
 
                 # --- RICH TELEGRAM ALERT ---
-                if original_action == "TP": emoji = "🎯"
-                elif side == "BUY": emoji = "🟢"
-                else: emoji = "🔴"
+                emoji = "🎯" if original_action == "TP" else ("🟢" if side == "BUY" else "🔴")
 
                 rich_msg = (
                     f"{emoji} **Bot Alert ({strat_id})**\n\n"

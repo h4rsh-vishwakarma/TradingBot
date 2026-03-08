@@ -20,7 +20,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 # Database Path
-DB_PATH = os.path.join(ROOT_DIR, 'storage/trading_system.db')
+DB_PATH = os.path.join(os.getcwd(), 'storage/trading_system.db')
 
 try:
     import tradingview_webhook_bot
@@ -48,8 +48,8 @@ logger = logging.getLogger("WEBHOOK_SERVER")
 
 # --- 3. TELEGRAM ALERT HELPER ---
 def send_telegram_notification(strat_id, symbol, side, qty, price, signal_id, indicator="N/A"):
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "7709465703:AAG049m19b8J0SFwCoHtkyRAnveynLSNPZo")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "-1003786123730")
     if not token or not chat_id:
         return
 
