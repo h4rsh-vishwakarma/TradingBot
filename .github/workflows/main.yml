@@ -22,6 +22,24 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pydantic flask gunicorn requests python-dotenv
+        # Install from requirements.txt to ensure consistency
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # Ensure testing tools are present
+        pip install pytest pytest-mock pydantic flask gunicorn requests python-dotenv gspread google-auth
 
-    
+    - name: Create Mock Environment
+      run: |
+        # CI environment ke liye dummy files create karna taaki crash na ho
+        mkdir -p tradingview_webhook_bot/storage
+        touch tradingview_webhook_bot/storage/signals.jsonl
+        touch tradingview_webhook_bot/storage/signals.offset
+        echo "WEBHOOK_SECRET=test_secret" > .env
+        echo "RUN_MODE=test" >> .env
+
+    - name: Run Pytest
+      env:
+        # 🛡️ Ye line sabse important hai naye package structure ke liye
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        # Sirf naye structure ke valid tests run karein
+        pytest tradingview_webhook_bot/tests/ -v01~
