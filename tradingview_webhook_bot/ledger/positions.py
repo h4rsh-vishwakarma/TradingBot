@@ -49,31 +49,26 @@ class PositionLedger:
         except Exception as e:
             logger.error(f"❌ Failed to save ledger state: {e}")
 
+    def get_position(self, symbol: str) -> PositionSnapshot:
+        """⭐ FIXED: Returns snapshot for a symbol (prevents crash)"""
+        return self.positions.get(symbol, PositionSnapshot(symbol=symbol))
+
     def get_daily_pnl(self) -> float:
-        """
-        Calculates total realized PnL for all symbols for the current UTC day.
-        """
+        """Calculates total realized PnL for the current day."""
         today = datetime.utcnow().strftime('%Y-%m-%d')
         total_daily_pnl = 0.0
-        
-        for symbol, pos in self.positions.items():
-            # Reset logic: If last update was not today, daily PnL is effectively 0
+        for pos in self.positions.values():
             if pos.last_update_date == today:
                 total_daily_pnl += pos.daily_realized_pnl
-        
         return total_daily_pnl
 
     def apply_fill(self, symbol: str, side: str, qty: float, price: float, fee: float = 0.0):
-        """
-        Updates the ledger based on a trade fill and tracks Daily PnL.
-        """
         if symbol not in self.positions:
             self.positions[symbol] = PositionSnapshot(symbol=symbol)
 
         pos = self.positions[symbol]
         today = datetime.utcnow().strftime('%Y-%m-%d')
-        
-        # Reset Daily PnL if it's a new day
+
         if pos.last_update_date != today:
             pos.daily_realized_pnl = 0.0
             pos.last_update_date = today
@@ -103,9 +98,7 @@ class PositionLedger:
 
         pos.realized_pnl += trade_pnl
         pos.daily_realized_pnl += trade_pnl
-        
         self._save_state()
-        logger.info(f"📊 Ledger Updated | {symbol} | Daily PnL: ${self.get_daily_pnl():.2f}")
         return pos
 
     def update_position_manually(self, symbol: str, quantity: float):

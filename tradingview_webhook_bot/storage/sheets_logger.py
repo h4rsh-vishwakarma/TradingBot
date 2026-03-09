@@ -11,11 +11,8 @@ class GoogleSheetsLogger:
         """
         Initialize Google Sheets using secure system paths.
         """
-        # 1. Prioritize Environment Variable (Set in /etc/tradingbot/env_vars)
-        # 2. Fallback to the new secure production path
-        # 3. Last fallback to the legacy project path
         self.json_key = json_key or os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE") or "/etc/tradingbot/service_account.json"
-        
+
         # Legacy fallback check for safety
         if not os.path.exists(self.json_key):
              legacy_path = "/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/storage/service_account.json"
@@ -40,23 +37,42 @@ class GoogleSheetsLogger:
             creds = Credentials.from_service_account_file(self.json_key, scopes=scopes)
             client = gspread.authorize(creds)
 
-            # Open the sheet
-            self.sheet = client.open(self.sheet_name).sheet1
-            logger.info(f"✅ Google Sheets Connected: {self.sheet_name}")
+            # Open the sheet (Make sure it's the first tab 'Trades')
+            spreadsheet = client.open(self.sheet_name)
+            self.sheet = spreadsheet.worksheet("Trades")
+            logger.info(f"✅ Google Sheets Connected to tab 'Trades'")
 
         except Exception as e:
             logger.error(f"❌ Sheets Connection Error: {e}")
             self.sheet = None
 
-    def log_trade(self, symbol, action, qty, price, strategy="N/A"):
+    def log_trade(self, signal_id, symbol, action, qty, price, strategy="N/A", indicator="N/A", pnl=0.0):
+        """
+        Logs detailed trade data including PnL for Analytics formulas.
+        Row Structure: [ID, Time, Symbol, Action, Qty, Price, PnL, Indicator, Strategy]
+        """
         if not self.sheet:
             logger.warning("⚠️ Skipping Sheet Update: Connection not established.")
             return
 
         try:
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            row = [timestamp, str(symbol).upper(), str(action).upper(), float(qty), float(price), str(strategy)]
+            
+            # 📊 Row Mapping for your Dashboard formulas
+            # Column A: ID | B: Time | C: Symbol | D: Action | E: Qty | F: Price | G: PnL | H: Indicator
+            row = [
+                str(signal_id),
+                timestamp,
+                str(symbol).upper(),
+                str(action).upper(),
+                float(qty),
+                float(price),
+                float(pnl),  # 💰 This goes to Column G for your SUMIF formulas
+                str(indicator),
+                str(strategy)
+            ]
+            
             self.sheet.append_row(row)
-            logger.info(f"📊 Sheet Updated: {symbol} {action}")
+            logger.info(f"📊 Sheet Updated: {symbol} | PnL: ${pnl}")
         except Exception as e:
             logger.error(f"❌ Failed to update sheet: {e}")

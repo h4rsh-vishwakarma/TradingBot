@@ -1,14 +1,18 @@
 {
     "BTCUSDT": {
         "symbol": "BTCUSDT",
-        "quantity": -0.065,
-        "avg_price": 63039.03230769229,
-        "realized_pnl": 7.7399999999999345
+        "quantity": -0.09500000000000003,
+        "avg_price": 64622.529473684175,
+        "realized_pnl": 7.7399999999999345,
+        "daily_realized_pnl": 0.0,
+        "last_update_date": "2026-03-09"
     },
     "ETHUSDT": {
         "symbol": "ETHUSDT",
         "quantity": 0.05,
         "avg_price": 3500.0,
-        "realized_pnl": 0.0
+        "realized_pnl": 0.0,
+        "daily_realized_pnl": 0.0,
+        "last_update_date": ""
     }
 }

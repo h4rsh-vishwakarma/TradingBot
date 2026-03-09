@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 # --- 1. PATH RESOLUTION & ENV LOAD ---
 CORE_DIR = Path(__file__).resolve().parent
-BASE_DIR = CORE_DIR.parent 
+BASE_DIR = CORE_DIR.parent
 
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
@@ -21,7 +21,7 @@ else:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Direct Imports (Relative to BASE_DIR)
+# Direct Imports
 try:
     from storage.idempotency_store import IdempotencyStore
     from core.schemas import SignalPayload
@@ -47,7 +47,7 @@ class Orchestrator:
         # 🛡️ 3. RISK LIMITS & CONFIGURATION
         self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
         self.run_mode = os.getenv("RUN_MODE", "production")
-        
+
         # Financial Gates
         self.max_notional = float(os.getenv("MAX_NOTIONAL_PER_TRADE", "500.0"))
         self.daily_loss_limit = float(os.getenv("DAILY_LOSS_LIMIT", "-50.0"))
@@ -72,12 +72,12 @@ class Orchestrator:
         self.consumer = JsonlOffsetConsumer(self.queue_path, self.offset_path)
         self.exchange = BinanceClient()
         self.idempotency = IdempotencyStore(self.idempotency_db)
-        
+
         self.processed_count = 0
         self.last_heartbeat = time.time()
 
-    def check_safety_gate(self, symbol, qty, price) -> tuple[bool, str]:
-        """🛡️ Pre-Trade Risk Validation"""
+    def check_safety_gate(self, symbol, qty, price, side) -> tuple[bool, str]:
+        """🛡️ Pre-Trade Risk Validation & Redundancy Check"""
         if not self.allow_real:
             return False, "ALLOW_REAL_TRADES is disabled"
 
@@ -90,19 +90,26 @@ class Orchestrator:
             logger.error(f"Risk Check Error: {e}")
             return False, "Ledger PnL calculation failed"
 
-        # 2. Notional Size Check
+        # 2. Redundant Trade Protection (Over-trading)
+        current_pos = self.ledger.get_position(symbol)
+        if side == "BUY" and current_pos.quantity > 0:
+            return False, f"Already LONG {symbol}. Blocking redundant BUY."
+        if side == "SELL" and current_pos.quantity < 0:
+            return False, f"Already SHORT {symbol}. Blocking redundant SELL."
+
+        # 3. Notional Size Check
         notional_value = qty * price
         if notional_value > self.max_notional:
             return False, f"Notional size ${notional_value:.2f} exceeds max ${self.max_notional}"
 
-        # 3. Symbol Whitelist
+        # 4. Symbol Whitelist
         if symbol not in self.allowed_symbols:
             return False, f"Symbol {symbol} not in allowed whitelist"
 
         return True, "Safe"
 
     def handle_signal(self, event: dict) -> bool:
-        """Core signal handler with Risk Gates and Adaptive Symbols."""
+        """Core signal handler with Analytics and Safety Gates."""
         try:
             signal_id = event.get("signal_id")
             if self.idempotency.is_seen(signal_id):
@@ -113,13 +120,12 @@ class Orchestrator:
 
             # 📝 1. SCHEMA VALIDATION & CLEANING
             try:
-                # Fallback for missing action/quantity in raw signals
                 if not payload_raw.get("action"):
                     ind = str(payload_raw.get("indicator", "")).upper()
                     payload_raw["action"] = "BUY" if any(x in ind for x in ["BULL", "LONG", "BOS"]) else "SELL"
-                
+
                 if not payload_raw.get("quantity"):
-                    payload_raw["quantity"] = 0.003 # Safe floor for $100 notional
+                    payload_raw["quantity"] = 0.003 
 
                 valid_payload = SignalPayload(**payload_raw)
                 payload = valid_payload.model_dump()
@@ -147,13 +153,15 @@ class Orchestrator:
             side = "SELL" if original_action in ["SELL", "TP", "EXIT", "SHORT"] else "BUY"
             qty = float(payload.get("quantity", 0))
             price = float(payload.get("price", 0))
-            strat_id = payload.get("strategy_id") or payload.get("strategy") or "Bot"
+            strat_id = payload.get("strategy_id") or payload.get("strategy") or "Bot_Strategy"
+            indicator_name = payload.get("indicator") or "SMC_LuxAlgo"
 
-            # 🛡️ 4. RISK GATE VERIFICATION
-            is_safe, reason = self.check_safety_gate(symbol, qty, price)
+            # 🛡️ 4. RISK GATE & REDUNDANCY VERIFICATION
+            is_safe, reason = self.check_safety_gate(symbol, qty, price, side)
             if not is_safe:
                 logger.warning(f"🚧 SAFETY GATE BLOCKED: {symbol} - {reason}")
-                self.alerts.send(f"🚧 *Safety Gate Blocked Trade*\nSymbol: {symbol}\nReason: {reason}", severity="WARNING")
+                if "redundant" not in reason.lower():
+                    self.alerts.send(f"🚧 *Safety Gate Blocked Trade*\nSymbol: {symbol}\nReason: {reason}", severity="WARNING")
                 return True
 
             # 5. EXECUTION
@@ -163,12 +171,37 @@ class Orchestrator:
                 client_oid = execution_res.get("order_id", "manual")
                 self.idempotency.mark_seen(signal_id, client_order_id=client_oid)
 
-                self.processed_count += 1
-                self.ledger.apply_fill(symbol, side, qty, price)
-                self.sheets_logger.log_trade(symbol=symbol, action=side, qty=qty, price=price, strategy=strat_id)
+                # Update Ledger and get Realized PnL
+                pos_snapshot = self.ledger.apply_fill(symbol, side, qty, price)
+                realized_pnl = pos_snapshot.daily_realized_pnl # Use daily realized or total realized
 
+                self.processed_count += 1
+                
+                # 📊 LOG TO GOOGLE SHEETS (Detailed for Analytics)
+                self.sheets_logger.log_trade(
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    action=side,
+                    qty=qty,
+                    price=price,
+                    strategy=strat_id,
+                    indicator=indicator_name,
+                    pnl=realized_pnl
+                )
+
+                # --- 🟢 PROFESSIONAL NOTIFICATION ---
                 emoji = "🟢" if side == "BUY" else "🔴"
-                self.alerts.send(f"{emoji} Trade Executed: {side} {symbol} @ {price}", channel="TRADES")
+                msg = (
+                    f"{emoji} *Bot Alert*\n\n"
+                    f"✅ *Executed:* {side} {symbol}\n"
+                    f"💰 *Price:* {price}\n"
+                    f"📊 *Indicator:* {indicator_name}\n"
+                    f"📦 *Qty:* {qty}\n"
+                    f"🆔 *ID:* {signal_id}\n"
+                    f"💵 *Realized PnL:* ${realized_pnl:.2f}"
+                )
+
+                self.alerts.send(msg, channel="TRADES")
                 return True
             else:
                 reason = execution_res.get("reason", "unknown_api")
@@ -199,7 +232,7 @@ class Orchestrator:
         except: return 0
 
     def run(self):
-        logger.info(f"🚀 Risk-Aware Engine Live | Mode: {self.run_mode} | Real Trades: {self.allow_real}")
+        logger.info(f"🚀 Risk-Aware Engine Live | Mode: {self.run_mode}")
         last_recon = time.time()
         while True:
             self.consumer.poll(handler=self.handle_signal, batch_size=5)
@@ -211,7 +244,7 @@ class Orchestrator:
                 try:
                     exchange_data = self.exchange.get_audit_data()
                     self.reconciler.reconcile_with_exchange(exchange_data)
-                except Exception as e: 
+                except Exception as e:
                     logger.error(f"Recon Error: {e}")
                 last_recon = current_time
             time.sleep(1)
