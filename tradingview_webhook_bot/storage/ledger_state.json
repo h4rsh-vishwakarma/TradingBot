@@ -1,9 +1,9 @@
 {
     "BTCUSDT": {
         "symbol": "BTCUSDT",
-        "quantity": 0.05000000000000002,
-        "avg_price": 62579.99999999998,
-        "realized_pnl": 0.0
+        "quantity": -0.065,
+        "avg_price": 63039.03230769229,
+        "realized_pnl": 7.7399999999999345
     },
     "ETHUSDT": {
         "symbol": "ETHUSDT",
