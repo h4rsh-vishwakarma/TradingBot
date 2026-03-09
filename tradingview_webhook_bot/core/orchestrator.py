@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 # --- 1. PATH RESOLUTION & ENV LOAD ---
 CORE_DIR = Path(__file__).resolve().parent
-BASE_DIR = CORE_DIR.parent # This is ~/tradingview_webhook_bot/tradingview_webhook_bot
+BASE_DIR = CORE_DIR.parent 
 
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
@@ -21,7 +21,7 @@ else:
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Direct Imports
+# Direct Imports (Relative to BASE_DIR)
 try:
     from storage.idempotency_store import IdempotencyStore
     from core.schemas import SignalPayload
@@ -44,9 +44,16 @@ except ImportError as e:
 
 class Orchestrator:
     def __init__(self):
+        # 🛡️ 3. RISK LIMITS & CONFIGURATION
         self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
         self.run_mode = os.getenv("RUN_MODE", "production")
+        
+        # Financial Gates
+        self.max_notional = float(os.getenv("MAX_NOTIONAL_PER_TRADE", "500.0"))
+        self.daily_loss_limit = float(os.getenv("DAILY_LOSS_LIMIT", "-50.0"))
+        self.allowed_symbols = os.getenv("ALLOWED_SYMBOLS", "BTCUSDT,ETHUSDT,SOLUSDT").split(",")
 
+        # Storage Paths
         storage_dir = Path("/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/storage")
         storage_dir.mkdir(parents=True, exist_ok=True)
 
@@ -57,12 +64,6 @@ class Orchestrator:
         self.queue_path = os.getenv("QUEUE_PATH") or str(storage_dir / "signals.jsonl")
         self.offset_path = os.getenv("OFFSET_PATH") or str(storage_dir / "signals.offset")
 
-        self.processed_count = 0
-        self.last_heartbeat = time.time()
-        self.dlq_threshold_count = int(os.getenv("DLQ_THRESHOLD", "5"))
-        self.dlq_threshold_window = int(os.getenv("DLQ_WINDOW_SECONDS", "60"))
-        self.recent_failures = []
-
         # Init Components
         self.ledger = PositionLedger(self.ledger_path)
         self.alerts = AlertRouter(self.alerts_log)
@@ -71,16 +72,37 @@ class Orchestrator:
         self.consumer = JsonlOffsetConsumer(self.queue_path, self.offset_path)
         self.exchange = BinanceClient()
         self.idempotency = IdempotencyStore(self.idempotency_db)
+        
+        self.processed_count = 0
+        self.last_heartbeat = time.time()
 
-    def get_dlq_size(self):
+    def check_safety_gate(self, symbol, qty, price) -> tuple[bool, str]:
+        """🛡️ Pre-Trade Risk Validation"""
+        if not self.allow_real:
+            return False, "ALLOW_REAL_TRADES is disabled"
+
+        # 1. Daily Loss Limit Check
         try:
-            if not os.path.exists(self.dlq_path): return 0
-            with open(self.dlq_path, "r") as f:
-                return sum(1 for line in f if line.strip())
-        except: return 0
+            current_pnl = self.ledger.get_daily_pnl()
+            if current_pnl <= self.daily_loss_limit:
+                return False, f"Daily loss limit hit: ${current_pnl:.2f}"
+        except Exception as e:
+            logger.error(f"Risk Check Error: {e}")
+            return False, "Ledger PnL calculation failed"
+
+        # 2. Notional Size Check
+        notional_value = qty * price
+        if notional_value > self.max_notional:
+            return False, f"Notional size ${notional_value:.2f} exceeds max ${self.max_notional}"
+
+        # 3. Symbol Whitelist
+        if symbol not in self.allowed_symbols:
+            return False, f"Symbol {symbol} not in allowed whitelist"
+
+        return True, "Safe"
 
     def handle_signal(self, event: dict) -> bool:
-        """Core signal handler with Adaptive Symbol Security and Schema Validation."""
+        """Core signal handler with Risk Gates and Adaptive Symbols."""
         try:
             signal_id = event.get("signal_id")
             if self.idempotency.is_seen(signal_id):
@@ -88,16 +110,16 @@ class Orchestrator:
                 return True
 
             payload_raw = event.get("payload", {})
-            
-            # 🛡️ 1. SCHEMA VALIDATION & CLEANING
+
+            # 📝 1. SCHEMA VALIDATION & CLEANING
             try:
                 # Fallback for missing action/quantity in raw signals
                 if not payload_raw.get("action"):
-                    indicator = str(payload_raw.get("indicator", "")).upper()
-                    payload_raw["action"] = "BUY" if "BULL" in indicator or "LONG" in indicator else "SELL"
+                    ind = str(payload_raw.get("indicator", "")).upper()
+                    payload_raw["action"] = "BUY" if any(x in ind for x in ["BULL", "LONG", "BOS"]) else "SELL"
                 
                 if not payload_raw.get("quantity"):
-                    payload_raw["quantity"] = 0.003 # Safe default for $100 notional
+                    payload_raw["quantity"] = 0.003 # Safe floor for $100 notional
 
                 valid_payload = SignalPayload(**payload_raw)
                 payload = valid_payload.model_dump()
@@ -106,21 +128,15 @@ class Orchestrator:
                 self.move_to_dlq(event, f"Schema Error: {schema_err}")
                 return True
 
-            # 🛡️ 2. ADAPTIVE SYMBOL SECURITY (Forever Fix)
-            # Binance Testnet/Mainnet uses USDT pairs for USDT balance
+            # 🛡️ 2. ADAPTIVE SYMBOL SECURITY
             raw_symbol = str(payload.get("symbol", "")).upper()
-            
             if "USDT" not in raw_symbol:
-                if "BTC" in raw_symbol:
-                    symbol = "BTCUSDT"
-                elif "ETH" in raw_symbol:
-                    symbol = "ETHUSDT"
-                elif "SOL" in raw_symbol:
-                    symbol = "SOLUSDT"
+                if "BTC" in raw_symbol: symbol = "BTCUSDT"
+                elif "ETH" in raw_symbol: symbol = "ETHUSDT"
+                elif "SOL" in raw_symbol: symbol = "SOLUSDT"
                 else:
-                    # Strip common suffixes and force USDT
-                    clean_name = raw_symbol.replace("USD", "").replace("H2026", "").replace(".P", "")
-                    symbol = f"{clean_name}USDT"
+                    clean = raw_symbol.replace("USD", "").replace("H2026", "").replace(".P", "")
+                    symbol = f"{clean}USDT"
             else:
                 symbol = raw_symbol
 
@@ -133,17 +149,24 @@ class Orchestrator:
             price = float(payload.get("price", 0))
             strat_id = payload.get("strategy_id") or payload.get("strategy") or "Bot"
 
-            # 4. EXECUTION
+            # 🛡️ 4. RISK GATE VERIFICATION
+            is_safe, reason = self.check_safety_gate(symbol, qty, price)
+            if not is_safe:
+                logger.warning(f"🚧 SAFETY GATE BLOCKED: {symbol} - {reason}")
+                self.alerts.send(f"🚧 *Safety Gate Blocked Trade*\nSymbol: {symbol}\nReason: {reason}", severity="WARNING")
+                return True
+
+            # 5. EXECUTION
             execution_res = self.exchange.execute_futures_order(symbol, side, qty, price, signal_id=signal_id)
-            
+
             if execution_res.get("status") == "SUCCESS":
                 client_oid = execution_res.get("order_id", "manual")
                 self.idempotency.mark_seen(signal_id, client_order_id=client_oid)
-                
+
                 self.processed_count += 1
                 self.ledger.apply_fill(symbol, side, qty, price)
                 self.sheets_logger.log_trade(symbol=symbol, action=side, qty=qty, price=price, strategy=strat_id)
-                
+
                 emoji = "🟢" if side == "BUY" else "🔴"
                 self.alerts.send(f"{emoji} Trade Executed: {side} {symbol} @ {price}", channel="TRADES")
                 return True
@@ -168,8 +191,15 @@ class Orchestrator:
         except Exception as dlq_err:
             logger.critical(f"🔥 DLQ WRITE FAILURE: {dlq_err}")
 
+    def get_dlq_size(self):
+        try:
+            if not os.path.exists(self.dlq_path): return 0
+            with open(self.dlq_path, "r") as f:
+                return sum(1 for line in f if line.strip())
+        except: return 0
+
     def run(self):
-        logger.info(f"🚀 Engine Live | Mode: {self.run_mode} | Real: {self.allow_real}")
+        logger.info(f"🚀 Risk-Aware Engine Live | Mode: {self.run_mode} | Real Trades: {self.allow_real}")
         last_recon = time.time()
         while True:
             self.consumer.poll(handler=self.handle_signal, batch_size=5)
