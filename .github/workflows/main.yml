@@ -42,4 +42,4 @@ jobs:
         PYTHONPATH: ${{ github.workspace }}
       run: |
         # Sirf naye structure ke valid tests run karein
-        pytest tradingview_webhook_bot/tests/ 
+        pytest tradingview_webhook_bot/tests/ -v
