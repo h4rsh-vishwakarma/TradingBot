@@ -39,7 +39,7 @@ jobs:
     - name: Run Pytest
       env:
         # 🛡️ Ye line sabse important hai naye package structure ke liye
-        PYTHONPATH: ${{ github.workspace }}
+        PYTHONPATH: ${{ github.workspace }}/tradingview_webhook_bot
       run: |
         # Sirf naye structure ke valid tests run karein
         pytest tradingview_webhook_bot/tests/ -v
