@@ -135,93 +135,248 @@ Both systems operate on Binance Futures with advanced risk management, real-time
 
 ## 📁 Repository Structure
 
+
 ```
-trading-view-indicators/
-│
-├── 📄 README.md                          # This file
-├── 📄 PRD_TRADING_SYSTEMS_COMBINED.md   # Product Requirements Document
-├── 📄 REORGANIZATION_PLAN.md             # Reorganization documentation
-│
-├── 📁 docs/                              # Documentation
-│   ├── LIQUIDATION_STRATEGY_DOCUMENTATION.md
-│   ├── TRADINGVIEW_BOT_DOCUMENTATION.md
-│   └── LIQUIDATION_HEATMAP_BOT.md
-│
-├── 📁 liquidation-heatmap-bot/           # Liquidation trading system
-│   ├── bot_main.py
-│   ├── signal_generator.py
-│   ├── data_sources.py
-│   ├── coinglass_visual_scraper.py
-│   ├── config.py
-│   ├── core/                             # Core modules
-│   ├── observability/                    # Event logging & metrics
-│   └── execution/                        # Trade execution
-│
-├── 📁 tradingview-webhook-bot/           # TradingView webhook system
-│   ├── main_enhanced.py                  # Main entry point
-│   ├── core/                             # Trading logic
-│   │   ├── balance_manager.py            # Virtual balance tracking
-│   │   ├── enhanced_order_manager.py     # Order execution
-│   │   ├── order_monitor.py              # Order fill monitoring
-│   │   ├── position_manager.py           # Position state
-│   │   ├── position_size_validator.py    # Position size security
-│   │   ├── risk_manager.py               # Risk calculations
-│   │   ├── signal_processor.py           # Signal validation
-│   │   ├── strategy_engine.py            # Strategy validation
-│   │   ├── webhook_server.py             # Flask webhook receiver
-│   │   └── circuit_breaker.py            # Circuit breaker logic
-│   ├── exchange/                         # Exchange integration
-│   │   ├── binance_client.py             # Binance API wrapper
-│   │   ├── price_provider.py             # Mainnet price fetcher
-│   │   ├── enhanced_order_executor.py    # Order execution
-│   │   └── execution_engine.py           # Testnet execution
-│   ├── utils/                            # Utility modules
-│   │   ├── logger.py                     # Logging setup
-│   │   ├── event_logger.py               # Event logging
-│   │   ├── health_checker.py             # Health monitoring
-│   │   ├── signal_archiver.py            # Signal queue cleanup
-│   │   ├── dashboard_updater.py          # Metrics dashboard
-│   │   ├── instance_lock.py              # Prevent duplicates
-│   │   ├── client_order_id_generator.py  # Order ID generation
-│   │   ├── position_reconciler.py        # Position reconciliation
-│   │   ├── telegram_alerter.py           # Telegram notifications
-│   │   └── helpers.py                    # Helper functions
-│   ├── storage/                          # Persistent data
-│   │   ├── idempotency_store.py          # Idempotency tracking
-│   │   ├── jsonl_queue.py                # Signal queue
-│   │   └── jsonl_consumer.py             # Queue consumer
-│   └── alerts/                           # Alert system
-│       └── telegram_alerts.py            # Telegram integration
-│
-├── 📁 strategies/                        # Pine Script indicators
-│   ├── ema_sma_crossover_webhook.pine
-│   ├── enhanced_atr_supertrend_webhook.pine
-│   ├── institutional_matrix_webhook.pine
-│   ├── lorentzian_classification_webhook.pine
-│   ├── obv_wavetrend_scalper_webhook.pine
-│   ├── sma_crossover_9_21_webhook.pine
-│   ├── squeeze_flow_expansion_webhook.pine
-│   └── supertrend_btc_4h_webhook.pine
-│
-├── 📁 scripts/                           # Utility scripts
-│   ├── analyze_7day.py                   # 7-day analysis
-│   ├── clean_dashboard_7tabs.py          # Dashboard cleanup
-│   ├── clean_dashboard_tab7.py           # Dashboard cleanup
-│   └── kill_switch.py                    # Emergency stop
-│
-├── 📁 config/                            # Strategy configurations
-│   ├── config_institutional_flow_hybrid.json
-│   ├── config_squeeze_flow_expansion.json
-│   ├── config_supertrend_btc_4h.json
-│   └── ...
-│
-├── 📁 deploy/                            # Deployment automation
-│   ├── deploy.sh                         # Manual deployment script
-│   └── nginx/                            # Nginx configurations
-│
-└── 📁 .github/
-    └── workflows/
-        └── deploy.yml                    # CI/CD deployment
+.
+└── tradingview_webhook_bot
+    ├── README.md
+    ├── RUNBOOK.md
+    ├── archive
+    │   ├── enhanced_trading_bot_remote.py
+    │   ├── legacy_backup
+    │   │   ├── conftest.py
+    │   │   ├── debug_poll.py
+    │   │   ├── generate_report.py
+    │   │   ├── ingest_trades.py
+    │   │   ├── send_fake_signals.py
+    │   │   ├── sync_ledger.py
+    │   │   ├── telegram_listener_secure.py
+    │   │   ├── test_alerts.py
+    │   │   └── test_telegram.py
+    │   ├── main.py
+    │   ├── main_engine.py
+    │   └── simulate_signal.py
+    ├── auto_scan.log
+    ├── aws-configs
+    │   ├── harsh-key-ap-south-1.pem
+    │   └── harsh-server-ap-south-1
+    │       └── HARSH_ACCESS_AP_SOUTH_1.md
+    ├── backtesting
+    │   ├── A_Leaderboard
+    │   │   ├── backtest_imports
+    │   │   │   ├── EMA_9_15_Strategy_with_Webhook_BINANCE_BTCUSDH2026_2026-03-05_15m.csv
+    │   │   │   ├── LuxAlgo_-_SMC_Strategy_BINANCE_ETHUSDH2026_2026-03-05_15m.csv
+    │   │   │   ├── MACD_Strategy_BINANCE_ETHUSDH2026_2026-03-05_4h.csv
+    │   │   │   ├── OBV_Div_BINANCE_BTCUSDH2026_2026-03-05_4h.csv
+    │   │   │   ├── Reverse_Liquidity_Trap_[PyraTime_Logic]_BINANCE_SOLUSDH2026_2026-03-05_4h.csv
+    │   │   │   └── SQZGo-WH_BITSTAMP_BTCUSD_2026-03-05_4h.csv
+    │   │   ├── ingest_csv.py
+    │   │   └── report.py
+    │   ├── __init__.py
+    │   ├── core
+    │   │   ├── add_last_updated.py
+    │   │   ├── init_db.py
+    │   │   └── schemas
+    │   │       └── event_schema_v1.json
+    │   ├── data
+    │   ├── db.sqlite3
+    │   ├── engine.py
+    │   └── pine
+    │       ├── 'SMC Strategy [LuxAlgo] + Webhook', 'LuxAlgo - SMC'
+    │       ├── ATR Supertrend [QuantAlgo]
+    │       ├── EMA 9by15 Strategy
+    │       ├── EMA-SMA Crossover
+    │       ├── Enhanced ATR Supertrend
+    │       ├── Hackathon V3 FIXED - Institutional Matrix
+    │       ├── Hybrid SMC [MarkitTick]
+    │       ├── Hybrid Smart Money Concepts [MarkitTick]
+    │       ├── Institutional Flow Hybrid [SMC + Hull + RSI]
+    │       ├── ML Lorentzian Classification
+    │       ├── MVO Momentum Variance
+    │       ├── Machine Learning Lorentzian Classification
+    │       ├── Madrid Ribbon
+    │       ├── Mean Reversion Scalper Hybrid
+    │       ├── Momentum Variance Oscillator
+    │       ├── OBV + WaveTrend Volume Scalper
+    │       ├── OBV Divergence Strategy
+    │       ├── Oppsite SMA
+    │       ├── Reverse Liquidity Trap
+    │       ├── Reverse MACD Strategy [ETH 1D]
+    │       ├── Reverse Madrid Ribbon Strategy
+    │       ├── Reverse SMA 9 Cross
+    │       ├── Reverse SMA Cross Backtest - ETH 1H
+    │       ├── Reverse SuperTrend - ETH 4h
+    │       ├── Reverse SuperTrend ETH 4h
+    │       ├── Reverse SuperTrend Strategy
+    │       ├── Reversed BarUpDn Strategy
+    │       ├── Smart Money Concept - Uncle Sam
+    │       ├── Smart Money Concepts Strategy [LuxAlgo] + Webhook', 'LuxAlgo - SMC Strategy'
+    │       ├── Smart Money Concepts [LuxAlgo]
+    │       ├── Smart Money Concepts [LuxAlgo] - Webhook'SMC-LuxAlgo-WH'
+    │       ├── Squeeze Go Momentum Pro
+    │       ├── Squeeze Go Pro
+    │       ├── Squeeze Momentum
+    │       ├── Squeeze Momentum Indicator [LazyBear]
+    │       ├── Squeeze Momentum [LazyBear]
+    │       ├── Squeeze vX [DGT]
+    │       ├── Squeeze-Flow Expansion Hybrid
+    │       ├── SuperTrend BTC 4h - Webhook
+    │       ├── SuperTrend Fusion — ATP
+    │       └── Supertrend
+    ├── config
+    │   └── settings.json
+    ├── deploy
+    │   ├── MIGRATION_README.md
+    │   ├── README.md
+    │   ├── deploy.sh
+    │   ├── migrate-server.sh
+    │   ├── nginx
+    │   │   ├── tradingview_webhook.conf
+    │   │   ├── webhook.conf
+    │   │   ├── webhook_rate_limit.conf
+    │   │   └── webhook_ssl_selfsigned.conf
+    │   └── systemd
+    │       ├── tv-engine.service
+    │       └── tv-webhook.service
+    ├── docs
+    │   ├── FINAL_STATUS.md
+    │   ├── LIQUIDATION_HEATMAP_BOT.md
+    │   ├── LIQUIDATION_STRATEGY_DOCUMENTATION.md
+    │   ├── PRD_TRADING_SYSTEMS_COMBINED.md
+    │   ├── RENAME_COMPLETE.md
+    │   ├── REORGANIZATION_PLAN.md
+    │   ├── TRADINGVIEW_BOT_DOCUMENTATION.md
+    │   └── reports
+    │       ├── dlq_analysis_report.txt
+    │       ├── requirements.txt
+    │       └── safety_gate_report.txt
+    ├── logs
+    │   ├── orchestrator.log
+    │   └── webhook.log
+    ├── pytest.ini
+    ├── scripts
+    │   ├── RUNBOOK.md
+    │   ├── analyze_7day.py
+    │   ├── asset_scanner.py
+    │   ├── backup_bot.sh
+    │   ├── clean_dashboard_7tabs.py
+    │   ├── clean_dashboard_tab7.py
+    │   ├── db_setup.py
+    │   ├── dlq_admin.py
+    │   ├── dlq_inspector.py
+    │   ├── dlq_replay.py
+    │   ├── emergency_stop.sh
+    │   ├── enable_trading.sh
+    │   ├── generate_report.py
+    │   ├── ingest_tv_export.py
+    │   ├── kill_switch.py
+    │   ├── ma_cross_checker.py
+    │   ├── smoke_test_signal.py
+    │   ├── strategy_health.py
+    │   └── system_health_check.py
+    ├── strategies
+    │   ├── ema_sma_crossover_webhook.pine
+    │   ├── enhanced_atr_supertrend_config.json
+    │   ├── enhanced_atr_supertrend_webhook.pine
+    │   ├── institutional_matrix_webhook.pine
+    │   ├── lorentzian_classification_webhook.pine
+    │   ├── obv_wavetrend_scalper_webhook.pine
+    │   ├── sma_crossover_9_21_webhook.pine
+    │   ├── squeeze_flow_expansion_webhook.pine
+    │   └── supertrend_btc_4h_webhook.pine
+    ├── tests
+    │   ├── __init__.py
+    │   ├── test_hardened_ledger.py
+    │   ├── test_hardened_logic.py
+    │   └── test_suite.py
+    ├── tradingview_webhook_bot
+    │   ├── README.md
+    │   ├── RUNBOOK.md
+    │   ├── __init__.py
+    │   ├── alerts
+    │   │   ├── __init__.py
+    │   │   ├── email_notifier.py
+    │   │   ├── router.py
+    │   │   ├── telegram_alerts.py
+    │   │   └── test_alerts.py
+    │   ├── clean_dashboard_tab7.py
+    │   ├── core
+    │   │   ├── __init__.py
+    │   │   ├── balance_manager.py
+    │   │   ├── circuit_breaker.py
+    │   │   ├── enhanced_order_manager.py
+    │   │   ├── orchestrator.py
+    │   │   ├── orchestrator.py.bak
+    │   │   ├── order_monitor.py
+    │   │   ├── position_manager.py
+    │   │   ├── position_size_validator.py
+    │   │   ├── reconciler.py
+    │   │   ├── risk_manager.py
+    │   │   ├── schemas.py
+    │   │   ├── signal_processor.py
+    │   │   ├── strategy_engine.py
+    │   │   └── webhook_server.py
+    │   ├── exchange
+    │   │   ├── __init__.py
+    │   │   ├── binance_client.py
+    │   │   ├── enhanced_order_executor.py
+    │   │   ├── execution_engine.py
+    │   │   └── price_provider.py
+    │   ├── ledger
+    │   │   ├── __init__.py
+    │   │   ├── positions.py
+    │   │   └── test_ledger.py
+    │   ├── logs
+    │   │   ├── bot.log
+    │   │   └── enhanced_bot.log
+    │   ├── main_enhanced.py
+    │   ├── recon
+    │   │   ├── __init__.py
+    │   │   ├── reconciler.py
+    │   │   └── test_recon.py
+    │   ├── requirements.txt
+    │   ├── schemas.py
+    │   ├── storage
+    │   │   ├── __init__.py
+    │   │   ├── alerts.jsonl
+    │   │   ├── alerts.jsonl.1
+    │   │   ├── dead_letter.jsonl
+    │   │   ├── dead_letter.jsonl.1
+    │   │   ├── dlq_archive_20260308_175623.jsonl
+    │   │   ├── dlq_archive_20260308_175623.jsonl.1
+    │   │   ├── idempotency.db
+    │   │   ├── idempotency_store.py
+    │   │   ├── jsonl_consumer.py
+    │   │   ├── jsonl_queue.py
+    │   │   ├── ledger_state.json
+    │   │   ├── sheets_logger.py
+    │   │   ├── signals.jsonl
+    │   │   ├── signals.jsonl.1
+    │   │   ├── signals.offset
+    │   │   ├── stress_test_queue.py
+    │   │   ├── test_storage.py
+    │   │   └── trading_system.db
+    │   ├── test_orchestrator.py
+    │   ├── test_webhook_server.py
+    │   ├── tests
+    │   │   └── test_core.py
+    │   ├── tradingview_webhook_server.py
+    │   ├── update_institutional_flow_hybrid_dashboard.py
+    │   ├── update_live_dashboard.py
+    │   └── utils
+    │       ├── __init__.py
+    │       ├── client_order_id_generator.py
+    │       ├── dashboard_updater.py
+    │       ├── event_logger.py
+    │       ├── health_checker.py
+    │       ├── helpers.py
+    │       ├── instance_lock.py
+    │       ├── logger.py
+    │       ├── position_reconciler.py
+    │       ├── signal_archiver.py
+    │       └── telegram_alerter.py
+    └── wsgi.py
+
 ```
 
 ---
