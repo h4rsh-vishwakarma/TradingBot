@@ -1,0 +1,152 @@
+//@version=5
+strategy("Squeeze Go Pro [kingthies] Webhook", 
+         overlay=false, 
+         default_qty_type=strategy.percent_of_equity, 
+         default_qty_value=100,
+         commission_type=strategy.commission.percent,
+         commission_value=0.1)
+
+// ═══════════════════════════════════════════════════════════
+// INPUTS
+// ═══════════════════════════════════════════════════════════
+lengthBB = input.int(20, "BB Length", minval=1)
+multBB = input.float(2.0, "BB Multiplier", minval=0.5)
+lengthKC = input.int(20, "KC Length", minval=1)
+multKC = input.float(1.5, "KC Multiplier", minval=0.5)
+momLength = input.int(10, "Momentum Length", minval=1)
+useMA = input.bool(true, "Use MA Filter")
+maLength = input.int(50, "MA Filter Length", minval=10)
+useTrendFilter = input.bool(true, "Use Trend Filter")
+trendLength = input.int(21, "Trend EMA Length", minval=5)
+
+// ═══════════════════════════════════════════════════════════
+// BOLLINGER BANDS
+// ═══════════════════════════════════════════════════════════
+basis = ta.sma(close, lengthBB)
+dev = multBB * ta.stdev(close, lengthBB)
+upperBB = basis + dev
+lowerBB = basis - dev
+
+// ═══════════════════════════════════════════════════════════
+// KELTNER CHANNELS
+// ═══════════════════════════════════════════════════════════
+ma = ta.sma(close, lengthKC)
+rangeMa = ta.sma(ta.tr, lengthKC)
+upperKC = ma + rangeMa * multKC
+lowerKC = ma - rangeMa * multKC
+
+// ═══════════════════════════════════════════════════════════
+// SQUEEZE DETECTION (BB inside KC = squeeze on)
+// ═══════════════════════════════════════════════════════════
+sqzOn = lowerBB > lowerKC and upperBB < upperKC
+sqzOff = lowerBB < lowerKC and upperBB > upperKC
+noSqz = not sqzOn and not sqzOff
+
+// Squeeze color coding
+sqzColor = sqzOn ? color.red : sqzOff ? color.green : color.gray
+
+// ═══════════════════════════════════════════════════════════
+// MOMENTUM CALCULATION (Linear Regression)
+// ═══════════════════════════════════════════════════════════
+// Calculate momentum using linear regression
+// Higher values = bullish, Lower values = bearish
+highest = ta.highest(high, momLength)
+lowest = ta.lowest(low, momLength)
+avgValue = math.avg(highest, lowest)
+
+// Momentum delta
+val = ta.linreg(close - avgValue, momLength, 0)
+
+// ═══════════════════════════════════════════════════════════
+// MOMENTUM COLOR GRADIENT (Pro feature)
+// ═══════════════════════════════════════════════════════════
+// Detect momentum acceleration/deceleration
+momAccel = val > val[1]
+momDecel = val < val[1]
+
+// Color based on momentum direction and strength
+momColor = val > 0 ? (momAccel ? color.new(color.lime, 0) : color.new(color.green, 30)) : (momDecel ? color.new(color.red, 0) : color.new(color.maroon, 30))
+
+// ═══════════════════════════════════════════════════════════
+// TREND FILTER (EMA)
+// ═══════════════════════════════════════════════════════════
+trendEMA = ta.ema(close, trendLength)
+bullishTrend = close > trendEMA
+bearishTrend = close < trendEMA
+
+// ═══════════════════════════════════════════════════════════
+// MA FILTER (Optional longer-term filter)
+// ═══════════════════════════════════════════════════════════
+maFilter = ta.sma(close, maLength)
+aboveMA = close > maFilter
+belowMA = close < maFilter
+
+// ═══════════════════════════════════════════════════════════
+// SIGNAL GENERATION
+// ═══════════════════════════════════════════════════════════
+// LONG Signal Requirements:
+// 1. Squeeze is firing (sqzOff) OR just released
+// 2. Momentum crosses above zero
+// 3. Momentum is accelerating (green gradient)
+// 4. Price above trend EMA (if filter enabled)
+// 5. Price above MA filter (if enabled)
+
+squeezeFiring = sqzOff or (sqzOn[1] and noSqz)
+momCrossUp = ta.crossover(val, 0)
+momBullish = val > 0 and momAccel
+
+longSetup = squeezeFiring and momBullish
+longTrigger = momCrossUp or (val > val[1] and val[1] <= 0)
+
+longCondition = longSetup and longTrigger and (not useTrendFilter or bullishTrend) and (not useMA or aboveMA)
+
+// SHORT Signal Requirements:
+// 1. Squeeze is firing (sqzOff) OR just released
+// 2. Momentum crosses below zero
+// 3. Momentum is decelerating (red gradient)
+// 4. Price below trend EMA (if filter enabled)
+// 5. Price below MA filter (if enabled)
+
+momCrossDown = ta.crossunder(val, 0)
+momBearish = val < 0 and momDecel
+
+shortSetup = squeezeFiring and momBearish
+shortTrigger = momCrossDown or (val < val[1] and val[1] >= 0)
+
+shortCondition = shortSetup and shortTrigger and (not useTrendFilter or bearishTrend) and (not useMA or belowMA)
+
+// ═══════════════════════════════════════════════════════════
+// STRATEGY EXECUTION
+// ═══════════════════════════════════════════════════════════
+if longCondition
+    strategy.entry("Long", strategy.long,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"squeeze_go_pro_kingthies","signal":"LONG","price":{{close}},"timeframe":"{{interval}}","symbol":"{{ticker}}"}')
+
+if shortCondition
+    strategy.entry("Short", strategy.short,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"squeeze_go_pro_kingthies","signal":"SHORT","price":{{close}},"timeframe":"{{interval}}","symbol":"{{ticker}}"}')
+
+// ═══════════════════════════════════════════════════════════
+// PLOTTING
+// ═══════════════════════════════════════════════════════════
+// Momentum Histogram with color gradient
+plot(val, "Momentum", style=plot.style_histogram, color=momColor, linewidth=3)
+plot(0, "Zero Line", color=color.gray, linewidth=1)
+
+// Squeeze indicator (dots at bottom)
+plot(sqzOn ? -5 : na, "Squeeze On", color=color.red, style=plot.style_circles, linewidth=3)
+plot(sqzOff ? -5 : na, "Squeeze Off", color=color.green, style=plot.style_circles, linewidth=3)
+plot(noSqz ? -5 : na, "No Squeeze", color=color.gray, style=plot.style_circles, linewidth=2)
+
+// Entry signals
+plotshape(longCondition, "LONG", shape.labelup, location.bottom, 
+         color.new(color.lime, 0), text="LONG", textcolor=color.black, size=size.normal)
+plotshape(shortCondition, "SHORT", shape.labeldown, location.top, 
+         color.new(color.red, 0), text="SHORT", textcolor=color.white, size=size.normal)
+
+// Background for squeeze state
+bgcolor(sqzOn ? color.new(color.red, 95) : sqzOff ? color.new(color.green, 95) : na, title="Squeeze State")
+
+// Momentum divergence lines (visual aid)
+plot(val > 0 ? val : na, "Bull Momentum", color=color.new(color.lime, 50), linewidth=1)
+plot(val < 0 ? val : na, "Bear Momentum", color=color.new(color.red, 50), linewidth=1)

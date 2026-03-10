@@ -1,0 +1,171 @@
+//@version=5
+strategy("EMA 9/15 Strategy with Webhook", overlay=true, max_boxes_count=50, max_labels_count=100)
+
+// ===== INPUTS =====
+emaFastLen     = input.int(9, "EMA Fast Length")
+emaSlowLen     = input.int(15, "EMA Slow Length")
+atrLen         = input.int(14, "ATR Length")
+atrMultSL      = input.float(1.5, "Stop Loss ATR Multiplier")
+rr             = input.float(2.0, "Risk:Reward Ratio")
+consolATRmult  = input.float(0.5, "Consolidation Filter")
+
+// Webhook Settings
+webhookURL = input.string("http://13.236.143.201/webhook/tradingview", "Webhook URL")
+
+// ===== COLORS =====
+colTP_Fill = color.new(#089981, 85)
+colSL_Fill = color.new(#f23645, 85)
+colTP_Text = #089981
+colSL_Text = #f23645
+
+// ===== INDICATORS =====
+emaFast = ta.ema(close, emaFastLen)
+emaSlow = ta.ema(close, emaSlowLen)
+atr     = ta.atr(atrLen)
+
+// Consolidation Filter
+rangeSize = ta.sma(high - low, 20)
+isChoppy  = atr < (rangeSize * consolATRmult)
+
+// ===== VARIABLES =====
+var box boxTP      = na
+var box boxSL      = na
+var label lblTP    = na
+var label lblSL    = na
+var int direction  = 0
+var float tpPrice  = na
+var float slPrice  = na
+var float entryPrice = na
+
+// ===== SIGNALS =====
+buySignal  = not isChoppy and ta.crossover(emaFast, emaSlow) and strategy.position_size == 0
+sellSignal = not isChoppy and ta.crossunder(emaFast, emaSlow) and strategy.position_size == 0
+
+// ===== CALCULATE SL/TP =====
+if buySignal
+    direction  := 1
+    entryPrice := close
+    slPrice    := entryPrice - (atr * atrMultSL)
+    tpPrice    := entryPrice + ((entryPrice - slPrice) * rr)
+    
+    tpPerc = (tpPrice - entryPrice) / entryPrice * 100
+    slPerc = (entryPrice - slPrice) / entryPrice * 100
+
+    // Visual boxes
+    boxTP := box.new(left=bar_index, top=tpPrice, right=bar_index + 1, bottom=entryPrice, 
+                     bgcolor=colTP_Fill, border_color=colTP_Text)
+    boxSL := box.new(left=bar_index, top=entryPrice, right=bar_index + 1, bottom=slPrice, 
+                     bgcolor=colSL_Fill, border_color=colSL_Text)
+
+    lblTP := label.new(bar_index, tpPrice, 
+             text="Target: " + str.tostring(tpPrice, "#.##") + " (" + str.tostring(tpPerc, "#.##") + "%)",
+             style=label.style_label_down, color=colTP_Text, textcolor=color.white, size=size.small)
+    lblSL := label.new(bar_index, slPrice, 
+             text="Stop: " + str.tostring(slPrice, "#.##") + " (" + str.tostring(slPerc, "#.##") + "%)",
+             style=label.style_label_up, color=colSL_Text, textcolor=color.white, size=size.small)
+
+    // Calculate confidence based on EMA spread and ATR
+    emaSpread = (emaFast - emaSlow) / emaSlow * 100
+    atrStrength = atr / close * 100
+    confidence = math.min(0.95, 0.70 + (math.abs(emaSpread) * 2) + (atrStrength * 0.5))
+    
+    // Strategy Entry
+    strategy.entry("BUY", strategy.long)
+    strategy.exit("TP/SL", "BUY", stop=slPrice, limit=tpPrice)
+    
+    // Webhook Message
+    webhookMessage = '{\n' +
+         '  "strategy_id": "ema_9_15",\n' +
+         '  "strategy_name": "EMA 9/15 Crossover",\n' +
+         '  "action": "BUY",\n' +
+         '  "symbol": "' + syminfo.ticker + '",\n' +
+         '  "timeframe": "' + timeframe.period + '",\n' +
+         '  "price": ' + str.tostring(close, "#.##") + ',\n' +
+         '  "stop_loss": ' + str.tostring(slPrice, "#.##") + ',\n' +
+         '  "take_profit": ' + str.tostring(tpPrice, "#.##") + ',\n' +
+         '  "confidence": ' + str.tostring(confidence, "#.##") + ',\n' +
+         '  "ema_fast": ' + str.tostring(emaFast, "#.##") + ',\n' +
+         '  "ema_slow": ' + str.tostring(emaSlow, "#.##") + ',\n' +
+         '  "atr": ' + str.tostring(atr, "#.##") + ',\n' +
+         '  "timestamp": "{{timenow}}",\n' +
+         '  "secret": "hybrid_tradingview_cluster_2026_secure"\n' +
+         '}'
+    
+    alert(webhookMessage, alert.freq_once_per_bar_close)
+
+if sellSignal
+    direction  := -1
+    entryPrice := close
+    slPrice    := entryPrice + (atr * atrMultSL)
+    tpPrice    := entryPrice - ((slPrice - entryPrice) * rr)
+
+    tpPerc = (entryPrice - tpPrice) / entryPrice * 100
+    slPerc = (slPrice - entryPrice) / entryPrice * 100
+
+    boxTP := box.new(left=bar_index, top=entryPrice, right=bar_index + 1, bottom=tpPrice, 
+                     bgcolor=colTP_Fill, border_color=colTP_Text)
+    boxSL := box.new(left=bar_index, top=slPrice, right=bar_index + 1, bottom=entryPrice, 
+                     bgcolor=colSL_Fill, border_color=colSL_Text)
+
+    lblTP := label.new(bar_index, tpPrice, 
+             text="Target: " + str.tostring(tpPrice, "#.##") + " (" + str.tostring(tpPerc, "#.##") + "%)",
+             style=label.style_label_up, color=colTP_Text, textcolor=color.white, size=size.small)
+    lblSL := label.new(bar_index, slPrice, 
+             text="Stop: " + str.tostring(slPrice, "#.##") + " (" + str.tostring(slPerc, "#.##") + "%)",
+             style=label.style_label_down, color=colSL_Text, textcolor=color.white, size=size.small)
+
+    // Calculate confidence
+    emaSpread = (emaSlow - emaFast) / emaSlow * 100
+    atrStrength = atr / close * 100
+    confidence = math.min(0.95, 0.70 + (math.abs(emaSpread) * 2) + (atrStrength * 0.5))
+    
+    // Strategy Entry
+    strategy.entry("SELL", strategy.short)
+    strategy.exit("TP/SL", "SELL", stop=slPrice, limit=tpPrice)
+    
+    // Webhook Message
+    webhookMessage = '{\n' +
+         '  "strategy_id": "ema_9_15",\n' +
+         '  "strategy_name": "EMA 9/15 Crossover",\n' +
+         '  "action": "SELL",\n' +
+         '  "symbol": "' + syminfo.ticker + '",\n' +
+         '  "timeframe": "' + timeframe.period + '",\n' +
+         '  "price": ' + str.tostring(close, "#.##") + ',\n' +
+         '  "stop_loss": ' + str.tostring(slPrice, "#.##") + ',\n' +
+         '  "take_profit": ' + str.tostring(tpPrice, "#.##") + ',\n' +
+         '  "confidence": ' + str.tostring(confidence, "#.##") + ',\n' +
+         '  "ema_fast": ' + str.tostring(emaFast, "#.##") + ',\n' +
+         '  "ema_slow": ' + str.tostring(emaSlow, "#.##") + ',\n' +
+         '  "atr": ' + str.tostring(atr, "#.##") + ',\n' +
+         '  "timestamp": "{{timenow}}",\n' +
+         '  "secret": "hybrid_tradingview_cluster_2026_secure"\n' +
+         '}'
+    
+    alert(webhookMessage, alert.freq_once_per_bar_close)
+
+// ===== UPDATE & EXIT LOGIC =====
+if direction != 0
+    if not na(boxTP)
+        box.set_right(boxTP, bar_index + 5)
+    if not na(boxSL)
+        box.set_right(boxSL, bar_index + 5)
+    if not na(lblTP)
+        label.set_x(lblTP, bar_index + 5)
+    if not na(lblSL)
+        label.set_x(lblSL, bar_index + 5)
+
+    bool hitTP = (direction == 1 and high >= tpPrice) or (direction == -1 and low <= tpPrice)
+    bool hitSL = (direction == 1 and low <= slPrice) or (direction == -1 and high >= slPrice)
+
+    if hitTP or hitSL
+        box.set_right(boxTP, bar_index)
+        box.set_right(boxSL, bar_index)
+        label.set_x(lblTP, bar_index)
+        label.set_x(lblSL, bar_index)
+        
+        direction := 0
+        boxTP := na, boxSL := na, lblTP := na, lblSL := na
+
+// ===== PLOTS =====
+plot(emaFast, "EMA 9", color=color.yellow, linewidth=2)
+plot(emaSlow, "EMA 15", color=color.blue, linewidth=2)

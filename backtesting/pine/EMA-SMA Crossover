@@ -1,0 +1,142 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © julioperez75955 | Webhook Integration by GratefulFutures
+
+//@version=5
+strategy("EMA/SMA Crossover — Webhook", overlay=true)
+
+// ========================================
+// WEBHOOK CONFIGURATION
+// ========================================
+webhook_url = input.string("https://your-server.com/webhook/tradingview", "Webhook URL")
+webhook_secret = input.string("your_secret_key", "Webhook Secret")
+
+// ========================================
+// MOVING AVERAGE SETTINGS
+// ========================================
+emaLength = input(9, title="EMA Period", group="Moving Averages")
+smaLength = input(21, title="SMA Period", group="Moving Averages")
+
+// ========================================
+// VISUAL SETTINGS
+// ========================================
+emaColor = input(color.new(color.blue, 0), title="EMA Color", group="Colors")
+smaColor = input(color.new(color.orange, 0), title="SMA Color", group="Colors")
+buySignalColor = input(color.new(color.green, 0), title="Buy Signal Color", group="Colors")
+sellSignalColor = input(color.new(color.red, 0), title="Sell Signal Color", group="Colors")
+
+signalOffset = input(100, title="Signal Vertical Offset (pips)", group="Signal Settings")
+
+// ========================================
+// RISK MANAGEMENT
+// ========================================
+stop_loss_pct = input.float(2.0, "Stop Loss %", minval=0.1, maxval=10.0, group="Risk Management") / 100
+take_profit_pct = input.float(3.0, "Take Profit %", minval=0.1, maxval=20.0, group="Risk Management") / 100
+
+// ========================================
+// CALCULATE MOVING AVERAGES
+// ========================================
+ema = ta.ema(close, emaLength)
+sma = ta.sma(close, smaLength)
+
+// Plot the lines
+plot(ema, color=emaColor, linewidth=2, title="EMA")
+plot(sma, color=smaColor, linewidth=2, title="SMA")
+
+// ========================================
+// DETECT CROSSOVERS
+// ========================================
+emaCrossAboveSma = ta.crossover(ema, sma)
+emaCrossBelowSma = ta.crossunder(ema, sma)
+
+// ========================================
+// RISK LEVELS
+// ========================================
+long_stop = close * (1 - stop_loss_pct)
+long_target = close * (1 + take_profit_pct)
+short_stop = close * (1 + stop_loss_pct)
+short_target = close * (1 - take_profit_pct)
+
+// ========================================
+// TREND CONFIRMATION
+// ========================================
+// Additional filter: price above/below SMA for trend confirmation
+bullishTrend = close > sma
+bearishTrend = close < sma
+
+// Calculate distance between EMAs as percentage
+ema_sma_distance = math.abs(ema - sma) / sma * 100
+
+// ========================================
+// WEBHOOK PAYLOAD
+// ========================================
+long_payload = '{\n' +
+     '  "secret": "' + webhook_secret + '",\n' +
+     '  "strategy": "ema_sma_crossover",\n' +
+     '  "signal": "LONG",\n' +
+     '  "price": ' + str.tostring(close) + ',\n' +
+     '  "stop_loss": ' + str.tostring(long_stop) + ',\n' +
+     '  "take_profit": ' + str.tostring(long_target) + ',\n' +
+     '  "symbol": "' + syminfo.ticker + '",\n' +
+     '  "timeframe": "' + timeframe.period + '",\n' +
+     '  "indicator_confidence": 0.75,\n' +
+     '  "metadata": {\n' +
+     '    "ema": ' + str.tostring(ema) + ',\n' +
+     '    "sma": ' + str.tostring(sma) + ',\n' +
+     '    "ema_length": ' + str.tostring(emaLength) + ',\n' +
+     '    "sma_length": ' + str.tostring(smaLength) + ',\n' +
+     '    "ma_distance_pct": ' + str.tostring(ema_sma_distance) + ',\n' +
+     '    "trend": "bullish"\n' +
+     '  }\n' +
+     '}'
+
+short_payload = '{\n' +
+     '  "secret": "' + webhook_secret + '",\n' +
+     '  "strategy": "ema_sma_crossover",\n' +
+     '  "signal": "SHORT",\n' +
+     '  "price": ' + str.tostring(close) + ',\n' +
+     '  "stop_loss": ' + str.tostring(short_stop) + ',\n' +
+     '  "take_profit": ' + str.tostring(short_target) + ',\n' +
+     '  "symbol": "' + syminfo.ticker + '",\n' +
+     '  "timeframe": "' + timeframe.period + '",\n' +
+     '  "indicator_confidence": 0.75,\n' +
+     '  "metadata": {\n' +
+     '    "ema": ' + str.tostring(ema) + ',\n' +
+     '    "sma": ' + str.tostring(sma) + ',\n' +
+     '    "ema_length": ' + str.tostring(emaLength) + ',\n' +
+     '    "sma_length": ' + str.tostring(smaLength) + ',\n' +
+     '    "ma_distance_pct": ' + str.tostring(ema_sma_distance) + ',\n' +
+     '    "trend": "bearish"\n' +
+     '  }\n' +
+     '}'
+
+// ========================================
+// STRATEGY EXECUTION
+// ========================================
+if emaCrossAboveSma
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long Exit", "Long", stop=long_stop, limit=long_target)
+    alert(long_payload, alert.freq_once_per_bar_close)
+
+if emaCrossBelowSma
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short Exit", "Short", stop=short_stop, limit=short_target)
+    alert(short_payload, alert.freq_once_per_bar_close)
+
+// ========================================
+// VISUAL SIGNALS
+// ========================================
+// Use fixed size to avoid plotshape type error
+buySignalPrice = emaCrossAboveSma ? low - (signalOffset * syminfo.mintick) : na
+sellSignalPrice = emaCrossBelowSma ? high + (signalOffset * syminfo.mintick) : na
+
+plotshape(buySignalPrice, style=shape.labelup, location=location.absolute, color=buySignalColor, size=size.small, title="Buy", text="BUY")
+plotshape(sellSignalPrice, style=shape.labeldown, location=location.absolute, color=sellSignalColor, size=size.small, title="Sell", text="SELL")
+
+// Plot SL/TP levels for active positions
+plot(strategy.position_size > 0 ? long_stop : na, "Long SL", color.red, 1, plot.style_linebr)
+plot(strategy.position_size > 0 ? long_target : na, "Long TP", color.green, 1, plot.style_linebr)
+plot(strategy.position_size < 0 ? short_stop : na, "Short SL", color.red, 1, plot.style_linebr)
+plot(strategy.position_size < 0 ? short_target : na, "Short TP", color.green, 1, plot.style_linebr)
+
+// Background color for trend
+bgcolor(bullishTrend ? color.new(color.green, 95) : bearishTrend ? color.new(color.red, 95) : na)

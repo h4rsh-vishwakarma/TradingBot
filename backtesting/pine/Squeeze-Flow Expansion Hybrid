@@ -1,0 +1,95 @@
+//@version=5
+strategy("Squeeze-Flow Expansion Hybrid [WEBHOOK]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// --- WEBHOOK CONFIGURATION ---
+grp_webhook = "🔔 Webhook Configuration"
+enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
+webhook_secret = input.string("squeeze_tradingview_cluster_2026_secure", "Webhook Secret", group=grp_webhook, tooltip="Must match bot configuration")
+
+// --- 1. INPUTS ---
+bb_len    = input.int(20, "Bollinger Length", group="Volatility")
+bb_mult   = input.float(2.0, "BB Multiplier", group="Volatility")
+kc_len    = input.int(20, "Keltner Length", group="Volatility")
+kc_mult   = input.float(1.5, "KC Multiplier", group="Volatility")
+
+cmf_len   = input.int(20, "CMF Length", group="Volume Flow")
+tp_mult   = input.float(2.0, "Take Profit (ATR Mult)", group="Risk Management")
+sl_mult   = input.float(1.5, "Stop Loss (ATR Mult)", group="Risk Management")
+
+// --- 2. VOLATILITY SQUEEZE LOGIC ---
+// Bollinger Bands
+[bb_mid, bb_upper, bb_lower] = ta.bb(close, bb_len, bb_mult)
+
+// Keltner Channels
+ma = ta.sma(close, kc_len)
+range_ema = ta.ema(high - low, kc_len)
+kc_upper = ma + range_ema * kc_mult
+kc_lower = ma - range_ema * kc_mult
+
+// Squeeze Detection: BB inside KC
+is_squeezed = bb_upper < kc_upper and bb_lower > kc_lower
+
+// --- 3. VOLUME FLOW (MANUAL CMF) ---
+// Fixing the 'ta.cmf' reference error
+mf_multiplier = ((close - low) - (high - close)) / (high - low)
+// Handle potential division by zero for assets with no price movement in a bar
+mf_multiplier := na(mf_multiplier) ? 0 : mf_multiplier 
+mf_volume = mf_multiplier * volume
+cmf = ta.sma(mf_volume, cmf_len) / ta.sma(volume, cmf_len)
+
+// --- 4. TRADE SIGNALS ---
+// Entry: Squeeze releases + Breakout + Volume Confirmation
+long_signal  = not is_squeezed and is_squeezed[1] and close > bb_upper and cmf > 0.1
+short_signal = not is_squeezed and is_squeezed[1] and close < bb_lower and cmf < -0.1
+
+// --- 5. RISK MANAGEMENT (ATR BASED) ---
+atr = ta.atr(14)
+long_tp = close + (atr * tp_mult)
+long_sl = close - (atr * sl_mult)
+short_tp = close - (atr * tp_mult)
+short_sl = close + (atr * sl_mult)
+
+// Convert timeframe to lowercase for webhook
+tf_lower = timeframe.period == "1D" ? "1d" : 
+           timeframe.period == "4H" or timeframe.period == "240" ? "4h" : 
+           timeframe.period == "1H" or timeframe.period == "60" ? "1h" : 
+           timeframe.period == "30" ? "30m" : 
+           timeframe.period == "15" ? "15m" : 
+           timeframe.period == "5" ? "5m" : 
+           timeframe.period == "3" ? "3m" : 
+           timeframe.period == "1" ? "1m" : 
+           timeframe.period == "10S" or timeframe.period == "10" ? "10s" :
+           timeframe.period == "5S" or timeframe.period == "5" ? "5s" :
+           str.replace_all(str.lower(timeframe.period), "S", "s")
+
+// --- 6. EXECUTION WITH WEBHOOK ---
+if (long_signal)
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit Long", "Long", limit=long_tp, stop=long_sl)
+    
+    if enable_webhook
+        alert('{"secret":"' + webhook_secret + '","strategy":"squeeze_flow_expansion","side":"BUY","symbol":"' + syminfo.ticker + '","timeframe":"' + tf_lower + '","price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(long_sl) + ',"take_profit":' + str.tostring(long_tp) + ',"cmf":' + str.tostring(cmf) + ',"is_squeezed":false}', alert.freq_once_per_bar_close)
+
+if (short_signal)
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Exit Short", "Short", limit=short_tp, stop=short_sl)
+    
+    if enable_webhook
+        alert('{"secret":"' + webhook_secret + '","strategy":"squeeze_flow_expansion","side":"SELL","symbol":"' + syminfo.ticker + '","timeframe":"' + tf_lower + '","price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(short_sl) + ',"take_profit":' + str.tostring(short_tp) + ',"cmf":' + str.tostring(cmf) + ',"is_squeezed":false}', alert.freq_once_per_bar_close)
+
+// Alternative Exit: Close if price crosses back over the Mean (Middle Band)
+if (ta.cross(close, bb_mid))
+    strategy.close_all("Mean Exit")
+
+// --- 7. VISUALS ---
+// Highlight Squeeze Zone
+bgcolor(is_squeezed ? color.new(color.orange, 90) : na)
+
+// Plot Bands
+plot(bb_upper, color=color.new(color.blue, 60), title="BB Upper")
+plot(bb_lower, color=color.new(color.blue, 60), title="BB Lower")
+plot(bb_mid,   color=color.new(color.gray, 80), title="Basis")
+
+// Signal Shapes
+plotshape(long_signal,  style=shape.triangleup,   location=location.belowbar, color=color.green, size=size.small, title="Long Entry")
+plotshape(short_signal, style=shape.triangledown, location=location.abovebar, color=color.red,   size=size.small, title="Short Entry")

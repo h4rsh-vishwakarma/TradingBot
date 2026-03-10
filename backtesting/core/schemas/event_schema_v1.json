@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TradingEvent",
+  "type": "object",
+  "properties": {
+    "schema_version": { "type": "string" },
+    "strategy_id": { "type": "string" },
+    "strategy_version": { "type": "string" },
+    "param_hash": { "type": "string" },
+    "event_type": { "type": "string", "enum": ["order_fill", "signal", "run_metadata", "backtest_metrics", "backtest_trades"] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "payload": { "type": "object" }
+  },
+  "required": ["schema_version", "strategy_id", "event_type", "timestamp", "payload"]
+}

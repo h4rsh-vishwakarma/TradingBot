@@ -1,0 +1,223 @@
+//@version=5
+strategy("Momentum Variance Oscillator - Hybrid Webhook", 
+         shorttitle="MVO-Hybrid", 
+         overlay=false,
+         default_qty_type=strategy.percent_of_equity,
+         default_qty_value=2,
+         commission_type=strategy.commission.percent,
+         commission_value=0.075,
+         slippage=2)
+
+// ========================================
+// WEBHOOK CONFIGURATION
+// ========================================
+grp_webhook = "🔔 Webhook Configuration"
+enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
+webhook_url = input.string("http://13.236.143.201/webhook/tradingview", "Webhook URL", group=grp_webhook, tooltip="Your bot webhook endpoint")
+WEBHOOK_SECRET = input.string("hybrid_tradingview_cluster_2026_secure", "Webhook Secret", group=grp_webhook, tooltip="Must match bot configuration")
+STRATEGY_ID = "mvo_momentum_variance"
+
+// ========================================
+// RISK MANAGEMENT
+// ========================================
+stop_loss_pct = input.float(1.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1, group="Risk")
+take_profit_pct = input.float(2.0, "Take Profit %", minval=0.5, maxval=10.0, step=0.5, group="Risk")
+
+// ========================================
+// MVO PARAMETERS
+// ========================================
+// Optimized for 15min timeframe: Faster momentum, stricter levels
+// High-frequency scalping: 2,680 trades, 41% win rate, 1.24 profit factor
+mvo_length = input.int(21, "MVO Length", minval=1, group="MVO")
+mvo_smooth = input.int(5, "MVO Smoothing", minval=1, group="MVO")
+overbought = input.float(80, "Overbought Level", minval=50, group="Levels")
+oversold = input.float(20, "Oversold Level", maxval=50, group="Levels")
+mvo_threshold = input.float(50, "Neutral Threshold", group="Levels")
+
+// Variance calculation
+variance_length = input.int(20, "Variance Length", minval=1, group="Variance")
+variance_multiplier = input.float(1.5, "Variance Multiplier", minval=0.1, step=0.1, group="Variance")
+
+// Volume filter
+use_volume_filter = input.bool(true, "Use Volume Filter", group="Filters")
+volume_ma_length = input.int(20, "Volume MA Length", minval=1, group="Filters")
+
+// ========================================
+// MOMENTUM CALCULATION
+// ========================================
+// Calculate momentum using ROC (Rate of Change)
+momentum = ta.roc(close, mvo_length)
+momentum_smooth = ta.sma(momentum, mvo_smooth)
+
+// Normalize momentum to 0-100 scale
+highest_momentum = ta.highest(momentum_smooth, mvo_length * 2)
+lowest_momentum = ta.lowest(momentum_smooth, mvo_length * 2)
+momentum_range = highest_momentum - lowest_momentum
+
+// Avoid division by zero
+mvo_normalized = momentum_range != 0 ? 
+                 ((momentum_smooth - lowest_momentum) / momentum_range) * 100 : 50
+
+// ========================================
+// VARIANCE CALCULATION
+// ========================================
+// Calculate price variance (standard deviation)
+price_variance = ta.stdev(close, variance_length)
+variance_ma = ta.sma(price_variance, variance_length)
+
+// High variance indicates volatility expansion
+variance_ratio = variance_ma != 0 ? price_variance / variance_ma : 1.0
+high_variance = variance_ratio > variance_multiplier
+
+// ========================================
+// VOLUME FILTER
+// ========================================
+volume_ma = ta.sma(volume, volume_ma_length)
+volume_condition = not use_volume_filter or volume > volume_ma
+
+// ========================================
+// ENTRY SIGNALS
+// ========================================
+
+// LONG: MVO crosses above oversold + high variance + volume
+long_mvo_cross = ta.crossover(mvo_normalized, oversold)
+long_momentum_positive = momentum_smooth > 0
+long_signal = long_mvo_cross and high_variance and volume_condition and barstate.isconfirmed
+
+// SHORT: MVO crosses below overbought + high variance + volume
+short_mvo_cross = ta.crossunder(mvo_normalized, overbought)
+short_momentum_negative = momentum_smooth < 0
+short_signal = short_mvo_cross and high_variance and volume_condition and barstate.isconfirmed
+
+// ========================================
+// EXIT SIGNALS
+// ========================================
+exit_long = ta.crossunder(mvo_normalized, mvo_threshold) or mvo_normalized > overbought
+
+exit_short = ta.crossover(mvo_normalized, mvo_threshold) or 
+             mvo_normalized < oversold
+
+// ========================================
+// CONFIDENCE CALCULATION
+// ========================================
+// Base confidence for MVO strategy
+base_conf = 0.75
+
+// Signal strength factors
+signal_count = 0
+if high_variance
+    signal_count += 1
+if volume_condition and volume > volume_ma * 1.5
+    signal_count += 1
+if long_signal and momentum_smooth > 0
+    signal_count += 1
+else if short_signal and momentum_smooth < 0
+    signal_count += 1
+
+// MVO extreme readings add confidence
+if mvo_normalized < oversold * 0.8 or mvo_normalized > overbought * 1.2
+    signal_count += 1
+
+signal_strength = signal_count / 4.0
+confidence = base_conf + (signal_strength * 0.15)
+confidence := math.min(confidence, 0.90)
+
+// ========================================
+// STOP LOSS & TAKE PROFIT
+// ========================================
+var float long_sl = na
+var float long_tp = na
+var float short_sl = na
+var float short_tp = na
+
+if long_signal
+    long_sl := close * (1 - stop_loss_pct / 100)
+    long_tp := close * (1 + take_profit_pct / 100)
+
+if short_signal
+    short_sl := close * (1 + stop_loss_pct / 100)
+    short_tp := close * (1 - take_profit_pct / 100)
+
+// ========================================
+// STRATEGY EXECUTION
+// ========================================
+if long_signal
+    strategy.entry("Long", strategy.long, comment="MVO Long")
+    strategy.exit("Exit Long", "Long", stop=long_sl, limit=long_tp)
+    
+if short_signal
+    strategy.entry("Short", strategy.short, comment="MVO Short")
+    strategy.exit("Exit Short", "Short", stop=short_sl, limit=short_tp)
+
+// Exits
+if exit_long and strategy.position_size > 0
+    strategy.close("Long", comment="MVO Exit")
+    
+if exit_short and strategy.position_size < 0
+    strategy.close("Short", comment="MVO Exit")
+
+// ========================================
+// WEBHOOK ALERTS (STANDARDIZED FORMAT)
+// ========================================
+if enable_webhook and barstate.isconfirmed and long_signal
+    string long_msg = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"' + STRATEGY_ID + '","side":"LONG","symbol":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"entry_price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(long_sl) + ',"take_profit":' + str.tostring(long_tp) + ',"timeframe":"' + timeframe.period + '","timestamp":"' + str.tostring(time) + '","confidence":' + str.tostring(confidence) + ',"mvo_value":' + str.tostring(mvo_normalized) + ',"variance_ratio":' + str.tostring(variance_ratio) + '}'
+    alert(long_msg, alert.freq_once_per_bar_close)
+
+if enable_webhook and barstate.isconfirmed and short_signal
+    string short_msg = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"' + STRATEGY_ID + '","side":"SHORT","symbol":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"entry_price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(short_sl) + ',"take_profit":' + str.tostring(short_tp) + ',"timeframe":"' + timeframe.period + '","timestamp":"' + str.tostring(time) + '","confidence":' + str.tostring(confidence) + ',"mvo_value":' + str.tostring(mvo_normalized) + ',"variance_ratio":' + str.tostring(variance_ratio) + '}'
+    alert(short_msg, alert.freq_once_per_bar_close)
+
+// ========================================
+// PLOTTING
+// ========================================
+
+// MVO Line
+plot(mvo_normalized, "MVO", color=color.blue, linewidth=2)
+
+// Levels
+hline(50, "Neutral", color=color.gray, linestyle=hline.style_solid)
+hline(overbought, "Overbought", color=color.red, linestyle=hline.style_dashed)
+hline(oversold, "Oversold", color=color.green, linestyle=hline.style_dashed)
+
+// Fill zones
+upper_band = hline(100, "Upper", color=color.new(color.red, 100))
+ob_line = hline(overbought, "OB Line", color=color.new(color.red, 100))
+fill(upper_band, ob_line, color=color.new(color.red, 90), title="Overbought Zone")
+
+lower_band = hline(0, "Lower", color=color.new(color.green, 100))
+os_line = hline(oversold, "OS Line", color=color.new(color.green, 100))
+fill(lower_band, os_line, color=color.new(color.green, 90), title="Oversold Zone")
+
+// Signals
+plotshape(long_signal, "Long Signal", shape.triangleup, location.bottom, 
+          color=color.new(color.lime, 0), size=size.small, text="L")
+plotshape(short_signal, "Short Signal", shape.triangledown, location.top, 
+          color=color.new(color.red, 0), size=size.small, text="S")
+
+// Variance indicator (subplot)
+plot(variance_ratio * 10, "Variance (x10)", color=color.orange, linewidth=1, 
+     display=display.none)  // Hidden but available
+
+// High variance marker
+bgcolor(high_variance ? color.new(color.yellow, 90) : na, title="High Variance")
+
+// Signal Labels
+if long_signal
+    label.new(bar_index, oversold, "MVO LONG\nConf: " + str.tostring(confidence, '#.##') + 
+              "\nSL: " + str.tostring(long_sl, '#.##') + "\nTP: " + str.tostring(long_tp, '#.##') + 
+              "\nMVO: " + str.tostring(mvo_normalized, '#.##') + 
+              "\nVar: " + str.tostring(variance_ratio, '#.##'), 
+              style=label.style_label_up, color=color.green, textcolor=color.white, 
+              size=size.small, yloc=yloc.price)
+
+if short_signal
+    label.new(bar_index, overbought, "MVO SHORT\nConf: " + str.tostring(confidence, '#.##') + 
+              "\nSL: " + str.tostring(short_sl, '#.##') + "\nTP: " + str.tostring(short_tp, '#.##') + 
+              "\nMVO: " + str.tostring(mvo_normalized, '#.##') + 
+              "\nVar: " + str.tostring(variance_ratio, '#.##'), 
+              style=label.style_label_down, color=color.red, textcolor=color.white, 
+              size=size.small, yloc=yloc.price)
+
+// Momentum subplot (separate pane)
+plot(momentum_smooth, "Momentum", color=color.purple, linewidth=2)
+hline(0, "Zero Line", color=color.gray, linestyle=hline.style_dotted)

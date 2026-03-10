@@ -1,0 +1,39 @@
+//@version=5
+strategy("Oppsite SMA", overlay=true, 
+         initial_capital=10000, 
+         default_qty_type=strategy.percent_of_equity, 
+         default_qty_value=100,
+         commission_type=strategy.commission.percent,
+         commission_value=0.1)
+
+// --- Inputs ---
+fastLen = input.int(9, title="Fast SMA Length")
+slowLen = input.int(50, title="Slow SMA Length")
+
+// --- Calculations ---
+fastSMA = ta.sma(close, fastLen)
+slowSMA = ta.sma(close, slowLen)
+
+// --- Reversed Logic ---
+// Normal: Long when 9 crosses ABOVE 50
+// Opposite: Long when 9 crosses BELOW 50
+oppositeLongCondition = ta.crossunder(fastSMA, slowSMA)
+
+// Normal: Short when 9 crosses BELOW 50
+// Opposite: Short when 9 crosses ABOVE 50
+oppositeShortCondition = ta.crossover(fastSMA, slowSMA)
+
+// --- Execution ---
+if (oppositeLongCondition)
+    strategy.entry("Opposite Long", strategy.long, comment="Contrarian Buy")
+
+if (oppositeShortCondition)
+    strategy.entry("Opposite Short", strategy.short, comment="Contrarian Sell")
+
+// --- Visualization ---
+plot(fastSMA, color=color.blue, title="9 SMA")
+plot(slowSMA, color=color.orange, title="50 SMA")
+
+// Highlight signals on chart
+plotshape(oppositeLongCondition, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="Opposite Buy")
+plotshape(oppositeShortCondition, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, title="Opposite Sell")

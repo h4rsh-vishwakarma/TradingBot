@@ -1,0 +1,32 @@
+//@version=5
+strategy("Reverse SMA Cross Backtest - ETH 1H", overlay=true, initial_capital=10000, default_qty_type=strategy.cash, default_qty_value=10000)
+
+// --- Input Parameters ---
+smaLength = input.int(21, title="SMA Length")
+stopLossPct = input.float(3.2, title="Stop Loss (%)") // Based on your -32.72 drawdown risk
+takeProfitPct = input.float(19.68, title="Take Profit (%)") // Matching your 19.68 metric
+
+// --- Indicators ---
+smaValue = ta.sma(close, smaLength)
+
+// --- Logic Inversion (The "Reverse" Backtest) ---
+// Normal SMA Cross: Buy when price > SMA. 
+// Reverse Logic: Sell when price > SMA (expecting a mean reversion).
+shortCondition = ta.crossover(close, smaValue)
+longCondition = ta.crossunder(close, smaValue)
+
+// --- Plotting ---
+plot(smaValue, color=color.blue, title="SMA 21")
+plotshape(longCondition, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="Reverse Buy")
+plotshape(shortCondition, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, title="Reverse Sell")
+
+// --- Execution ---
+if (longCondition)
+    strategy.entry("Reverse Long", strategy.long, comment="Price Cross Under SMA")
+
+if (shortCondition)
+    strategy.entry("Reverse Short", strategy.short, comment="Price Cross Over SMA")
+
+// --- Risk Management ---
+strategy.exit("Exit Long", "Reverse Long", stop=strategy.position_avg_price * (1 - stopLossPct/100), limit=strategy.position_avg_price * (1 + takeProfitPct/100))
+strategy.exit("Exit Short", "Reverse Short", stop=strategy.position_avg_price * (1 + stopLossPct/100), limit=strategy.position_avg_price * (1 - takeProfitPct/100))

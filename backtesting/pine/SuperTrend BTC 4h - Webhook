@@ -1,0 +1,122 @@
+//@version=5
+strategy("SuperTrend BTC 4h - Webhook", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//WEBHOOK CONFIGURATION
+//---------------------------------------------------------------------------------------------------------------------{
+grp_webhook = "🔔 Webhook Configuration"
+enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
+webhook_secret = input.string("supertrend_btc_4h_cluster_2026_secure", "Webhook Secret", group=grp_webhook, tooltip="Must match bot configuration")
+
+//---------------------------------------------------------------------------------------------------------------------}
+//SUPERTREND SETTINGS
+//---------------------------------------------------------------------------------------------------------------------{
+grp_st = "📈 SuperTrend Parameters"
+atrPeriod = input.int(10, "ATR Period", minval=1, group=grp_st, tooltip="Standard: 10, BTC 4h can use 10-12")
+factor = input.float(3.0, "ATR Multiplier", step=0.1, minval=0.1, group=grp_st, tooltip="Standard: 3.0")
+
+//---------------------------------------------------------------------------------------------------------------------}
+//RISK MANAGEMENT
+//---------------------------------------------------------------------------------------------------------------------{
+grp_risk = "⚠️ Risk Management"
+stop_loss_pct = input.float(1.5, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1, group=grp_risk)
+take_profit_pct = input.float(3.0, "Take Profit %", minval=0.5, maxval=10.0, step=0.5, group=grp_risk)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//SUPERTREND CALCULATION
+//---------------------------------------------------------------------------------------------------------------------{
+[supertrend, direction] = ta.supertrend(factor, atrPeriod)
+
+// Signal detection: direction flip
+buySignal = ta.change(direction) < 0  // Flips from bearish to bullish
+sellSignal = ta.change(direction) > 0  // Flips from bullish to bearish
+
+//---------------------------------------------------------------------------------------------------------------------}
+//CONFIDENCE CALCULATION
+//---------------------------------------------------------------------------------------------------------------------{
+// Base confidence for SuperTrend
+base_conf = 0.78
+
+// ATR volatility factor
+atr_current = ta.atr(atrPeriod)
+atr_ma = ta.sma(atr_current, atrPeriod * 2)
+atr_strength = atr_ma != 0 ? math.min(atr_current / atr_ma, 2.0) / 2.0 : 0.5
+
+// Distance from SuperTrend line (tighter = stronger signal)
+distance_pct = math.abs(close - supertrend) / close
+distance_strength = math.max(0, 1 - (distance_pct / 0.01))
+
+// Trend consistency (how long in same direction)
+var int trend_bars = 0
+if direction != direction[1]
+    trend_bars := 0
+else
+    trend_bars += 1
+
+trend_consistency = math.min(trend_bars / 20.0, 0.15)
+confidence = base_conf + (atr_strength * 0.08) + (distance_strength * 0.04) + trend_consistency
+confidence := math.min(confidence, 0.95)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//STOP LOSS & TAKE PROFIT
+//---------------------------------------------------------------------------------------------------------------------{
+var float long_sl = na
+var float long_tp = na
+var float short_sl = na
+var float short_tp = na
+
+if buySignal
+    long_sl := close * (1 - stop_loss_pct / 100)
+    long_tp := close * (1 + take_profit_pct / 100)
+
+if sellSignal
+    short_sl := close * (1 + stop_loss_pct / 100)
+    short_tp := close * (1 - take_profit_pct / 100)
+
+// Convert timeframe to lowercase for webhook
+tf_lower = timeframe.period == "1D" ? "1d" : 
+           timeframe.period == "4H" or timeframe.period == "240" ? "4h" : 
+           timeframe.period == "1H" or timeframe.period == "60" ? "1h" : 
+           timeframe.period == "30" ? "30m" : 
+           timeframe.period == "15" ? "15m" : 
+           timeframe.period == "5" ? "5m" : 
+           timeframe.period == "3" ? "3m" :
+           timeframe.period == "1" ? "1m" : 
+           str.replace_all(str.lower(timeframe.period), " ", "")
+
+//---------------------------------------------------------------------------------------------------------------------}
+//STRATEGY EXECUTION & WEBHOOK
+//---------------------------------------------------------------------------------------------------------------------{
+if (direction < 0)
+    strategy.entry("BTC_ST_Long", strategy.long)
+
+if (direction > 0)
+    strategy.close("BTC_ST_Long")
+
+// WEBHOOK ALERTS - Single line JSON format like other bots
+if enable_webhook and buySignal
+    webhook_msg = '{"secret":"' + webhook_secret + '","strategy":"supertrend_btc_4h","side":"BUY","symbol":"' + syminfo.ticker + '","timeframe":"' + tf_lower + '","price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(long_sl) + ',"take_profit":' + str.tostring(long_tp) + ',"confidence":' + str.tostring(confidence) + ',"atr_period":' + str.tostring(atrPeriod) + ',"atr_multiplier":' + str.tostring(factor) + '}'
+    alert(webhook_msg, alert.freq_once_per_bar_close)
+
+if enable_webhook and sellSignal
+    webhook_msg = '{"secret":"' + webhook_secret + '","strategy":"supertrend_btc_4h","side":"SELL","symbol":"' + syminfo.ticker + '","timeframe":"' + tf_lower + '","price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(short_sl) + ',"take_profit":' + str.tostring(short_tp) + ',"confidence":' + str.tostring(confidence) + ',"atr_period":' + str.tostring(atrPeriod) + ',"atr_multiplier":' + str.tostring(factor) + '}'
+    alert(webhook_msg, alert.freq_once_per_bar_close)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//VISUALS
+//---------------------------------------------------------------------------------------------------------------------{
+// SuperTrend line
+plot(supertrend, title="SuperTrend Line", color=direction < 0 ? color.lime : color.red, linewidth=2)
+
+// Buy/Sell signals
+plotshape(buySignal, "Buy Signal", shape.triangleup, location.belowbar, color.lime, size=size.small)
+plotshape(sellSignal, "Sell Signal", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// Stop Loss & Take Profit levels (only show when in position)
+plot(strategy.position_size > 0 ? long_sl : na, "Long SL", color.red, linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size > 0 ? long_tp : na, "Long TP", color.green, linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size < 0 ? short_sl : na, "Short SL", color.red, linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size < 0 ? short_tp : na, "Short TP", color.green, linewidth=1, style=plot.style_linebr)
+
+// Background color for trend
+bgcolor(direction < 0 ? color.new(color.lime, 95) : color.new(color.red, 95), title="Trend Background")

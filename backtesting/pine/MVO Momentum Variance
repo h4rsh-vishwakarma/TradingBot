@@ -1,0 +1,163 @@
+//@version=5
+strategy("MVO Momentum Variance Webhook", 
+         overlay=false, 
+         default_qty_type=strategy.percent_of_equity, 
+         default_qty_value=100,
+         commission_type=strategy.commission.percent,
+         commission_value=0.1)
+
+// ═══════════════════════════════════════════════════════════
+// INPUTS
+// ═══════════════════════════════════════════════════════════
+momentumLength = input.int(14, "Momentum Length", minval=5)
+varianceLength = input.int(20, "Variance Length", minval=10)
+smoothingLength = input.int(3, "Smoothing Length", minval=1)
+overboughtLevel = input.float(80, "Overbought Level", minval=50)
+oversoldLevel = input.float(20, "Oversold Level", maxval=50)
+useDivergence = input.bool(true, "Use Divergence Detection")
+
+// ═══════════════════════════════════════════════════════════
+// MOMENTUM CALCULATION
+// ═══════════════════════════════════════════════════════════
+// Rate of change over momentum length
+momentum = (close - close[momentumLength]) / close[momentumLength] * 100
+
+// Smooth momentum
+smoothMomentum = ta.sma(momentum, smoothingLength)
+
+// ═══════════════════════════════════════════════════════════
+// VARIANCE CALCULATION
+// ═══════════════════════════════════════════════════════════
+// Calculate returns
+returns = (close - close[1]) / close[1]
+
+// Rolling variance (standard deviation squared)
+variance = ta.stdev(returns, varianceLength) * ta.stdev(returns, varianceLength) * 10000
+
+// Normalize variance to 0-100 scale
+var float maxVariance = 0.0
+var float minVariance = 9999.0
+maxVariance := math.max(maxVariance, variance)
+minVariance := math.min(minVariance, variance)
+
+normalizedVariance = maxVariance != minVariance ? 
+                     (variance - minVariance) / (maxVariance - minVariance) * 100 : 50
+
+// ═══════════════════════════════════════════════════════════
+// MVO OSCILLATOR (Momentum / Variance ratio)
+// ═══════════════════════════════════════════════════════════
+// High momentum + low variance = strong signal
+// Low momentum + high variance = weak signal
+varianceAdjusted = normalizedVariance > 5 ? normalizedVariance : 5  // Avoid division by near-zero
+mvo = (smoothMomentum / varianceAdjusted) * 50 + 50  // Center around 50
+
+// Smooth MVO
+mvoSmooth = ta.ema(mvo, smoothingLength)
+
+// ═══════════════════════════════════════════════════════════
+// SIGNAL LINE (Moving average of MVO)
+// ═══════════════════════════════════════════════════════════
+signalLine = ta.sma(mvoSmooth, 9)
+
+// ═══════════════════════════════════════════════════════════
+// DIVERGENCE DETECTION
+// ═══════════════════════════════════════════════════════════
+// Find pivots
+pvtLookback = 5
+priceLow = ta.pivotlow(close, pvtLookback, pvtLookback)
+priceHigh = ta.pivothigh(close, pvtLookback, pvtLookback)
+mvoLow = ta.pivotlow(mvoSmooth, pvtLookback, pvtLookback)
+mvoHigh = ta.pivothigh(mvoSmooth, pvtLookback, pvtLookback)
+
+// Bullish Divergence: Price makes lower low, MVO makes higher low
+var float lastPriceLow = na
+var float lastMVOLow = na
+var int lastLowBar = 0
+
+bullishDiv = false
+if not na(priceLow) and not na(mvoLow)
+    if not na(lastPriceLow) and not na(lastMVOLow)
+        if priceLow < lastPriceLow and mvoLow > lastMVOLow and bar_index - lastLowBar < 50
+            bullishDiv := true
+    lastPriceLow := priceLow
+    lastMVOLow := mvoLow
+    lastLowBar := bar_index
+
+// Bearish Divergence: Price makes higher high, MVO makes lower high
+var float lastPriceHigh = na
+var float lastMVOHigh = na
+var int lastHighBar = 0
+
+bearishDiv = false
+if not na(priceHigh) and not na(mvoHigh)
+    if not na(lastPriceHigh) and not na(lastMVOHigh)
+        if priceHigh > lastPriceHigh and mvoHigh < lastMVOHigh and bar_index - lastHighBar < 50
+            bearishDiv := true
+    lastPriceHigh := priceHigh
+    lastMVOHigh := mvoHigh
+    lastHighBar := bar_index
+
+// ═══════════════════════════════════════════════════════════
+// TRADING SIGNALS
+// ═══════════════════════════════════════════════════════════
+// LONG Conditions:
+// 1. MVO crosses above signal line
+// 2. MVO is in oversold zone OR bullish divergence
+// 3. Momentum is positive
+longCross = ta.crossover(mvoSmooth, signalLine)
+longDivergence = useDivergence ? bullishDiv : false
+longOversold = mvoSmooth < oversoldLevel
+
+longCondition = longCross and (longOversold or longDivergence) and momentum > 0
+
+// SHORT Conditions:
+// 1. MVO crosses below signal line
+// 2. MVO is in overbought zone OR bearish divergence
+// 3. Momentum is negative
+shortCross = ta.crossunder(mvoSmooth, signalLine)
+shortDivergence = useDivergence ? bearishDiv : false
+shortOverbought = mvoSmooth > overboughtLevel
+
+shortCondition = shortCross and (shortOverbought or shortDivergence) and momentum < 0
+
+// ═══════════════════════════════════════════════════════════
+// STRATEGY EXECUTION
+// ═══════════════════════════════════════════════════════════
+if longCondition
+    strategy.entry("Long", strategy.long,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"MVO Momentum Variance","side":"LONG","price":{{close}},"timeframe":"1h","symbol":"{{ticker}}"}')
+
+if shortCondition
+    strategy.entry("Short", strategy.short,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"MVO Momentum Variance","side":"SHORT","price":{{close}},"timeframe":"1h","symbol":"{{ticker}}"}')
+
+// ═══════════════════════════════════════════════════════════
+// PLOTTING
+// ═══════════════════════════════════════════════════════════
+// MVO Line
+plot(mvoSmooth, "MVO", color=color.new(color.blue, 0), linewidth=2)
+plot(signalLine, "Signal", color=color.new(color.orange, 0), linewidth=1)
+
+// Overbought/Oversold Levels
+hline(overboughtLevel, "Overbought", color.red, linestyle=hline.style_dashed)
+hline(oversoldLevel, "Oversold", color.green, linestyle=hline.style_dashed)
+hline(50, "Midline", color.gray, linestyle=hline.style_dotted)
+
+// Background coloring
+bgcolor(mvoSmooth > overboughtLevel ? color.new(color.red, 90) : mvoSmooth < oversoldLevel ? color.new(color.green, 90) : na)
+
+// Divergence markers
+plotshape(bullishDiv, "Bullish Div", shape.triangleup, location.bottom, 
+         color.new(color.green, 0), size=size.small, text="BULL DIV")
+plotshape(bearishDiv, "Bearish Div", shape.triangledown, location.top, 
+         color.new(color.red, 0), size=size.small, text="BEAR DIV")
+
+// Entry Signals
+plotshape(longCondition, "LONG", shape.labelup, location.bottom, 
+         color.green, text="LONG", textcolor=color.white, size=size.normal)
+plotshape(shortCondition, "SHORT", shape.labeldown, location.top, 
+         color.red, text="SHORT", textcolor=color.white, size=size.normal)
+
+// Histogram for momentum
+plot(momentum, "Momentum", style=plot.style_histogram, 
+     color=momentum > 0 ? color.new(color.green, 70) : color.new(color.red, 70))

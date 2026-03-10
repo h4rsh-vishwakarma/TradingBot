@@ -1,0 +1,58 @@
+//@version=5
+strategy("Squeeze Momentum [LazyBear] with Webhook", 
+         overlay=false, 
+         default_qty_type=strategy.percent_of_equity, 
+         default_qty_value=100)
+
+// === INPUTS ===
+length = input.int(20, title="BB Length")
+mult = input.float(2.0, title="BB MultFactor")
+lengthKC = input.int(20, title="KC Length")
+multKC = input.float(1.5, title="KC MultFactor")
+
+// === CALCULATIONS ===
+// Bollinger Bands
+source = close
+basis = ta.sma(source, length)
+dev = multKC * ta.stdev(source, length)
+upperBB = basis + dev
+lowerBB = basis - dev
+
+// Keltner Channels
+ma = ta.sma(source, lengthKC)
+range_ma = ta.sma(ta.tr, lengthKC)
+rangema = ta.atr(lengthKC)
+upperKC = ma + rangema * multKC
+lowerKC = ma - rangema * multKC
+
+// Squeeze Condition
+sqzOn  = (lowerBB > lowerKC) and (upperBB < upperKC)
+sqzOff = (lowerBB < lowerKC) and (upperBB > upperKC)
+noSqz  = not sqzOn and not sqzOff
+
+// Momentum Calculation
+val = ta.linreg(source - math.avg(math.avg(ta.highest(high, lengthKC), ta.lowest(low, lengthKC)), ta.sma(close, lengthKC)), lengthKC, 0)
+
+// === TRADING LOGIC ===
+// Long when momentum crosses above zero during/after squeeze
+longCondition = ta.crossover(val, 0)
+shortCondition = ta.crossunder(val, 0)
+
+if longCondition
+    strategy.entry("Long", strategy.long, 
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"squeeze_momentum_lazybear","signal":"LONG","price":{{close}},"timeframe":"{{interval}}","symbol":"{{ticker}}"}')
+
+if shortCondition
+    strategy.entry("Short", strategy.short,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"squeeze_momentum_lazybear","signal":"SHORT","price":{{close}},"timeframe":"{{interval}}","symbol":"{{ticker}}"}')
+
+// === PLOTTING ===
+bcolor = sqzOn ? color.black : sqzOff ? color.gray : color.blue
+plot(val, color=val > 0 ? (val > val[1] ? color.lime : color.green) : (val < val[1] ? color.red : color.maroon), style=plot.style_histogram, linewidth=2)
+plot(0, color=color.gray, linewidth=1)
+
+// Squeeze indicators
+plotshape(sqzOn, title="Squeeze On", location=location.bottom, 
+         color=color.red, style=shape.circle, size=size.tiny)
+plotshape(sqzOff, title="Squeeze Off", location=location.bottom, 
+         color=color.green, style=shape.circle, size=size.tiny)

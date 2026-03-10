@@ -1,18 +1,58 @@
 {
-    "BTCUSDT": {
-        "symbol": "BTCUSDT",
-        "quantity": -0.09500000000000003,
-        "avg_price": 64622.529473684175,
-        "realized_pnl": 7.7399999999999345,
-        "daily_realized_pnl": 0.0,
-        "last_update_date": "2026-03-09"
+    "positions": {
+        "BTCUSDT": {
+            "symbol": "BTCUSDT",
+            "quantity": -0.07700000000000001,
+            "avg_price": 64622.529473684175,
+            "realized_pnl": 958.0955305263149,
+            "daily_realized_pnl": 950.3555305263151,
+            "last_update_date": "2026-03-10"
+        },
+        "ETHUSDT": {
+            "symbol": "ETHUSDT",
+            "quantity": 0.05,
+            "avg_price": 3500.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": ""
+        }
     },
-    "ETHUSDT": {
-        "symbol": "ETHUSDT",
-        "quantity": 0.05,
-        "avg_price": 3500.0,
-        "realized_pnl": 0.0,
-        "daily_realized_pnl": 0.0,
-        "last_update_date": ""
-    }
+    "trade_history": [
+        {
+            "timestamp": "2026-03-10T08:20:31.779492",
+            "symbol": "BTCUSDT",
+            "pnl": 193.86758842105252,
+            "exit_price": 0.0
+        },
+        {
+            "timestamp": "2026-03-10T08:30:10.744633",
+            "symbol": "BTCUSDT",
+            "pnl": 193.86758842105252,
+            "exit_price": 0.0
+        },
+        {
+            "timestamp": "2026-03-10T08:38:56.428946",
+            "symbol": "BTCUSDT",
+            "pnl": 193.86758842105252,
+            "exit_price": 0.0
+        },
+        {
+            "timestamp": "2026-03-10T08:47:53.720406",
+            "symbol": "BTCUSDT",
+            "pnl": 193.86758842105252,
+            "exit_price": 0.0
+        },
+        {
+            "timestamp": "2026-03-10T08:49:42.363324",
+            "symbol": "BTCUSDT",
+            "pnl": 193.86758842105252,
+            "exit_price": 0.0
+        },
+        {
+            "timestamp": "2026-03-10T08:52:50.864222",
+            "symbol": "BTCUSDT",
+            "pnl": -18.982411578947474,
+            "exit_price": 70950.0
+        }
+    ]
 }

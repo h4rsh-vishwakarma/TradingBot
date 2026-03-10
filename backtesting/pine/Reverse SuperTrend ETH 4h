@@ -1,0 +1,30 @@
+//@version=5
+strategy("Reverse SuperTrend ETH 4h", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// --- Inputs ---
+// Typical SuperTrend defaults are 10 and 3. Adjust if your original test used custom values.
+atrPeriod = input.int(10, "ATR Length")
+factor = input.float(3.0, "Factor / Multiplier")
+
+// --- SuperTrend Calculation ---
+[supertrend, direction] = ta.supertrend(factor, atrPeriod)
+
+// --- REVERSE LOGIC ---
+// Original Long (direction < 0): Now enters SHORT
+// Original Short (direction > 0): Now enters LONG
+
+reverseLong  = ta.change(direction) > 0 // Signal flipped from Bullish to Bearish
+reverseShort = ta.change(direction) < 0 // Signal flipped from Bearish to Bullish
+
+// --- Execution ---
+if (reverseLong)
+    strategy.entry("Rev-Long", strategy.long, comment="Contrarian Buy")
+
+if (reverseShort)
+    strategy.entry("Rev-Short", strategy.short, comment="Contrarian Sell")
+
+// --- Visual Markers ---
+plot(supertrend, color = direction < 0 ? color.red : color.green, linewidth=2, title="Reverse SuperTrend Line")
+
+plotshape(reverseLong, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="Reverse Buy")
+plotshape(reverseShort, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, title="Reverse Sell")

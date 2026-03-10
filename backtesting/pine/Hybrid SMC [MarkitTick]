@@ -1,0 +1,129 @@
+//@version=5
+strategy("Hybrid SMC [MarkitTick] Webhook", 
+         overlay=true, 
+         default_qty_type=strategy.percent_of_equity, 
+         default_qty_value=100,
+         commission_type=strategy.commission.percent,
+         commission_value=0.1)
+
+// ═══════════════════════════════════════════════════════════
+// INPUTS
+// ═══════════════════════════════════════════════════════════
+swingLength = input.int(5, "Swing Detection Length", minval=3)
+rsiLength = input.int(14, "RSI Length")
+rsiOverbought = input.int(70, "RSI Overbought")
+rsiOversold = input.int(30, "RSI Oversold")
+macdFast = input.int(12, "MACD Fast")
+macdSlow = input.int(26, "MACD Slow")
+macdSignal = input.int(9, "MACD Signal")
+useVolumeFilter = input.bool(true, "Use Volume Filter")
+volumeMA = input.int(20, "Volume MA Length")
+
+// ═══════════════════════════════════════════════════════════
+// SMART MONEY CONCEPTS - ORDER BLOCKS
+// ═══════════════════════════════════════════════════════════
+swingHigh = ta.pivothigh(high, swingLength, swingLength)
+swingLow = ta.pivotlow(low, swingLength, swingLength)
+
+var float bullishOB = na
+var float bearishOB = na
+var int lastOBBar = 0
+
+// Detect Order Blocks
+if not na(swingLow)
+    bullishOB := low[swingLength]
+    lastOBBar := bar_index
+
+if not na(swingHigh)
+    bearishOB := high[swingLength]
+    lastOBBar := bar_index
+
+// OB still valid for 50 bars
+obActive = bar_index - lastOBBar < 50
+bullOBTouch = obActive and not na(bullishOB) and low <= bullishOB * 1.002
+bearOBTouch = obActive and not na(bearishOB) and high >= bearishOB * 0.998
+
+// ═══════════════════════════════════════════════════════════
+// MARKET STRUCTURE - CHANGE OF CHARACTER (CHoCH)
+// ═══════════════════════════════════════════════════════════
+var float lastHigh = na
+var float lastLow = na
+var int marketStructure = 0  // 1 = bullish, -1 = bearish
+
+if not na(swingHigh)
+    lastHigh := swingHigh
+if not na(swingLow)
+    lastLow := swingLow
+
+// CHoCH Detection
+bullishCHoCH = not na(lastLow) and close > lastHigh and marketStructure != 1
+bearishCHoCH = not na(lastHigh) and close < lastLow and marketStructure != -1
+
+if bullishCHoCH
+    marketStructure := 1
+if bearishCHoCH
+    marketStructure := -1
+
+// ═══════════════════════════════════════════════════════════
+// TRADITIONAL INDICATORS (Hybrid approach)
+// ═══════════════════════════════════════════════════════════
+// RSI
+rsiValue = ta.rsi(close, rsiLength)
+rsiBullish = rsiValue < rsiOversold and rsiValue > rsiValue[1]
+rsiBearish = rsiValue > rsiOverbought and rsiValue < rsiValue[1]
+
+// MACD
+[macdLine, signalLine, _] = ta.macd(close, macdFast, macdSlow, macdSignal)
+macdBullish = ta.crossover(macdLine, signalLine)
+macdBearish = ta.crossunder(macdLine, signalLine)
+
+// Volume Confirmation
+avgVolume = ta.sma(volume, volumeMA)
+volumeSpike = useVolumeFilter ? volume > avgVolume * 1.2 : true
+
+// ═══════════════════════════════════════════════════════════
+// HYBRID SIGNAL LOGIC
+// ═══════════════════════════════════════════════════════════
+// LONG: Bullish CHoCH + OB Touch + RSI oversold + MACD cross + Volume
+longCondition = marketStructure == 1 and bullOBTouch and rsiBullish and macdBullish and volumeSpike
+
+// SHORT: Bearish CHoCH + OB Touch + RSI overbought + MACD cross + Volume
+shortCondition = marketStructure == -1 and bearOBTouch and rsiBearish and macdBearish and volumeSpike
+
+// ═══════════════════════════════════════════════════════════
+// STRATEGY EXECUTION
+// ═══════════════════════════════════════════════════════════
+if longCondition
+    strategy.entry("Long", strategy.long,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"Hybrid SMC [MarkitTick]","side":"LONG","price":{{close}},"timeframe":"1h","symbol":"{{ticker}}"}')
+
+if shortCondition
+    strategy.entry("Short", strategy.short,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"Hybrid SMC [MarkitTick]","side":"SHORT","price":{{close}},"timeframe":"1h","symbol":"{{ticker}}"}')
+
+// ═══════════════════════════════════════════════════════════
+// PLOTTING
+// ═══════════════════════════════════════════════════════════
+// Order Blocks
+plot(obActive ? bullishOB : na, "Bullish OB", color.new(color.green, 60), 2)
+plot(obActive ? bearishOB : na, "Bearish OB", color.new(color.red, 60), 2)
+
+// Market Structure
+bgcolor(marketStructure == 1 ? color.new(color.green, 95) : marketStructure == -1 ? color.new(color.red, 95) : na, title="Market Structure")
+
+// CHoCH Markers
+plotshape(bullishCHoCH, "Bullish CHoCH", shape.circle, location.belowbar, 
+         color.new(color.green, 30), size=size.tiny, text="CHoCH")
+plotshape(bearishCHoCH, "Bearish CHoCH", shape.circle, location.abovebar, 
+         color.new(color.red, 30), size=size.tiny, text="CHoCH")
+
+// Entry Signals
+plotshape(longCondition, "LONG", shape.labelup, location.belowbar, 
+         color.green, text="LONG", textcolor=color.white, size=size.normal)
+plotshape(shortCondition, "SHORT", shape.labeldown, location.abovebar, 
+         color.red, text="SHORT", textcolor=color.white, size=size.normal)
+
+// RSI Level (subplot)
+hline(rsiOverbought, "RSI OB", color.red, linestyle=hline.style_dotted)
+hline(rsiOversold, "RSI OS", color.green, linestyle=hline.style_dotted)
+hline(50, "RSI Mid", color.gray, linestyle=hline.style_dotted)

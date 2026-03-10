@@ -1,0 +1,242 @@
+//@version=5
+strategy("OBV Divergence Strategy with Webhook", shorttitle='OBV Div', overlay=true, max_boxes_count=50, max_labels_count=100)
+
+// ===== INPUTS =====
+src = input(close, title='Source')
+shortLength = input(1, title='Short OBV period')
+longLength = input(20, title='Long OBV period')
+pivR = input(title='OBV Wave Pivot Lookback Right', defval=1)
+pivL = input(title='OBV Wave Pivot Lookback Left', defval=20)
+
+lbR = input(title='Divergence Pivot Lookback Right', defval=1)
+lbL = input(title='Divergence Pivot Lookback Left', defval=5)
+rangeUpper = input(title='Max of Lookback Range', defval=100)
+rangeLower = input(title='Min of Lookback Range', defval=2)
+
+// Signal Settings
+useBullDiv = input.bool(true, title='Trade Regular Bullish Divergence')
+useHiddenBullDiv = input.bool(true, title='Trade Hidden Bullish Divergence')
+useBearDiv = input.bool(true, title='Trade Regular Bearish Divergence')
+useHiddenBearDiv = input.bool(true, title='Trade Hidden Bearish Divergence')
+
+atrLen = input.int(14, "ATR Length")
+atrMultSL = input.float(2.0, "Stop Loss ATR Multiplier")
+rr = input.float(2.0, "Risk:Reward Ratio")
+
+// Webhook Settings
+webhookURL = input.string("http://13.236.143.201/webhook/tradingview", "Webhook URL")
+
+// ===== COLORS =====
+colTP_Fill = color.new(#089981, 85)
+colSL_Fill = color.new(#f23645, 85)
+colTP_Text = #089981
+colSL_Text = #f23645
+
+// ===== OBV OSCILLATOR =====
+obvOsc = ta.ema(ta.obv, shortLength) - ta.ema(ta.obv, longLength)
+obvColor = obvOsc > 0 ? color.new(color.aqua, 60) : color.new(color.orange, 60)
+
+// ===== DIVERGENCE DETECTION =====
+up = ta.rma(math.max(ta.change(src), 0), shortLength)
+down = ta.rma(-math.min(ta.change(src), 0), shortLength)
+
+bearColor = color.new(color.red, 0)
+bullColor = color.new(color.green, 0)
+hiddenBullColor = color.new(color.aqua, 0)
+hiddenBearColor = color.new(color.orange, 0)
+
+osc = ta.ema(ta.obv, shortLength) - ta.ema(ta.obv, longLength)
+plFound = na(ta.pivotlow(osc, lbL, lbR)) ? false : true
+phFound = na(ta.pivothigh(osc, lbL, lbR)) ? false : true
+
+_inRange(cond) =>
+    bars = ta.barssince(cond == true)
+    rangeLower <= bars and bars <= rangeUpper
+
+// Regular Bullish - Osc: Higher Low, Price: Lower Low
+oscHL = osc[lbR] > ta.valuewhen(plFound, osc[lbR], 1) and _inRange(plFound[1])
+priceLL = low[lbR] < ta.valuewhen(plFound, low[lbR], 1)
+bullCond = useBullDiv and priceLL and oscHL and plFound
+
+// Hidden Bullish - Osc: Lower Low, Price: Higher Low
+oscLL = osc[lbR] < ta.valuewhen(plFound, osc[lbR], 1) and _inRange(plFound[1])
+priceHL = low[lbR] > ta.valuewhen(plFound, low[lbR], 1)
+hiddenBullCond = useHiddenBullDiv and priceHL and oscLL and plFound
+
+// Regular Bearish - Osc: Lower High, Price: Higher High
+oscLH = osc[lbR] < ta.valuewhen(phFound, osc[lbR], 1) and _inRange(phFound[1])
+priceHH = high[lbR] > ta.valuewhen(phFound, high[lbR], 1)
+bearCond = useBearDiv and priceHH and oscLH and phFound
+
+// Hidden Bearish - Osc: Higher High, Price: Lower High
+oscHH = osc[lbR] > ta.valuewhen(phFound, osc[lbR], 1) and _inRange(phFound[1])
+priceLH = high[lbR] < ta.valuewhen(phFound, high[lbR], 1)
+hiddenBearCond = useHiddenBearDiv and priceLH and oscHH and phFound
+
+// ===== VARIABLES =====
+var box boxTP = na
+var box boxSL = na
+var label lblTP = na
+var label lblSL = na
+var int direction = 0
+var float tpPrice = na
+var float slPrice = na
+var float entryPrice = na
+
+atr = ta.atr(atrLen)
+
+// ===== SIGNALS =====
+buySignal = (bullCond or hiddenBullCond) and strategy.position_size == 0
+sellSignal = (bearCond or hiddenBearCond) and strategy.position_size == 0
+
+// Determine signal type for webhook
+signalType = ""
+if bullCond
+    signalType := "Regular Bullish Divergence"
+else if hiddenBullCond
+    signalType := "Hidden Bullish Divergence"
+else if bearCond
+    signalType := "Regular Bearish Divergence"
+else if hiddenBearCond
+    signalType := "Hidden Bearish Divergence"
+
+// ===== CALCULATE SL/TP =====
+if buySignal
+    direction := 1
+    entryPrice := close
+    slPrice := entryPrice - (atr * atrMultSL)
+    tpPrice := entryPrice + ((entryPrice - slPrice) * rr)
+    
+    tpPerc = (tpPrice - entryPrice) / entryPrice * 100
+    slPerc = (entryPrice - slPrice) / entryPrice * 100
+
+    // Visual boxes
+    boxTP := box.new(left=bar_index, top=tpPrice, right=bar_index + 1, bottom=entryPrice, 
+                     bgcolor=colTP_Fill, border_color=colTP_Text)
+    boxSL := box.new(left=bar_index, top=entryPrice, right=bar_index + 1, bottom=slPrice, 
+                     bgcolor=colSL_Fill, border_color=colSL_Text)
+
+    lblTP := label.new(bar_index, tpPrice, 
+             text="Target: " + str.tostring(tpPrice, "#.##") + " (" + str.tostring(tpPerc, "#.##") + "%)",
+             style=label.style_label_down, color=colTP_Text, textcolor=color.white, size=size.small)
+    lblSL := label.new(bar_index, slPrice, 
+             text="Stop: " + str.tostring(slPrice, "#.##") + " (" + str.tostring(slPerc, "#.##") + "%)",
+             style=label.style_label_up, color=colSL_Text, textcolor=color.white, size=size.small)
+
+    // Calculate confidence based on OBV strength and divergence type
+    obvStrength = math.abs(obvOsc) / ta.highest(math.abs(obvOsc), 100)
+    atrStrength = atr / close * 100
+    baseConfidence = bullCond ? 0.80 : 0.75  // Regular divergence higher confidence
+    confidence = math.min(0.95, baseConfidence + (obvStrength * 0.10) + (atrStrength * 0.05))
+    
+    // Strategy Entry
+    strategy.entry("BUY", strategy.long)
+    strategy.exit("TP/SL", "BUY", stop=slPrice, limit=tpPrice)
+    
+    // Webhook Message
+    tickerClean = str.replace(str.tostring(syminfo.ticker), ".P", "")
+    tfClean = str.lower(str.tostring(timeframe.period))
+    webhookMsg = '{\n' +
+         '  "strategy": "obv_divergence",\n' +
+         '  "side": "BUY",\n' +
+         '  "symbol": "' + tickerClean + '",\n' +
+         '  "timeframe": "' + tfClean + '",\n' +
+         '  "price": ' + str.tostring(close, "#.##") + ',\n' +
+         '  "stop_loss": ' + str.tostring(slPrice, "#.##") + ',\n' +
+         '  "take_profit": ' + str.tostring(tpPrice, "#.##") + ',\n' +
+         '  "confidence": ' + str.tostring(confidence, "#.##") + ',\n' +
+         '  "obv_osc": ' + str.tostring(obvOsc, "#.##") + ',\n' +
+         '  "atr": ' + str.tostring(atr, "#.##") + ',\n' +
+         '  "signal_type": "' + signalType + '",\n' +
+         '  "timestamp": "{{timenow}}",\n' +
+         '  "secret": "hybrid_tradingview_cluster_2026_secure"\n' +
+         '}'
+    
+    alert(webhookMsg, alert.freq_once_per_bar_close)
+
+if sellSignal
+    direction := -1
+    entryPrice := close
+    slPrice := entryPrice + (atr * atrMultSL)
+    tpPrice := entryPrice - ((slPrice - entryPrice) * rr)
+
+    tpPerc = (entryPrice - tpPrice) / entryPrice * 100
+    slPerc = (slPrice - entryPrice) / entryPrice * 100
+
+    boxTP := box.new(left=bar_index, top=entryPrice, right=bar_index + 1, bottom=tpPrice, 
+                     bgcolor=colTP_Fill, border_color=colTP_Text)
+    boxSL := box.new(left=bar_index, top=slPrice, right=bar_index + 1, bottom=entryPrice, 
+                     bgcolor=colSL_Fill, border_color=colSL_Text)
+
+    lblTP := label.new(bar_index, tpPrice, 
+             text="Target: " + str.tostring(tpPrice, "#.##") + " (" + str.tostring(tpPerc, "#.##") + "%)",
+             style=label.style_label_up, color=colTP_Text, textcolor=color.white, size=size.small)
+    lblSL := label.new(bar_index, slPrice, 
+             text="Stop: " + str.tostring(slPrice, "#.##") + " (" + str.tostring(slPerc, "#.##") + "%)",
+             style=label.style_label_down, color=colSL_Text, textcolor=color.white, size=size.small)
+
+    // Calculate confidence
+    obvStrength = math.abs(obvOsc) / ta.highest(math.abs(obvOsc), 100)
+    atrStrength = atr / close * 100
+    baseConfidence = bearCond ? 0.80 : 0.75
+    confidence = math.min(0.95, baseConfidence + (obvStrength * 0.10) + (atrStrength * 0.05))
+    
+    // Strategy Entry
+    strategy.entry("SELL", strategy.short)
+    strategy.exit("TP/SL", "SELL", stop=slPrice, limit=tpPrice)
+    
+    // Webhook Message
+    tickerClean = str.replace(str.tostring(syminfo.ticker), ".P", "")
+    tfClean = str.lower(str.tostring(timeframe.period))
+    webhookMsg = '{\n' +
+         '  "strategy": "obv_divergence",\n' +
+         '  "side": "SELL",\n' +
+         '  "symbol": "' + tickerClean + '",\n' +
+         '  "timeframe": "' + tfClean + '",\n' +
+         '  "price": ' + str.tostring(close, "#.##") + ',\n' +
+         '  "stop_loss": ' + str.tostring(slPrice, "#.##") + ',\n' +
+         '  "take_profit": ' + str.tostring(tpPrice, "#.##") + ',\n' +
+         '  "confidence": ' + str.tostring(confidence, "#.##") + ',\n' +
+         '  "obv_osc": ' + str.tostring(obvOsc, "#.##") + ',\n' +
+         '  "atr": ' + str.tostring(atr, "#.##") + ',\n' +
+         '  "signal_type": "' + signalType + '",\n' +
+         '  "timestamp": "{{timenow}}",\n' +
+         '  "secret": "hybrid_tradingview_cluster_2026_secure"\n' +
+         '}'
+    
+    alert(webhookMsg, alert.freq_once_per_bar_close)
+
+// ===== UPDATE & EXIT LOGIC =====
+if direction != 0
+    if not na(boxTP)
+        box.set_right(boxTP, bar_index + 5)
+    if not na(boxSL)
+        box.set_right(boxSL, bar_index + 5)
+    if not na(lblTP)
+        label.set_x(lblTP, bar_index + 5)
+    if not na(lblSL)
+        label.set_x(lblSL, bar_index + 5)
+
+    bool hitTP = (direction == 1 and high >= tpPrice) or (direction == -1 and low <= tpPrice)
+    bool hitSL = (direction == 1 and low <= slPrice) or (direction == -1 and high >= slPrice)
+
+    if hitTP or hitSL
+        box.set_right(boxTP, bar_index)
+        box.set_right(boxSL, bar_index)
+        label.set_x(lblTP, bar_index)
+        label.set_x(lblSL, bar_index)
+        
+        direction := 0
+        boxTP := na, boxSL := na, lblTP := na, lblSL := na
+
+// ===== PLOTS =====
+// Plot divergence signals on chart
+plotshape(buySignal, title='Buy Signal', style=shape.triangleup, location=location.belowbar, 
+          color=color.new(color.green, 0), size=size.small)
+plotshape(sellSignal, title='Sell Signal', style=shape.triangledown, location=location.abovebar, 
+          color=color.new(color.red, 0), size=size.small)
+
+// Plot OBV oscillator in separate pane
+obvPlot = plot(obvOsc, color=obvColor, title='OBV Oscillator', linewidth=2)
+zeroLine = plot(0, title='Zero Line', color=color.new(color.gray, 60), linewidth=1)
+fill(obvPlot, zeroLine, color=obvColor, title='OBV Fill')

@@ -1,0 +1,40 @@
+//@version=5
+strategy("Reverse Madrid Ribbon Strategy", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// --- Inputs ---
+src = input(close, title="Source")
+maType = input.string("EMA", title="MA Type", options=["EMA", "SMA"])
+
+// --- Ribbon Calculations ---
+// The Madrid Ribbon typically uses 20 moving averages from length 5 to 100
+float ma05 = maType == "EMA" ? ta.ema(src, 5)  : ta.sma(src, 5)
+float ma10 = maType == "EMA" ? ta.ema(src, 10) : ta.sma(src, 10)
+float ma100 = maType == "EMA" ? ta.ema(src, 100) : ta.sma(src, 100)
+
+// Standard Madrid Logic: Bullish when short MA > long MA (or when MAs are rising)
+// We simplify the 'Trend' based on the relationship between fast and slow averages
+isBullish = ma05 > ma10 and ma10 > ma100
+isBearish = ma05 < ma10 and ma10 < ma100
+
+// --- REVERSE EXECUTION LOGIC ---
+// Original Long: isBullish -> We now enter SHORT
+// Original Short: isBearish -> We now enter LONG
+
+reverseLong  = ta.crossunder(ma05, ma10) // Entering Long on a bearish crossover
+reverseShort = ta.crossover(ma05, ma10)  // Entering Short on a bullish crossover
+
+// --- Execution ---
+if (reverseLong)
+    strategy.entry("Rev-Long", strategy.long, comment="Contrarian Buy")
+
+if (reverseShort)
+    strategy.entry("Rev-Short", strategy.short, comment="Contrarian Sell")
+
+// --- Visualizing the Ribbon ---
+// We plot the core averages to see the "Flip"
+plot(ma05, color=isBullish ? color.lime : color.red, linewidth=1, title="Fast MA")
+plot(ma10, color=isBullish ? color.green : color.maroon, linewidth=1, title="Mid MA")
+plot(ma100, color=color.gray, linewidth=2, title="Baseline")
+
+plotshape(reverseLong, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="Reverse Buy")
+plotshape(reverseShort, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, title="Reverse Sell")

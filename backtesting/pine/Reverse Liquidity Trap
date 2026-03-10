@@ -1,0 +1,43 @@
+//@version=5
+strategy("Reverse Liquidity Trap [PyraTime Logic]", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// --- Inputs ---
+lookbackPeriod = input.int(10, "Pivot Lookback Period", minval=2)
+wickPercent    = input.float(10.0, "Min Wick/Range % for Sweep", minval=0.0)
+
+// --- Calculations ---
+// Define recent swing highs and lows
+swingHigh = ta.highest(high[1], lookbackPeriod)
+swingLow  = ta.lowest(low[1], lookbackPeriod)
+
+// Identify the "Trap" (Original Logic)
+// Bull Trap: Price goes above high, but closes below it
+isBullTrap = high > swingHigh and close < swingHigh
+// Bear Trap: Price goes below low, but closes above it
+isBearTrap = low < swingLow and close > swingLow
+
+// Wick Filter: Ensuring it was a 'sweep' with a rejection wick
+bodySize = math.abs(close - open)
+candleRange = high - low
+wickSizeHigh = high - math.max(open, close)
+wickSizeLow  = math.min(open, close) - low
+
+validBullSweep = isBullTrap and (wickSizeHigh / candleRange * 100) >= wickPercent
+validBearSweep = isBearTrap and (wickSizeLow / candleRange * 100) >= wickPercent
+
+// --- REVERSE EXECUTION LOGIC ---
+// Original Logic: Bull Trap -> Short | Bear Trap -> Long
+// Reverse Logic:  Bull Trap -> LONG  | Bear Trap -> SHORT
+
+if (validBullSweep)
+    strategy.entry("Rev-Bull-Long", strategy.long, comment="Buying the Breakout")
+
+if (validBearSweep)
+    strategy.entry("Rev-Bear-Short", strategy.short, comment="Selling the Breakdown")
+
+// --- Plotting ---
+plot(swingHigh, color=color.red, style=plot.style_stepline, title="Recent Swing High")
+plot(swingLow, color=color.green, style=plot.style_stepline, title="Recent Swing Low")
+
+plotshape(validBullSweep, "Breakout Buy", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(validBearSweep, "Breakdown Sell", shape.triangledown, location.abovebar, color.red, size=size.small)

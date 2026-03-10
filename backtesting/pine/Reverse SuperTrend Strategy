@@ -1,0 +1,34 @@
+//@version=5
+strategy("Reverse SuperTrend Strategy", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// --- Inputs ---
+// Adjust these to match the exact settings used in your original 'UNPROFITABLE' backtest
+atrPeriod = input.int(10, title="ATR Length")
+factor = input.float(3.0, title="Factor / Multiplier")
+
+// --- SuperTrend Calculation ---
+[supertrend, direction] = ta.supertrend(factor, atrPeriod)
+
+// --- Logic Flipping ---
+// Original Long: direction changes to -1 (Bullish)
+// Reverse Long: Trigger when direction changes to 1 (Bearish)
+reverseLong = ta.change(direction) > 0 
+
+// Original Short: direction changes to 1 (Bearish)
+// Reverse Short: Trigger when direction changes to -1 (Bullish)
+reverseShort = ta.change(direction) < 0
+
+// --- Plotting ---
+// Note: Colors are also flipped to represent the reverse bias
+plot(supertrend, color = direction < 0 ? color.red : color.green, title="Reverse SuperTrend Line")
+
+// --- Execution ---
+if (reverseLong)
+    strategy.entry("Rev-Long", strategy.long, comment="Buying the Bearish Flip")
+
+if (reverseShort)
+    strategy.entry("Rev-Short", strategy.short, comment="Selling the Bullish Flip")
+
+// Visualizing signals
+plotshape(reverseLong, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="Reverse Buy Signal")
+plotshape(reverseShort, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, title="Reverse Sell Signal")

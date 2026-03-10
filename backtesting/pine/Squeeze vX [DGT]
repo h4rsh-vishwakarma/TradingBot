@@ -1,0 +1,190 @@
+//@version=5
+strategy("Squeeze vX [DGT] Webhook", 
+         overlay=false, 
+         default_qty_type=strategy.percent_of_equity, 
+         default_qty_value=100,
+         commission_type=strategy.commission.percent,
+         commission_value=0.1)
+
+// ═══════════════════════════════════════════════════════════
+// INPUTS
+// ═══════════════════════════════════════════════════════════
+lengthBB = input.int(20, "BB Length", minval=1)
+multBB = input.float(2.0, "BB Multiplier", minval=0.5)
+lengthKC = input.int(20, "KC Length", minval=1)
+multKC = input.float(1.5, "KC Multiplier", minval=0.5)
+momLength = input.int(12, "Momentum Length", minval=1)
+useVolumeWeight = input.bool(true, "Use Volume Weighting")
+volLength = input.int(20, "Volume MA Length", minval=5)
+useSuperSqueeze = input.bool(true, "Detect Super Squeeze")
+superSqzMult = input.float(1.0, "Super Squeeze Mult", minval=0.5)
+
+// ═══════════════════════════════════════════════════════════
+// BOLLINGER BANDS
+// ═══════════════════════════════════════════════════════════
+basis = ta.sma(close, lengthBB)
+dev = multBB * ta.stdev(close, lengthBB)
+upperBB = basis + dev
+lowerBB = basis - dev
+
+// ═══════════════════════════════════════════════════════════
+// KELTNER CHANNELS (Regular)
+// ═══════════════════════════════════════════════════════════
+ma = ta.sma(close, lengthKC)
+rangeMa = ta.sma(ta.tr, lengthKC)
+upperKC = ma + rangeMa * multKC
+lowerKC = ma - rangeMa * multKC
+
+// ═══════════════════════════════════════════════════════════
+// SUPER SQUEEZE (Tighter KC for extreme compression)
+// ═══════════════════════════════════════════════════════════
+upperKC_super = ma + rangeMa * superSqzMult
+lowerKC_super = ma - rangeMa * superSqzMult
+
+// ═══════════════════════════════════════════════════════════
+// SQUEEZE STATES
+// ═══════════════════════════════════════════════════════════
+// Regular Squeeze: BB inside KC
+sqzOn = lowerBB > lowerKC and upperBB < upperKC
+sqzOff = lowerBB < lowerKC and upperBB > upperKC
+
+// Super Squeeze: BB inside tighter KC (extra compression)
+superSqz = useSuperSqueeze and lowerBB > lowerKC_super and upperBB < upperKC_super
+
+noSqz = not sqzOn and not sqzOff
+
+// Squeeze color: red=regular, orange=super, green=off, gray=none
+sqzColor = superSqz ? color.orange : sqzOn ? color.red : sqzOff ? color.green : color.gray
+
+// ═══════════════════════════════════════════════════════════
+// VOLUME-WEIGHTED MOMENTUM
+// ═══════════════════════════════════════════════════════════
+// Calculate price momentum
+highest = ta.highest(high, momLength)
+lowest = ta.lowest(low, momLength)
+avgPrice = math.avg(highest, lowest)
+val = ta.linreg(close - avgPrice, momLength, 0)
+
+// Volume weighting factor
+volMA = ta.sma(volume, volLength)
+volRatio = useVolumeWeight ? volume / volMA : 1.0
+volWeight = math.min(volRatio, 3.0)  // Cap at 3x to avoid extreme spikes
+
+// Apply volume weight to momentum
+valWeighted = val * volWeight
+
+// Smooth the volume-weighted momentum
+valSmooth = ta.ema(valWeighted, 3)
+
+// ═══════════════════════════════════════════════════════════
+// MOMENTUM STRENGTH & DIRECTION
+// ═══════════════════════════════════════════════════════════
+// Detect momentum acceleration
+momIncreasing = valSmooth > valSmooth[1]
+momDecreasing = valSmooth < valSmooth[1]
+
+// Momentum color gradient based on strength and direction
+momStrength = math.abs(valSmooth)
+strongBull = valSmooth > 0 and momIncreasing and momStrength > momStrength[1]
+weakBull = valSmooth > 0 and not strongBull
+strongBear = valSmooth < 0 and momDecreasing and momStrength > momStrength[1]
+weakBear = valSmooth < 0 and not strongBear
+
+momColor = strongBull ? color.new(color.lime, 0) : weakBull ? color.new(color.green, 40) : strongBear ? color.new(color.red, 0) : color.new(color.maroon, 40)
+
+// ═══════════════════════════════════════════════════════════
+// SQUEEZE RELEASE DETECTION
+// ═══════════════════════════════════════════════════════════
+// Track squeeze duration to identify powerful releases
+var int sqzDuration = 0
+var bool wasInSqueeze = false
+
+if sqzOn or superSqz
+    sqzDuration += 1
+    wasInSqueeze := true
+else if wasInSqueeze and sqzOff
+    wasInSqueeze := false
+    // Squeeze just released
+else
+    sqzDuration := 0
+
+// Strong release = squeeze was on for multiple bars
+strongRelease = sqzOff and sqzDuration[1] >= 3
+
+// ═══════════════════════════════════════════════════════════
+// SIGNAL GENERATION
+// ═══════════════════════════════════════════════════════════
+// LONG Signal:
+// 1. Squeeze released (preferably strong release from super squeeze)
+// 2. Momentum crosses above zero OR is positive and accelerating
+// 3. Volume above average (already weighted in)
+// 4. Strong bullish momentum (lime bars)
+
+momCrossUp = ta.crossover(valSmooth, 0)
+momPosAccel = valSmooth > 0 and momIncreasing and valSmooth > valSmooth[2]
+
+longTrigger = momCrossUp or momPosAccel
+longSetup = (sqzOff or strongRelease) and strongBull
+
+longCondition = longSetup and longTrigger
+
+// SHORT Signal:
+// 1. Squeeze released (preferably strong release from super squeeze)
+// 2. Momentum crosses below zero OR is negative and decelerating
+// 3. Volume above average (already weighted in)
+// 4. Strong bearish momentum (red bars)
+
+momCrossDown = ta.crossunder(valSmooth, 0)
+momNegDecel = valSmooth < 0 and momDecreasing and valSmooth < valSmooth[2]
+
+shortTrigger = momCrossDown or momNegDecel
+shortSetup = (sqzOff or strongRelease) and strongBear
+
+shortCondition = shortSetup and shortTrigger
+
+// ═══════════════════════════════════════════════════════════
+// STRATEGY EXECUTION
+// ═══════════════════════════════════════════════════════════
+if longCondition
+    strategy.entry("Long", strategy.long,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"squeeze_vx_dgt","signal":"LONG","price":{{close}},"timeframe":"{{interval}}","symbol":"{{ticker}}"}')
+
+if shortCondition
+    strategy.entry("Short", strategy.short,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"squeeze_vx_dgt","signal":"SHORT","price":{{close}},"timeframe":"{{interval}}","symbol":"{{ticker}}"}')
+
+// ═══════════════════════════════════════════════════════════
+// PLOTTING
+// ═══════════════════════════════════════════════════════════
+// Volume-Weighted Momentum Histogram
+plot(valSmooth, "Momentum vX", style=plot.style_histogram, color=momColor, linewidth=4)
+plot(0, "Zero Line", color=color.gray, linewidth=1)
+
+// Squeeze State Indicator (dots at bottom)
+plot(superSqz ? -3 : na, "Super Squeeze", color=color.orange, style=plot.style_circles, linewidth=4)
+plot(sqzOn and not superSqz ? -3 : na, "Squeeze On", color=color.red, style=plot.style_circles, linewidth=3)
+plot(sqzOff ? -3 : na, "Squeeze Off", color=color.green, style=plot.style_circles, linewidth=3)
+plot(noSqz ? -3 : na, "No Squeeze", color=color.gray, style=plot.style_circles, linewidth=2)
+
+// Strong release marker
+plotshape(strongRelease, "Strong Release", shape.diamond, location.bottom, 
+         color.new(color.yellow, 0), size=size.tiny, text="⚡")
+
+// Entry signals
+plotshape(longCondition, "LONG", shape.labelup, location.bottom, 
+         color.new(color.lime, 0), text="LONG", textcolor=color.black, size=size.normal)
+plotshape(shortCondition, "SHORT", shape.labeldown, location.top, 
+         color.new(color.red, 0), text="SHORT", textcolor=color.white, size=size.normal)
+
+// Background coloring for squeeze state
+bgcolor(superSqz ? color.new(color.orange, 92) : sqzOn ? color.new(color.red, 95) : sqzOff ? color.new(color.green, 95) : na, title="Squeeze State")
+
+// Volume weight indicator (optional subplot)
+plot(volWeight - 1, "Volume Weight", color=color.new(color.blue, 70), style=plot.style_line, linewidth=1)
+hline(0, "Avg Volume", color=color.blue, linestyle=hline.style_dotted)
+
+// Momentum strength envelope
+plot(momStrength > 0 ? momStrength : na, "Bull Strength", 
+     color=color.new(color.lime, 80), style=plot.style_area)
+plot(momStrength > 0 ? -momStrength : na, "Bear Strength", 
+     color=color.new(color.red, 80), style=plot.style_area)

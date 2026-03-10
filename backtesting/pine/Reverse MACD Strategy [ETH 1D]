@@ -1,0 +1,36 @@
+//@version=5
+strategy("Reverse MACD Strategy [ETH 1D]", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// --- Inputs ---
+fastLen = input.int(12, "Fast Length")
+slowLen = input.int(26, "Slow Length")
+sigLen  = input.int(9,  "Signal Smoothing")
+
+// --- MACD Calculation ---
+[macdLine, signalLine, _] = ta.macd(close, fastLen, slowLen, sigLen)
+
+// --- REVERSE LOGIC ---
+// Original Long: macdLine crosses ABOVE signalLine
+// Reverse Long: Trigger when macdLine crosses BELOW signalLine
+reverseLong = ta.crossunder(macdLine, signalLine)
+
+// Original Short: macdLine crosses BELOW signalLine
+// Reverse Short: Trigger when macdLine crosses ABOVE signalLine
+reverseShort = ta.crossover(macdLine, signalLine)
+
+// --- Execution with Capital Guard ---
+canTrade = strategy.equity > 0
+
+if (canTrade)
+    if (reverseLong)
+        strategy.entry("Rev-Long", strategy.long, comment="Contrarian Buy")
+
+    if (reverseShort)
+        strategy.entry("Rev-Short", strategy.short, comment="Contrarian Sell")
+
+// --- Visuals ---
+plot(macdLine, color=color.blue, title="MACD Line")
+plot(signalLine, color=color.orange, title="Signal Line")
+
+plotshape(reverseLong, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="Reverse Buy")
+plotshape(reverseShort, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, title="Reverse Sell")

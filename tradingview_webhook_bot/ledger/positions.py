@@ -1,14 +1,14 @@
 """
 Deterministic Position Ledger
 Calculates Weighted Average Entry Price (WAEP) and Realized PnL.
-Persists state to local storage for crash recovery.
+Persists state to local storage for crash recovery and Hybrid Scoring.
 """
 
 import logging
 import json
 import os
 from datetime import datetime
-from typing import Dict
+from typing import Dict, List
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class PositionSnapshot(BaseModel):
     symbol: str
     quantity: float = 0.0      # Positive for LONG, Negative for SHORT
-    avg_price: float = 0.0     # Weighted Average Entry Price
+    avg_price: float = 0.0      # Weighted Average Entry Price
     realized_pnl: float = 0.0  # Total lifetime profit/loss
     daily_realized_pnl: float = 0.0 # PnL for the current day
     last_update_date: str = "" # To track PnL reset
@@ -25,6 +25,8 @@ class PositionLedger:
     def __init__(self, storage_path: str = "storage/ledger_state.json"):
         self.storage_path = storage_path
         self.positions: Dict[str, PositionSnapshot] = {}
+        # ⭐ New: Trade history for Hybrid Scoring (Live performance)
+        self.trade_history: List[dict] = [] 
         self._load_state()
 
     def _load_state(self):
@@ -32,25 +34,32 @@ class PositionLedger:
         if os.path.exists(self.storage_path):
             try:
                 with open(self.storage_path, 'r') as f:
-                    data = json.load(f)
-                    for symbol, pos_data in data.items():
-                        self.positions[symbol] = PositionSnapshot(**pos_data)
-                logger.info(f"💾 Ledger state loaded from {self.storage_path}")
+                    full_data = json.load(f)
+                    # Support for both old and new storage formats
+                    pos_data = full_data.get("positions", full_data) if isinstance(full_data, dict) else {}
+                    self.trade_history = full_data.get("trade_history", []) if isinstance(full_data, dict) else []
+                    
+                    for symbol, data in pos_data.items():
+                        self.positions[symbol] = PositionSnapshot(**data)
+                logger.info(f"💾 Ledger state loaded. History: {len(self.trade_history)} trades.")
             except Exception as e:
                 logger.error(f"❌ Failed to load ledger state: {e}")
 
     def _save_state(self):
-        """Persists the current ledger state to disk."""
+        """Persists the current ledger state and trade history to disk."""
         try:
             os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
             with open(self.storage_path, 'w') as f:
-                data = {s: p.model_dump() for s, p in self.positions.items()}
+                data = {
+                    "positions": {s: p.model_dump() for s, p in self.positions.items()},
+                    "trade_history": self.trade_history[-50:] # Keep last 50 trades for scoring
+                }
                 json.dump(data, f, indent=4)
         except Exception as e:
             logger.error(f"❌ Failed to save ledger state: {e}")
 
     def get_position(self, symbol: str) -> PositionSnapshot:
-        """⭐ FIXED: Returns snapshot for a symbol (prevents crash)"""
+        """Returns snapshot for a symbol."""
         return self.positions.get(symbol, PositionSnapshot(symbol=symbol))
 
     def get_daily_pnl(self) -> float:
@@ -62,38 +71,58 @@ class PositionLedger:
                 total_daily_pnl += pos.daily_realized_pnl
         return total_daily_pnl
 
+    # ⭐ NEW FEATURE: Hybrid Scoring Support
+    def get_daily_pnl_events(self) -> List[dict]:
+        """Returns trade history for Hybrid scoring engine."""
+        return self.trade_history
+
     def apply_fill(self, symbol: str, side: str, qty: float, price: float, fee: float = 0.0):
+        """Core logic to update WAEP and track realized PnL."""
         if symbol not in self.positions:
             self.positions[symbol] = PositionSnapshot(symbol=symbol)
 
         pos = self.positions[symbol]
         today = datetime.utcnow().strftime('%Y-%m-%d')
 
+        # Reset daily PnL if new day
         if pos.last_update_date != today:
             pos.daily_realized_pnl = 0.0
             pos.last_update_date = today
 
         side = side.lower()
         trade_qty = qty if side == 'buy' else -qty
+        
+        # Check if trade increases or reduces position
         is_increasing = (pos.quantity >= 0 and trade_qty > 0) or (pos.quantity <= 0 and trade_qty < 0)
 
         trade_pnl = 0.0
         if is_increasing:
+            # Weighted Average Entry Price logic
             new_total_qty = pos.quantity + trade_qty
             if abs(new_total_qty) > 1e-10:
                 pos.avg_price = ((abs(pos.quantity) * pos.avg_price) + (qty * price)) / abs(new_total_qty)
             pos.quantity = new_total_qty
             trade_pnl = -fee
         else:
+            # Profit calculation for closing/reducing
             direction = 1 if pos.quantity > 0 else -1
             realized_qty = min(abs(pos.quantity), qty)
             trade_pnl = ((price - pos.avg_price) * realized_qty * direction) - fee
+            
+            # Record trade in history for Hybrid scoring
+            self.trade_history.append({
+                "timestamp": datetime.utcnow().isoformat(),
+                "symbol": symbol,
+                "pnl": trade_pnl,
+                "exit_price": price
+            })
+            
             pos.quantity += trade_qty
-
             if abs(pos.quantity) < 1e-10:
                 pos.quantity = 0.0
                 pos.avg_price = 0.0
             elif (direction == 1 and pos.quantity < 0) or (direction == -1 and pos.quantity > 0):
+                # Flit: Position reversed (Long to Short or vice versa)
                 pos.avg_price = price
 
         pos.realized_pnl += trade_pnl
@@ -102,6 +131,7 @@ class PositionLedger:
         return pos
 
     def update_position_manually(self, symbol: str, quantity: float):
+        """Force update position (Reconciliation fallback)."""
         if symbol not in self.positions:
             self.positions[symbol] = PositionSnapshot(symbol=symbol)
         pos = self.positions[symbol]

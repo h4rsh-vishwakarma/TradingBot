@@ -1,0 +1,226 @@
+//@version=5
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Enhanced ATR Supertrend — WEBHOOK VERSION
+// 
+// Optimized for SOLUSDT 4H timeframe
+// Automated trading with TradingView alerts
+// ══════════════════════════════════════════════════════════════════════════════
+
+strategy("Enhanced ATR Supertrend — Webhook", shorttitle="ATR ST Webhook", overlay=true,
+         default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WEBHOOK CONFIGURATION
+// ══════════════════════════════════════════════════════════════════════════════
+webhookUrl = input.string("http://13.236.143.201:5000/webhook/tradingview", 
+                          title="Webhook URL", group="Webhook Settings")
+webhookSecret = input.string("hybrid_tradingview_cluster_2026_secure", 
+                             title="Webhook Secret", group="Webhook Settings")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RISK MANAGEMENT
+// ══════════════════════════════════════════════════════════════════════════════
+stopLossPercent = input.float(3.0, title="Stop Loss %", minval=0.1, maxval=10, step=0.1, group="Risk Management")
+takeProfitPercent = input.float(5.0, title="Take Profit %", minval=0.1, maxval=20, step=0.1, group="Risk Management")
+positionSize = input.float(0.60, title="Position Size (SOL)", minval=0.001, step=0.01, group="Risk Management",
+                           tooltip="Minimum ~0.60 SOL for $100 notional at ~$170")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CORE SETTINGS
+// ══════════════════════════════════════════════════════════════════════════════
+atrPeriod = input.int(10, "ATR Period", minval=1, maxval=500, group="Core Settings")
+atrMultiplier = input.float(3.0, "ATR Multiplier", minval=0.1, step=0.1, group="Core Settings")
+
+// ATR Calculation Method
+atrMethod = input.string("RMA", "ATR Smoothing", options=["RMA", "SMA", "EMA", "WMA"], group="Advanced Settings")
+useAdaptive = input.bool(false, "Use Adaptive Multiplier", group="Advanced Settings")
+volatilityLookback = input.int(50, "Volatility Lookback", minval=10, group="Advanced Settings")
+
+// Visual Settings
+showFill = input.bool(true, "Show Background Fill", group="Visual")
+upColor = input.color(color.new(#00ff88, 0), "Uptrend Color", group="Visual")
+downColor = input.color(color.new(#ff3366, 0), "Downtrend Color", group="Visual")
+fillTransparency = input.int(92, "Fill Transparency", minval=0, maxval=100, group="Visual")
+showDashboard = input.bool(true, "Show Dashboard", group="Visual")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ATR CALCULATION
+// ══════════════════════════════════════════════════════════════════════════════
+trueRange = math.max(high - low, math.abs(high - close[1]), math.abs(low - close[1]))
+
+atrValue = switch atrMethod
+    "RMA" => ta.rma(trueRange, atrPeriod)
+    "SMA" => ta.sma(trueRange, atrPeriod)
+    "EMA" => ta.ema(trueRange, atrPeriod)
+    "WMA" => ta.wma(trueRange, atrPeriod)
+    => ta.rma(trueRange, atrPeriod)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ADAPTIVE VOLATILITY MULTIPLIER
+// ══════════════════════════════════════════════════════════════════════════════
+adaptiveMultiplier = atrMultiplier
+if useAdaptive
+    currentVol = atrValue / close
+    avgVol = ta.sma(currentVol, volatilityLookback)
+    volRatio = currentVol / avgVol
+    adaptiveMultiplier := atrMultiplier * (1 + (1 - volRatio) * 0.5)
+    adaptiveMultiplier := math.max(adaptiveMultiplier, atrMultiplier * 0.5)
+    adaptiveMultiplier := math.min(adaptiveMultiplier, atrMultiplier * 2.0)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SUPERTREND CALCULATION
+// ══════════════════════════════════════════════════════════════════════════════
+hl2 = (high + low) / 2
+basicUpperBand = hl2 + (adaptiveMultiplier * atrValue)
+basicLowerBand = hl2 - (adaptiveMultiplier * atrValue)
+
+// Trailing bands calculation
+var float finalUpperBand = na
+var float finalLowerBand = na
+
+finalUpperBand := na(basicUpperBand[1]) ? basicUpperBand : basicUpperBand < nz(finalUpperBand[1]) or close[1] > nz(finalUpperBand[1]) ? basicUpperBand : nz(finalUpperBand[1])
+finalLowerBand := na(basicLowerBand[1]) ? basicLowerBand : basicLowerBand > nz(finalLowerBand[1]) or close[1] < nz(finalLowerBand[1]) ? basicLowerBand : nz(finalLowerBand[1])
+
+// Determine trend
+var float supertrend = na
+var int direction = na
+
+prevDirection = nz(direction[1], 1)
+direction := close > nz(finalUpperBand[1]) ? 1 : close < nz(finalLowerBand[1]) ? -1 : prevDirection
+
+supertrend := direction == 1 ? finalLowerBand : finalUpperBand
+trendChanged = ta.change(direction) != 0
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SIGNAL LOGIC
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Entry signals
+longSignal = trendChanged and direction == 1
+shortSignal = trendChanged and direction == -1
+
+// Prevent multiple signals
+var float lastLongBar = na
+var float lastShortBar = na
+
+isNewLong = longSignal and (na(lastLongBar) or bar_index - lastLongBar > 3)
+isNewShort = shortSignal and (na(lastShortBar) or bar_index - lastShortBar > 3)
+
+if isNewLong
+    lastLongBar := bar_index
+if isNewShort
+    lastShortBar := bar_index
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CALCULATE SL/TP LEVELS
+// ══════════════════════════════════════════════════════════════════════════════
+var float entryPrice = na
+var float stopLoss = na
+var float takeProfit = na
+
+if isNewLong
+    entryPrice := close
+    stopLoss := entryPrice * (1 - stopLossPercent / 100)
+    takeProfit := entryPrice * (1 + takeProfitPercent / 100)
+    
+if isNewShort
+    entryPrice := close
+    stopLoss := entryPrice * (1 + stopLossPercent / 100)
+    takeProfit := entryPrice * (1 - takeProfitPercent / 100)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WEBHOOK PAYLOAD
+// ══════════════════════════════════════════════════════════════════════════════
+generateWebhookPayload(signal, price, sl, tp) =>
+    timestamp = str.format("{0,date,yyyy-MM-dd} {0,time,HH:mm:ss}", timenow)
+    signalId = "TV-" + str.replace_all(timestamp, " ", "") + str.replace_all(timestamp, ":", "") + str.replace_all(timestamp, "-", "") + "-atrst_"
+    
+    distPercent = ((close - supertrend) / close) * 100
+    
+    payload = '{\n' +
+              '  "strategy": "enhanced_atr_supertrend",\n' +
+              '  "signal_id": "' + signalId + '",\n' +
+              '  "action": "' + signal + '",\n' +
+              '  "symbol": "' + syminfo.ticker + '",\n' +
+              '  "timeframe": "' + timeframe.period + '",\n' +
+              '  "price": ' + str.tostring(price) + ',\n' +
+              '  "stop_loss": ' + str.tostring(sl) + ',\n' +
+              '  "take_profit": ' + str.tostring(tp) + ',\n' +
+              '  "position_size": ' + str.tostring(positionSize) + ',\n' +
+              '  "atr_value": ' + str.tostring(atrValue, "#.###") + ',\n' +
+              '  "atr_multiplier": ' + str.tostring(adaptiveMultiplier, "#.##") + ',\n' +
+              '  "supertrend_level": ' + str.tostring(supertrend, "#.##") + ',\n' +
+              '  "distance_percent": ' + str.tostring(distPercent, "#.##") + ',\n' +
+              '  "timestamp": "' + timestamp + '",\n' +
+              '  "exchange": "binance",\n' +
+              '  "secret": "' + webhookSecret + '"\n' +
+              '}'
+    payload
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SEND WEBHOOK ALERTS
+// ══════════════════════════════════════════════════════════════════════════════
+if isNewLong
+    webhookMessage = generateWebhookPayload("LONG", entryPrice, stopLoss, takeProfit)
+    alert(webhookMessage, alert.freq_once_per_bar)
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit Long", "Long", stop=stopLoss, limit=takeProfit)
+
+if isNewShort
+    webhookMessage = generateWebhookPayload("SHORT", entryPrice, stopLoss, takeProfit)
+    alert(webhookMessage, alert.freq_once_per_bar)
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Exit Short", "Short", stop=stopLoss, limit=takeProfit)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PLOTTING
+// ══════════════════════════════════════════════════════════════════════════════
+supertrendColor = direction == 1 ? upColor : downColor
+
+plot(direction == 1 ? supertrend : na, "Uptrend", color=upColor, linewidth=2, style=plot.style_linebr)
+plot(direction == -1 ? supertrend : na, "Downtrend", color=downColor, linewidth=2, style=plot.style_linebr)
+
+plotshape(isNewLong, "Long Signal", shape.triangleup, location.belowbar, color=color.new(upColor, 0), size=size.small)
+plotshape(isNewShort, "Short Signal", shape.triangledown, location.abovebar, color=color.new(downColor, 0), size=size.small)
+
+// Background fill
+bodyMiddle = (open + close) / 2
+upTrendPlot = plot(direction == 1 ? supertrend : na, display=display.none)
+downTrendPlot = plot(direction == -1 ? supertrend : na, display=display.none)
+bodyPlot = plot(bodyMiddle, display=display.none)
+
+fill(bodyPlot, upTrendPlot, color=showFill ? color.new(upColor, fillTransparency) : na)
+fill(bodyPlot, downTrendPlot, color=showFill ? color.new(downColor, fillTransparency) : na)
+
+// SL/TP levels
+plot(strategy.position_size != 0 ? stopLoss : na, color=color.red, 
+     style=plot.style_linebr, linewidth=2, title="Stop Loss")
+plot(strategy.position_size != 0 ? takeProfit : na, color=color.green, 
+     style=plot.style_linebr, linewidth=2, title="Take Profit")
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+var infoTable = table.new(position.top_right, 2, 6, border_width=1)
+
+if showDashboard and barstate.islast
+    table.cell(infoTable, 0, 0, "Supertrend", text_color=color.white, bgcolor=color.new(color.gray, 30))
+    table.cell(infoTable, 1, 0, direction == 1 ? "BULLISH" : "BEARISH", text_color=color.white, bgcolor=direction == 1 ? color.new(upColor, 30) : color.new(downColor, 30))
+    
+    table.cell(infoTable, 0, 1, "ATR", text_color=color.gray)
+    table.cell(infoTable, 1, 1, str.tostring(atrValue, "#.###"), text_color=color.white)
+    
+    table.cell(infoTable, 0, 2, "Multiplier", text_color=color.gray)
+    table.cell(infoTable, 1, 2, str.tostring(adaptiveMultiplier, "#.##"), text_color=color.white)
+    
+    table.cell(infoTable, 0, 3, "ST Level", text_color=color.gray)
+    table.cell(infoTable, 1, 3, str.tostring(supertrend, "#.##"), text_color=color.white)
+    
+    table.cell(infoTable, 0, 4, "Distance", text_color=color.gray)
+    distPercent = ((close - supertrend) / close) * 100
+    table.cell(infoTable, 1, 4, str.tostring(distPercent, "#.##") + "%", text_color=distPercent > 0 ? upColor : downColor)
+    
+    table.cell(infoTable, 0, 5, "Position", text_color=color.gray)
+    table.cell(infoTable, 1, 5, strategy.position_size > 0 ? "LONG" : strategy.position_size < 0 ? "SHORT" : "NONE", 
+               text_color=color.white, bgcolor=strategy.position_size != 0 ? color.blue : color.gray)

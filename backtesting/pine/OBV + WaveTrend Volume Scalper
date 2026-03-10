@@ -1,0 +1,187 @@
+//@version=5
+strategy("OBV + WaveTrend Volume Scalper — Webhook", shorttitle="GF Volume Scalper WH", overlay=true)
+
+// ========================================
+// WEBHOOK CONFIGURATION
+// ========================================
+webhook_url = input.string("https://your-server.com/webhook/tradingview", "Webhook URL")
+webhook_secret = input.string("your_secret_key", "Webhook Secret")
+
+// ------------------------------
+// USER INPUTS - OBV OSCILLATOR
+// ------------------------------
+obv_src     = input.source(close, "OBV Source")
+obv_ema_len = input.int(10, "OBV EMA Length", minval=1)
+obv_smooth  = input.int(2, "OBV Smoothing Length", minval=1)
+obv_smooth_type = input.string("SMA", "OBV Smoothing Type", options=["SMA","EMA","SMMA"]) 
+
+// ------------------------------
+// USER INPUTS - WaveTrend (WT)
+// ------------------------------
+wt_n1 = input.int(10, "WT Channel Length (n1)")
+wt_n2 = input.int(21, "WT Average Length (n2)")
+wt_sma_len = input.int(4, "WT Signal SMA Length")
+
+// ------------------------------
+// USER INPUTS - Squeeze Momentum
+// ------------------------------
+sqz_bb_len = input.int(20, "BB Length")
+sqz_bb_mult = input.float(2.0, "BB MultFactor")
+sqz_kc_len = input.int(20, "KC Length")
+sqz_kc_mult = input.float(1.5, "KC MultFactor")
+sqz_use_tr = input.bool(true, "Use TrueRange for KC")
+
+// ------------------------------
+// RISK MANAGEMENT
+// ------------------------------
+stop_loss_pct = input.float(1.5, "Stop Loss %", minval=0.1, maxval=10.0) / 100
+take_profit_pct = input.float(2.5, "Take Profit %", minval=0.1, maxval=20.0) / 100
+
+// ------------------------------
+// OBV OSCILLATOR
+// ------------------------------
+obv_func(_src) =>
+    delta = ta.change(_src)
+    ta.cum(delta > 0 ? volume : delta < 0 ? -volume : 0)
+
+_os = obv_func(obv_src)
+obv_osc = _os - ta.ema(_os, obv_ema_len)
+
+smooth_fn(srcSeries, len, method) =>
+    switch method
+        "EMA" => ta.ema(srcSeries, len)
+        "SMMA" => ta.rma(srcSeries, len)
+        => ta.sma(srcSeries, len)
+
+smoothed_obv_osc = smooth_fn(obv_osc, obv_smooth, obv_smooth_type)
+
+obvBull = smoothed_obv_osc[1] < 0 and smoothed_obv_osc > 0
+obvBear = smoothed_obv_osc[1] > 0 and smoothed_obv_osc < 0
+
+// ------------------------------
+// SQUEEZE MOMENTUM
+// ------------------------------
+src = close
+basis = ta.sma(src, sqz_bb_len)
+dev = sqz_bb_mult * ta.stdev(src, sqz_bb_len)
+upperBB = basis + dev
+lowerBB = basis - dev
+
+ma = ta.sma(src, sqz_kc_len)
+rng = sqz_use_tr ? ta.tr : (high - low)
+rangema = ta.sma(rng, sqz_kc_len)
+upperKC = ma + rangema * sqz_kc_mult
+lowerKC = ma - rangema * sqz_kc_mult
+
+sqzOn  = (lowerBB > lowerKC) and (upperBB < upperKC)
+sqzOff = (lowerBB < lowerKC) and (upperBB > upperKC)
+noSqz  = not sqzOn and not sqzOff
+
+hh = ta.highest(high, sqz_kc_len)
+ll = ta.lowest(low, sqz_kc_len)
+avg1 = (hh + ll) / 2
+avg2 = (avg1 + ta.sma(close, sqz_kc_len)) / 2
+
+val = ta.linreg(src - avg2, sqz_kc_len, 0)
+
+sqzBull = val > val[1]
+sqzBear = val < val[1]
+
+// ------------------------------
+// WAVETREND
+// ------------------------------
+ap = hlc3
+esa = ta.ema(ap, wt_n1)
+d = ta.ema(math.abs(ap - esa), wt_n1)
+ci = (ap - esa) / (0.015 * d)
+tci = ta.ema(ci, wt_n2)
+wt1 = tci
+wt2 = ta.sma(wt1, wt_sma_len)
+
+wtBull = wt1 > wt2
+wtBear = wt1 < wt2
+
+// ------------------------------
+// SIGNAL CONDITIONS
+// ------------------------------
+buySignal = obvBull and sqzBull and wtBull
+sellSignal = obvBear and sqzBear and wtBear
+
+// ------------------------------
+// RISK LEVELS
+// ------------------------------
+long_stop = close * (1 - stop_loss_pct)
+long_target = close * (1 + take_profit_pct)
+short_stop = close * (1 + stop_loss_pct)
+short_target = close * (1 - take_profit_pct)
+
+// ------------------------------
+// WEBHOOK PAYLOAD
+// ------------------------------
+long_payload = '{\n' +
+     '  "secret": "' + webhook_secret + '",\n' +
+     '  "strategy": "obv_wavetrend_scalper",\n' +
+     '  "signal": "LONG",\n' +
+     '  "price": ' + str.tostring(close) + ',\n' +
+     '  "stop_loss": ' + str.tostring(long_stop) + ',\n' +
+     '  "take_profit": ' + str.tostring(long_target) + ',\n' +
+     '  "symbol": "' + syminfo.ticker + '",\n' +
+     '  "timeframe": "' + timeframe.period + '",\n' +
+     '  "indicator_confidence": 0.85,\n' +
+     '  "metadata": {\n' +
+     '    "obv_osc": ' + str.tostring(smoothed_obv_osc) + ',\n' +
+     '    "wt1": ' + str.tostring(wt1) + ',\n' +
+     '    "wt2": ' + str.tostring(wt2) + ',\n' +
+     '    "squeeze_val": ' + str.tostring(val) + ',\n' +
+     '    "squeeze_on": ' + str.tostring(sqzOn) + ',\n' +
+     '    "volume_trend": "bullish"\n' +
+     '  }\n' +
+     '}'
+
+short_payload = '{\n' +
+     '  "secret": "' + webhook_secret + '",\n' +
+     '  "strategy": "obv_wavetrend_scalper",\n' +
+     '  "signal": "SHORT",\n' +
+     '  "price": ' + str.tostring(close) + ',\n' +
+     '  "stop_loss": ' + str.tostring(short_stop) + ',\n' +
+     '  "take_profit": ' + str.tostring(short_target) + ',\n' +
+     '  "symbol": "' + syminfo.ticker + '",\n' +
+     '  "timeframe": "' + timeframe.period + '",\n' +
+     '  "indicator_confidence": 0.85,\n' +
+     '  "metadata": {\n' +
+     '    "obv_osc": ' + str.tostring(smoothed_obv_osc) + ',\n' +
+     '    "wt1": ' + str.tostring(wt1) + ',\n' +
+     '    "wt2": ' + str.tostring(wt2) + ',\n' +
+     '    "squeeze_val": ' + str.tostring(val) + ',\n' +
+     '    "squeeze_on": ' + str.tostring(sqzOn) + ',\n' +
+     '    "volume_trend": "bearish"\n' +
+     '  }\n' +
+     '}'
+
+// ------------------------------
+// STRATEGY EXECUTION
+// ------------------------------
+if buySignal
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long Exit", "Long", stop=long_stop, limit=long_target)
+    alert(long_payload, alert.freq_once_per_bar)
+
+if sellSignal
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short Exit", "Short", stop=short_stop, limit=short_target)
+    alert(short_payload, alert.freq_once_per_bar)
+
+// ------------------------------
+// VISUAL SIGNALS
+// ------------------------------
+plotshape(buySignal, title="Buy Signal", location=location.belowbar, color=color.green, style=shape.labelup, text="BUY", size=size.small)
+plotshape(sellSignal, title="Sell Signal", location=location.abovebar, color=color.red, style=shape.labeldown, text="SELL", size=size.small)
+
+// Background color for squeeze
+bgcolor(sqzOn ? color.new(color.red, 90) : sqzOff ? color.new(color.green, 90) : na)
+
+// Plot levels for current position
+plot(strategy.position_size > 0 ? long_stop : na, "Long SL", color.red, 1, plot.style_linebr)
+plot(strategy.position_size > 0 ? long_target : na, "Long TP", color.green, 1, plot.style_linebr)
+plot(strategy.position_size < 0 ? short_stop : na, "Short SL", color.red, 1, plot.style_linebr)
+plot(strategy.position_size < 0 ? short_target : na, "Short TP", color.green, 1, plot.style_linebr)

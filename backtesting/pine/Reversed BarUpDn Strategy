@@ -1,0 +1,24 @@
+//@version=5
+strategy("Reversed BarUpDn Strategy", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// --- Logic Calculations ---
+isUp = close > open
+isDown = close < open
+
+// Standard BarUpDn logic is: Up & Up[1] = Long
+// Reversed Logic:
+// 1. Two consecutive Down bars -> Entry Long
+// 2. Two consecutive Up bars   -> Entry Short
+longCondition = isDown and isDown[1]
+shortCondition = isUp and isUp[1]
+
+// --- Execution ---
+if (longCondition)
+    strategy.entry("Rev-Long", strategy.long, comment="2 Red Bars")
+
+if (shortCondition)
+    strategy.entry("Rev-Short", strategy.short, comment="2 Green Bars")
+
+// --- Visuals ---
+plotshape(longCondition, title="Long Signal", location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small)
+plotshape(shortCondition, title="Short Signal", location=location.abovebar, color=color.red, style=shape.triangledown, size=size.small)

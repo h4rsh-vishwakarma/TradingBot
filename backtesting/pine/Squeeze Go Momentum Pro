@@ -1,0 +1,198 @@
+//@version=6
+// Original: Squeeze Go Momentum Pro © kingthies
+// Modified for webhook integration with trading bot
+strategy("Squeeze Go Momentum Pro - Webhook", "SQZGo-WH", overlay=false,
+         initial_capital=10000,
+         default_qty_type=strategy.percent_of_equity,
+         default_qty_value=100,
+         commission_type=strategy.commission.percent,
+         commission_value=0.1,
+         slippage=2,
+         precision=2)
+
+// ===============================
+// WEBHOOK SECRET
+// ===============================
+SECRET = "hybrid_tradingview_cluster_2026_secure"
+
+// ===============================
+// TRADING SETTINGS
+// ===============================
+grpTrade = "Trading Settings"
+useLongTrades  = input.bool(true, "Enable Long Trades", group=grpTrade)
+useShortTrades = input.bool(true, "Enable Short Trades", group=grpTrade)
+stopLossPct    = input.float(1.5, "Stop Loss %", minval=0.1, step=0.1, group=grpTrade)
+takeProfitPct  = input.float(3.0, "Take Profit %", minval=0.1, step=0.1, group=grpTrade)
+
+// ===============================
+// CORE SETTINGS
+// ===============================
+grpCore = "Core Settings"
+srcInput = input.source(close, "Source", group=grpCore)
+int bbLength = input.int(20, "BB Length", minval=1, group=grpCore)
+float bbMult = input.float(2.0, "BB StdDev", minval=0.5, step=0.1, group=grpCore)
+int kcLength = input.int(20, "KC Length", minval=1, group=grpCore)
+float kcMult = input.float(1.5, "KC ATR Multiplier", minval=0.5, step=0.1, group=grpCore)
+
+// ===============================
+// MOMENTUM SETTINGS
+// ===============================
+grpMom = "Momentum Settings"
+int momLength = input.int(20, "Momentum Length", minval=1, group=grpMom)
+
+// ===============================
+// VISUAL SETTINGS
+// ===============================
+grpVis = "Visuals"
+bool showHistogram = input.bool(true, "Show Momentum Histogram", group=grpVis)
+bool showSqueezeColor = input.bool(true, "Color Code Squeeze State", group=grpVis)
+bool showZeroLine = input.bool(true, "Show Zero Line", group=grpVis)
+
+// ===============================
+// CALCULATIONS
+// ===============================
+
+// Bollinger Bands
+float bbBasis = ta.sma(srcInput, bbLength)
+float bbDev = ta.stdev(srcInput, bbLength)
+float bbUpper = bbBasis + bbDev * bbMult
+float bbLower = bbBasis - bbDev * bbMult
+
+// Keltner Channels
+float kcBasis = ta.sma(srcInput, kcLength)
+float kcRange = ta.sma(ta.tr, kcLength)
+float kcUpper = kcBasis + kcRange * kcMult
+float kcLower = kcBasis - kcRange * kcMult
+
+// Squeeze Detection
+bool inSqueeze = bbLower > kcLower and bbUpper < kcUpper
+bool noSqueeze = bbLower < kcLower and bbUpper > kcUpper
+
+// Momentum Calculation
+float highest = ta.highest(high, momLength)
+float lowest = ta.lowest(low, momLength)
+float avg = math.avg(highest, lowest)
+float momentum = ta.linreg(srcInput - avg, momLength, 0)
+
+// Momentum Direction
+bool momUp = momentum > momentum[1]
+bool momDown = momentum < momentum[1]
+
+// Squeeze Release Detection
+bool sqzRelease = inSqueeze[1] and noSqueeze
+
+// ===============================
+// ENTRY SIGNALS (Original: Squeeze Release + Momentum Direction)
+// ===============================
+bool longCondition = sqzRelease and momentum > 0
+bool shortCondition = sqzRelease and momentum < 0
+
+// ===============================
+// STRATEGY EXECUTION WITH WEBHOOK
+// ===============================
+if useLongTrades and longCondition and strategy.position_size == 0
+    slPrice = close * (1 - stopLossPct / 100)
+    tpPrice = close * (1 + takeProfitPct / 100)
+    
+    alertMessage = '{"secret":"' + SECRET + '","strategy":"squeeze_go_pro","side":"LONG","symbol":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"timeframe":"' + timeframe.period + '","stop_loss":' + str.tostring(slPrice) + ',"take_profit":' + str.tostring(tpPrice) + '}'
+    
+    strategy.entry("Long", strategy.long, alert_message=alertMessage)
+    strategy.exit("Long Exit", "Long", stop=slPrice, limit=tpPrice)
+
+if useShortTrades and shortCondition and strategy.position_size == 0
+    slPrice = close * (1 + stopLossPct / 100)
+    tpPrice = close * (1 - takeProfitPct / 100)
+    
+    alertMessage = '{"secret":"' + SECRET + '","strategy":"squeeze_go_pro","side":"SHORT","symbol":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"timeframe":"' + timeframe.period + '","stop_loss":' + str.tostring(slPrice) + ',"take_profit":' + str.tostring(tpPrice) + '}'
+    
+    strategy.entry("Short", strategy.short, alert_message=alertMessage)
+    strategy.exit("Short Exit", "Short", stop=slPrice, limit=tpPrice)
+
+// ===============================
+// COLORING LOGIC
+// ===============================
+
+// Momentum bar colors
+color momColor = momentum >= 0 ? 
+      (momUp ? #00C853 : #26A69A) :  // Green shades for positive
+      (momDown ? #D32F2F : #EF5350)  // Red shades for negative
+
+// Squeeze state colors for dots
+color sqzColor = inSqueeze ? #FF6D00 : noSqueeze ? #00C853 : #78909C
+
+// ===============================
+// PLOTTING
+// ===============================
+
+// Zero line
+hline(0, "Zero Line", color=showZeroLine ? color.new(color.gray, 50) : na, linewidth=1)
+
+// Momentum Histogram
+plot(showHistogram ? momentum : na, "Momentum", 
+     color=momColor, style=plot.style_histogram, linewidth=3)
+
+// Squeeze dots on zero line
+plot(showSqueezeColor ? 0 : na, "Squeeze Indicator", 
+     color=sqzColor, style=plot.style_circles, linewidth=4)
+
+// Entry signals
+plotshape(longCondition, "Long Entry", 
+     shape.triangleup, location.bottom, color.new(color.green, 0), size=size.small)
+plotshape(shortCondition, "Short Entry", 
+     shape.triangledown, location.top, color.new(color.red, 0), size=size.small)
+
+// ===============================
+// INFO PANEL
+// ===============================
+
+var string BULL = "●"
+var string BEAR = "●"
+var string NEUTRAL = "●"
+
+var table infoPanel = table.new(position.top_right, 2, 4, 
+     bgcolor=color.new(#1E1E1E, 10), 
+     border_width=1, 
+     border_color=color.new(#424242, 0))
+
+if barstate.islast
+    // Squeeze Status
+    table.cell(infoPanel, 0, 0, "Squeeze", 
+         text_color=#E0E0E0, text_size=size.normal, bgcolor=color.new(#2C2C2C, 0))
+    
+    string sqzText = inSqueeze ? "ON " + BEAR : noSqueeze ? "OFF " + BULL : "NEUTRAL " + NEUTRAL
+    color sqzTextColor = inSqueeze ? #FF6D00 : noSqueeze ? #00C853 : #78909C
+    
+    table.cell(infoPanel, 1, 0, sqzText, 
+         text_color=sqzTextColor, text_size=size.normal, bgcolor=color.new(#2C2C2C, 0))
+    
+    // Momentum
+    table.cell(infoPanel, 0, 1, "Momentum", 
+         text_color=#E0E0E0, text_size=size.normal, bgcolor=color.new(#2C2C2C, 0))
+    
+    string momText = momentum > 0 ? "BULL " + BULL : "BEAR " + BEAR
+    color momTextColor = momentum > 0 ? #00C853 : #D32F2F
+    
+    table.cell(infoPanel, 1, 1, momText, 
+         text_color=momTextColor, text_size=size.normal, bgcolor=color.new(#2C2C2C, 0))
+    
+    // Momentum Value
+    table.cell(infoPanel, 0, 2, "Value", 
+         text_color=#E0E0E0, text_size=size.normal, bgcolor=color.new(#2C2C2C, 0))
+    
+    table.cell(infoPanel, 1, 2, str.tostring(momentum, "#.###"), 
+         text_color=#E0E0E0, text_size=size.normal, bgcolor=color.new(#2C2C2C, 0))
+    
+    // Trade Signal
+    table.cell(infoPanel, 0, 3, "Signal", 
+         text_color=#E0E0E0, text_size=size.normal, bgcolor=color.new(#2C2C2C, 0))
+    
+    string signalText = longCondition ? "LONG SETUP " + BULL : 
+         shortCondition ? "SHORT SETUP " + BEAR : 
+         inSqueeze ? "WAIT" : "MONITOR"
+    
+    color signalColor = longCondition ? #00E676 : 
+         shortCondition ? #FF1744 : 
+         inSqueeze ? #FF6D00 : #78909C
+    
+    table.cell(infoPanel, 1, 3, signalText, 
+         text_color=signalColor, text_size=size.normal, bgcolor=color.new(#2C2C2C, 0))

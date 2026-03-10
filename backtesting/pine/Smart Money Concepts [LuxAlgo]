@@ -1,0 +1,111 @@
+//@version=5
+strategy("Smart Money Concepts [LuxAlgo] Webhook", 
+         overlay=true, 
+         default_qty_type=strategy.percent_of_equity, 
+         default_qty_value=100,
+         commission_type=strategy.commission.percent,
+         commission_value=0.1)
+
+// ═══════════════════════════════════════════════════════════
+// INPUTS
+// ═══════════════════════════════════════════════════════════
+swingLength = input.int(10, "Swing Length", minval=5)
+obvLength = input.int(50, "Order Block Lookback", minval=10)
+fvgMinSize = input.float(0.5, "Min FVG Size %", minval=0.1) / 100
+useBreakOfStructure = input.bool(true, "Use Break of Structure")
+
+// ═══════════════════════════════════════════════════════════
+// SWING HIGHS & LOWS
+// ═══════════════════════════════════════════════════════════
+swingHigh = ta.pivothigh(high, swingLength, swingLength)
+swingLow = ta.pivotlow(low, swingLength, swingLength)
+
+var float lastSwingHigh = na
+var float lastSwingLow = na
+
+if not na(swingHigh)
+    lastSwingHigh := swingHigh
+if not na(swingLow)
+    lastSwingLow := swingLow
+
+// ═══════════════════════════════════════════════════════════
+// ORDER BLOCKS (Last bearish/bullish candle before reversal)
+// ═══════════════════════════════════════════════════════════
+var float bullishOB = na
+var float bearishOB = na
+
+// Bullish Order Block: Last down candle before up move
+if not na(swingLow)
+    bullishOB := low[swingLength]
+
+// Bearish Order Block: Last up candle before down move  
+if not na(swingHigh)
+    bearishOB := high[swingLength]
+
+// ═══════════════════════════════════════════════════════════
+// FAIR VALUE GAPS (3-candle gaps)
+// ═══════════════════════════════════════════════════════════
+// Bullish FVG: Gap between candle[2] low and current high
+bullishFVG = low > high[2] and (low - high[2]) / close > fvgMinSize
+// Bearish FVG: Gap between candle[2] high and current low
+bearishFVG = high < low[2] and (low[2] - high) / close > fvgMinSize
+
+// ═══════════════════════════════════════════════════════════
+// BREAK OF STRUCTURE (BOS)
+// ═══════════════════════════════════════════════════════════
+var int trendDirection = 0  // 1 = bullish, -1 = bearish
+
+// Bullish BOS: Price breaks above last swing high
+if useBreakOfStructure and not na(lastSwingHigh)
+    if close > lastSwingHigh and trendDirection != 1
+        trendDirection := 1
+
+// Bearish BOS: Price breaks below last swing low
+if useBreakOfStructure and not na(lastSwingLow)
+    if close < lastSwingLow and trendDirection != -1
+        trendDirection := -1
+
+// ═══════════════════════════════════════════════════════════
+// TRADING SIGNALS
+// ═══════════════════════════════════════════════════════════
+// LONG: Bullish BOS + Price touches Bullish Order Block or Bullish FVG
+longSetup = trendDirection == 1 and (bullishFVG or (not na(bullishOB) and low <= bullishOB))
+longCondition = longSetup and ta.crossover(close, ta.ema(close, 9))
+
+// SHORT: Bearish BOS + Price touches Bearish Order Block or Bearish FVG
+shortSetup = trendDirection == -1 and (bearishFVG or (not na(bearishOB) and high >= bearishOB))
+shortCondition = shortSetup and ta.crossunder(close, ta.ema(close, 9))
+
+// ═══════════════════════════════════════════════════════════
+// STRATEGY EXECUTION
+// ═══════════════════════════════════════════════════════════
+if longCondition
+    strategy.entry("Long", strategy.long,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"Smart Money Concepts [LuxAlgo]","side":"LONG","price":{{close}},"timeframe":"1h","symbol":"{{ticker}}"}')
+
+if shortCondition
+    strategy.entry("Short", strategy.short,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"Smart Money Concepts [LuxAlgo]","side":"SHORT","price":{{close}},"timeframe":"1h","symbol":"{{ticker}}"}')
+
+// ═══════════════════════════════════════════════════════════
+// PLOTTING
+// ═══════════════════════════════════════════════════════════
+// Order Blocks
+plot(bullishOB, "Bullish OB", color.new(color.green, 70), style=plot.style_linebr)
+plot(bearishOB, "Bearish OB", color.new(color.red, 70), style=plot.style_linebr)
+
+// FVG Highlights
+bgcolor(bullishFVG ? color.new(color.green, 90) : na, title="Bullish FVG")
+bgcolor(bearishFVG ? color.new(color.red, 90) : na, title="Bearish FVG")
+
+// BOS Arrows
+plotshape(trendDirection == 1 and trendDirection[1] != 1, "Bullish BOS", 
+         shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(trendDirection == -1 and trendDirection[1] != -1, "Bearish BOS", 
+         shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// Entry Signals
+plotshape(longCondition, "Long Entry", shape.labelup, location.belowbar, 
+         color.new(color.green, 0), text="LONG", size=size.normal)
+plotshape(shortCondition, "Short Entry", shape.labeldown, location.abovebar, 
+         color.new(color.red, 0), text="SHORT", size=size.normal)

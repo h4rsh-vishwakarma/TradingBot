@@ -1,0 +1,412 @@
+//@version=5
+// ═══════════════════════════════════════════════════════════════════════════
+// Smart Money Concepts [LuxAlgo] - WEBHOOK ENABLED
+// ═══════════════════════════════════════════════════════════════════════════
+// Original: LuxAlgo (CC BY-NC-SA 4.0)
+// Modified: Webhook integration for automated trading
+// 
+// ENTRY LOGIC:
+// - LONG: Bullish BOS/CHoCH (structure break)
+// - SHORT: Bearish BOS/CHoCH (structure break)
+//
+// Strategy: Smart Money Concepts - Structure breaks on 15m timeframe
+// Timeframe: 15m
+// Symbol: BTCUSDT
+// ═══════════════════════════════════════════════════════════════════════════
+
+strategy('Smart Money Concepts [LuxAlgo] - Webhook', 
+         'SMC-LuxAlgo-WH', 
+         overlay = true, 
+         max_labels_count = 500, 
+         max_lines_count = 500, 
+         max_boxes_count = 500,
+         default_qty_type = strategy.percent_of_equity,
+         default_qty_value = 100,
+         commission_type = strategy.commission.percent,
+         commission_value = 0.1,
+         slippage = 2,
+         initial_capital = 10000,
+         pyramiding = 0,
+         calc_on_every_tick = false,
+         calc_on_order_fills = false,
+         process_orders_on_close = true)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//CONSTANTS
+//---------------------------------------------------------------------------------------------------------------------{
+BULLISH_LEG     = 1
+BEARISH_LEG     = 0
+BULLISH         = +1
+BEARISH         = -1
+GREEN           = #089981
+RED             = #F23645
+BLUE            = #2157f3
+GRAY            = #878b94
+HISTORICAL      = 'Historical'
+PRESENT         = 'Present'
+ALL             = 'All'
+BOS             = 'BOS'
+CHOCH           = 'CHoCH'
+TINY            = size.tiny
+SMALL           = size.small
+ATR             = 'Atr'
+RANGE           = 'Cumulative Mean Range'
+CLOSE           = 'Close'
+HIGHLOW         = 'High/Low'
+
+//---------------------------------------------------------------------------------------------------------------------}
+//INPUTS
+//---------------------------------------------------------------------------------------------------------------------{
+SMART_GROUP     = 'Smart Money Concepts'
+SWING_GROUP     = 'Swing Structure'
+BLOCKS_GROUP    = 'Order Blocks'
+ZONES_GROUP     = 'Premium & Discount Zones'
+TRADE_GROUP     = 'Trading Settings'
+
+modeInput                       = input.string(HISTORICAL, 'Mode', group = SMART_GROUP, options = [HISTORICAL, PRESENT])
+showStructureInput              = input(true, 'Show Swing Structure', group = SWING_GROUP)
+showSwingBullInput              = input.string(ALL, 'Bullish Structure', group = SWING_GROUP, inline = 'bull', options = [ALL,BOS,CHOCH])
+swingBullColorInput             = input(GREEN, '', group = SWING_GROUP, inline = 'bull')
+showSwingBearInput              = input.string(ALL, 'Bearish Structure', group = SWING_GROUP, inline = 'bear', options = [ALL,BOS,CHOCH])
+swingBearColorInput             = input(RED, '', group = SWING_GROUP, inline = 'bear')
+swingStructureSize              = input.string(SMALL, 'Swing Label Size', group = SWING_GROUP, options = [TINY,SMALL])
+swingsLengthInput               = input.int(20, 'Swings Length', group = SWING_GROUP, minval = 5, maxval = 50)
+
+showSwingOrderBlocksInput       = input(true, 'Swing Order Blocks', group = BLOCKS_GROUP, inline = 'ob')
+swingOrderBlocksSizeInput       = input.int(5, '', group = BLOCKS_GROUP, minval = 1, maxval = 20, inline = 'ob')
+orderBlockFilterInput           = input.string(ATR, 'Order Block Filter', group = BLOCKS_GROUP, options = [ATR, RANGE])
+orderBlockMitigationInput       = input.string(HIGHLOW, 'Order Block Mitigation', group = BLOCKS_GROUP, options = [CLOSE,HIGHLOW])
+swingBullishOrderBlockColor     = input.color(color.new(#1848cc, 80), 'Bullish OB', group = BLOCKS_GROUP)
+swingBearishOrderBlockColor     = input.color(color.new(#b22833, 80), 'Bearish OB', group = BLOCKS_GROUP)
+
+showPremiumDiscountZonesInput   = input(true, 'Premium/Discount Zones', group = ZONES_GROUP)
+premiumZoneColorInput           = input.color(RED, 'Premium Zone', group = ZONES_GROUP)
+discountZoneColorInput          = input.color(GREEN, 'Discount Zone', group = ZONES_GROUP)
+
+enableLongTrades                = input.bool(true, 'Enable Long Trades', group = TRADE_GROUP)
+enableShortTrades               = input.bool(true, 'Enable Short Trades', group = TRADE_GROUP)
+requireOrderBlock               = input.bool(false, 'Require Order Block', group = TRADE_GROUP)
+requireZoneConfluence           = input.bool(false, 'Require Premium/Discount Zone', group = TRADE_GROUP)
+
+// Stop Loss and Take Profit
+useStopLoss                     = input.bool(true, 'Use Stop Loss', group = TRADE_GROUP)
+stopLossPct                     = input.float(1.5, 'Stop Loss %', group = TRADE_GROUP, minval = 0.1, maxval = 10, step = 0.1)
+useTakeProfit                   = input.bool(true, 'Use Take Profit', group = TRADE_GROUP)
+takeProfitPct                   = input.float(3.0, 'Take Profit %', group = TRADE_GROUP, minval = 0.1, maxval = 20, step = 0.1)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//DATA STRUCTURES
+//---------------------------------------------------------------------------------------------------------------------{
+type pivot
+    float currentLevel
+    float lastLevel
+    bool crossed
+    int barTime = time
+    int barIndex = bar_index
+
+type orderBlock
+    float barHigh
+    float barLow
+    int barTime
+    int bias
+
+type trend
+    int bias
+
+type trailingExtremes
+    float top
+    float bottom
+    int barTime
+    int barIndex
+    int lastTopTime
+    int lastBottomTime
+
+var pivot swingHigh             = pivot.new(na,na,false)
+var pivot swingLow              = pivot.new(na,na,false)
+var trend swingTrend            = trend.new(0)
+var trailingExtremes trailing   = trailingExtremes.new()
+var array<orderBlock> swingOrderBlocks = array.new<orderBlock>()
+var array<box> swingOrderBlocksBoxes = array.new<box>()
+var array<float> parsedHighs    = array.new<float>()
+var array<float> parsedLows     = array.new<float>()
+var array<float> highs          = array.new<float>()
+var array<float> lows           = array.new<float>()
+var array<int> times            = array.new<int>()
+var swingBullishColor           = swingBullColorInput
+var swingBearishColor           = swingBearColorInput
+
+if barstate.isfirst
+    if showSwingOrderBlocksInput
+        for index = 1 to swingOrderBlocksSizeInput
+            swingOrderBlocksBoxes.push(box.new(na,na,na,na,xloc = xloc.bar_time,extend = extend.right))
+
+bearishOrderBlockMitigationSource = orderBlockMitigationInput == CLOSE ? close : high
+bullishOrderBlockMitigationSource = orderBlockMitigationInput == CLOSE ? close : low
+atrMeasure = ta.atr(200)
+volatilityMeasure = orderBlockFilterInput == ATR ? atrMeasure : ta.cum(ta.tr)/bar_index
+highVolatilityBar = (high - low) >= (2 * volatilityMeasure)
+parsedHigh = highVolatilityBar ? low : high
+parsedLow = highVolatilityBar ? high : low
+
+parsedHighs.push(parsedHigh)
+parsedLows.push(parsedLow)
+highs.push(high)
+lows.push(low)
+times.push(time)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//FUNCTIONS
+//---------------------------------------------------------------------------------------------------------------------{
+leg(int size) =>
+    var leg = 0
+    newLegHigh = high[size] > ta.highest(size)
+    newLegLow = low[size] < ta.lowest(size)
+    if newLegHigh
+        leg := BEARISH_LEG
+    else if newLegLow
+        leg := BULLISH_LEG
+    leg
+
+startOfNewLeg(int leg) => ta.change(leg) != 0
+startOfBearishLeg(int leg) => ta.change(leg) == -1
+startOfBullishLeg(int leg) => ta.change(leg) == +1
+
+drawLabel(int labelTime, float labelPrice, string tag, color labelColor, string labelStyle) =>
+    var label l_abel = na
+    if modeInput == PRESENT
+        l_abel.delete()
+    l_abel := label.new(chart.point.new(labelTime,na,labelPrice),tag,xloc.bar_time,color=color(na),textcolor=labelColor,style = labelStyle,size = size.small)
+
+getCurrentStructure(int size) =>
+    currentLeg = leg(size)
+    newPivot = startOfNewLeg(currentLeg)
+    pivotLow = startOfBullishLeg(currentLeg)
+    pivotHigh = startOfBearishLeg(currentLeg)
+
+    if newPivot
+        if pivotLow
+            swingLow.lastLevel := swingLow.currentLevel
+            swingLow.currentLevel := low[size]
+            swingLow.crossed := false
+            swingLow.barTime := time[size]
+            swingLow.barIndex := bar_index[size]
+            trailing.bottom := swingLow.currentLevel
+            trailing.barTime := swingLow.barTime
+            trailing.barIndex := swingLow.barIndex
+            trailing.lastBottomTime := swingLow.barTime
+        else
+            swingHigh.lastLevel := swingHigh.currentLevel
+            swingHigh.currentLevel := high[size]
+            swingHigh.crossed := false
+            swingHigh.barTime := time[size]
+            swingHigh.barIndex := bar_index[size]
+            trailing.top := swingHigh.currentLevel
+            trailing.barTime := swingHigh.barTime
+            trailing.barIndex := swingHigh.barIndex
+            trailing.lastTopTime := swingHigh.barTime
+
+drawStructure(pivot p_ivot, string tag, color structureColor, string lineStyle, string labelStyle, string labelSize) =>
+    var line l_ine = line.new(na,na,na,na,xloc = xloc.bar_time)
+    var label l_abel = label.new(na,na)
+    if modeInput == PRESENT
+        l_ine.delete()
+        l_abel.delete()
+    l_ine := line.new(chart.point.new(p_ivot.barTime,na,p_ivot.currentLevel), chart.point.new(time,na,p_ivot.currentLevel), xloc.bar_time, color=structureColor, style=line.style_solid)
+    l_abel := label.new(chart.point.new(na,math.round(0.5*(p_ivot.barIndex+bar_index)),p_ivot.currentLevel), tag, xloc.bar_index, color=color(na), textcolor=structureColor, style=labelStyle, size = labelSize)
+
+storeOrdeBlock(pivot p_ivot, int bias) =>
+    if showSwingOrderBlocksInput
+        array<float> a_rray = na
+        int parsedIndex = na
+        if bias == BEARISH
+            a_rray := parsedHighs.slice(p_ivot.barIndex,bar_index)
+            parsedIndex := p_ivot.barIndex + a_rray.indexof(a_rray.max())
+        else
+            a_rray := parsedLows.slice(p_ivot.barIndex,bar_index)
+            parsedIndex := p_ivot.barIndex + a_rray.indexof(a_rray.min())
+        orderBlock o_rderBlock = orderBlock.new(parsedHighs.get(parsedIndex), parsedLows.get(parsedIndex), times.get(parsedIndex), bias)
+        if swingOrderBlocks.size() >= 100
+            swingOrderBlocks.pop()
+        swingOrderBlocks.unshift(o_rderBlock)
+
+deleteOrderBlocks() =>
+    for [index,eachOrderBlock] in swingOrderBlocks
+        bool crossedOderBlock = false
+        if bearishOrderBlockMitigationSource > eachOrderBlock.barHigh and eachOrderBlock.bias == BEARISH
+            crossedOderBlock := true
+        else if bullishOrderBlockMitigationSource < eachOrderBlock.barLow and eachOrderBlock.bias == BULLISH
+            crossedOderBlock := true
+        if crossedOderBlock
+            swingOrderBlocks.remove(index)
+
+drawOrderBlocks() =>
+    orderBlocksSize = swingOrderBlocks.size()
+    if orderBlocksSize > 0
+        maxOrderBlocks = swingOrderBlocksSizeInput
+        array<orderBlock> parsedOrdeBlocks = swingOrderBlocks.slice(0, math.min(maxOrderBlocks,orderBlocksSize))
+        for [index,eachOrderBlock] in parsedOrdeBlocks
+            orderBlockColor = eachOrderBlock.bias == BEARISH ? swingBearishOrderBlockColor : swingBullishOrderBlockColor
+            box b_ox = swingOrderBlocksBoxes.get(index)
+            b_ox.set_top_left_point(chart.point.new(eachOrderBlock.barTime,na,eachOrderBlock.barHigh))
+            b_ox.set_bottom_right_point(chart.point.new(last_bar_time,na,eachOrderBlock.barLow))
+            b_ox.set_border_color(orderBlockColor)
+            b_ox.set_bgcolor(orderBlockColor)
+
+updateTrailingExtremes() =>
+    trailing.top := math.max(high,trailing.top)
+    trailing.lastTopTime := trailing.top == high ? time : trailing.lastTopTime
+    trailing.bottom := math.min(low,trailing.bottom)
+    trailing.lastBottomTime := trailing.bottom == low ? time : trailing.lastBottomTime
+
+drawZone(float labelLevel, int labelIndex, float top, float bottom, string tag, color zoneColor, string style) =>
+    var label l_abel = label.new(na,na,text = tag, color=color(na),textcolor = zoneColor, style = style, size = size.small)
+    var box b_ox = box.new(na,na,na,na,bgcolor = color.new(zoneColor,80),border_color = color(na), xloc = xloc.bar_time)
+    b_ox.set_top_left_point(chart.point.new(trailing.barTime,na,top))
+    b_ox.set_bottom_right_point(chart.point.new(last_bar_time,na,bottom))
+    l_abel.set_point(chart.point.new(na,labelIndex,labelLevel))
+
+drawPremiumDiscountZones() =>
+    drawZone(trailing.top, math.round(0.5*(trailing.barIndex + last_bar_index)), trailing.top, 0.95*trailing.top + 0.05*trailing.bottom, 'Premium', premiumZoneColorInput, label.style_label_down)
+    drawZone(trailing.bottom, math.round(0.5*(trailing.barIndex + last_bar_index)), 0.95*trailing.bottom + 0.05*trailing.top, trailing.bottom, 'Discount', discountZoneColorInput, label.style_label_up)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//EXECUTION
+//---------------------------------------------------------------------------------------------------------------------{
+if showPremiumDiscountZonesInput
+    updateTrailingExtremes()
+    drawPremiumDiscountZones()
+
+getCurrentStructure(swingsLengthInput)
+
+// Structure break detection
+bullishStructureBreak = false
+bearishStructureBreak = false
+
+if not na(swingHigh.currentLevel) and ta.crossover(close, swingHigh.currentLevel) and not swingHigh.crossed
+    string tag = swingTrend.bias == BEARISH ? CHOCH : BOS
+    swingHigh.crossed := true
+    swingTrend.bias := BULLISH
+    bullishStructureBreak := true
+    
+    displayCondition = showStructureInput and (showSwingBullInput == ALL or (showSwingBullInput == BOS and tag != CHOCH) or (showSwingBullInput == CHOCH and tag == CHOCH))
+    if displayCondition
+        drawStructure(swingHigh, tag, swingBullishColor, line.style_solid, label.style_label_down, swingStructureSize)
+    if showSwingOrderBlocksInput
+        storeOrdeBlock(swingHigh, BULLISH)
+
+if not na(swingLow.currentLevel) and ta.crossunder(close, swingLow.currentLevel) and not swingLow.crossed
+    string tag = swingTrend.bias == BULLISH ? CHOCH : BOS
+    swingLow.crossed := true
+    swingTrend.bias := BEARISH
+    bearishStructureBreak := true
+    
+    displayCondition = showStructureInput and (showSwingBearInput == ALL or (showSwingBearInput == BOS and tag != CHOCH) or (showSwingBearInput == CHOCH and tag == CHOCH))
+    if displayCondition
+        drawStructure(swingLow, tag, swingBearishColor, line.style_solid, label.style_label_up, swingStructureSize)
+    if showSwingOrderBlocksInput
+        storeOrdeBlock(swingLow, BEARISH)
+
+if showSwingOrderBlocksInput
+    deleteOrderBlocks()
+
+if barstate.islastconfirmedhistory or barstate.islast
+    if showSwingOrderBlocksInput
+        drawOrderBlocks()
+
+// Order block detection
+inBullishOrderBlock = false
+inBearishOrderBlock = false
+
+if swingOrderBlocks.size() > 0
+    latestOB = swingOrderBlocks.get(0)
+    if latestOB.bias == BULLISH and close >= latestOB.barLow and close <= latestOB.barHigh
+        inBullishOrderBlock := true
+    else if latestOB.bias == BEARISH and close >= latestOB.barLow and close <= latestOB.barHigh
+        inBearishOrderBlock := true
+
+// Premium/Discount zone detection
+inPremiumZone = false
+inDiscountZone = false
+
+if trailing.top > 0 and trailing.bottom > 0
+    premiumLevel = 0.95 * trailing.top + 0.05 * trailing.bottom
+    discountLevel = 0.95 * trailing.bottom + 0.05 * trailing.top
+    
+    if close >= premiumLevel
+        inPremiumZone := true
+    else if close <= discountLevel
+        inDiscountZone := true
+
+//---------------------------------------------------------------------------------------------------------------------}
+//ENTRY CONDITIONS
+//---------------------------------------------------------------------------------------------------------------------{
+longCondition = enableLongTrades and bullishStructureBreak and 
+                 (not requireOrderBlock or inBullishOrderBlock) and
+                 (not requireZoneConfluence or inDiscountZone) and
+                 strategy.position_size == 0
+
+shortCondition = enableShortTrades and bearishStructureBreak and 
+                 (not requireOrderBlock or inBearishOrderBlock) and
+                 (not requireZoneConfluence or inPremiumZone) and
+                 strategy.position_size == 0
+
+//---------------------------------------------------------------------------------------------------------------------}
+//WEBHOOK INTEGRATION
+//---------------------------------------------------------------------------------------------------------------------{
+if longCondition
+    longSL = useStopLoss ? close * (1 - stopLossPct / 100) : na
+    longTP = useTakeProfit ? close * (1 + takeProfitPct / 100) : na
+    
+    strategy.entry("Long", strategy.long,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"smc_luxalgo","side":"LONG","symbol":"{{ticker}}","price":{{close}},"timeframe":"{{interval}}"}')
+    
+    if useStopLoss
+        strategy.exit("Long Exit", "Long", stop=longSL, limit=longTP)
+    else if useTakeProfit
+        strategy.exit("Long Exit", "Long", limit=longTP)
+
+if shortCondition
+    shortSL = useStopLoss ? close * (1 + stopLossPct / 100) : na
+    shortTP = useTakeProfit ? close * (1 - takeProfitPct / 100) : na
+    
+    strategy.entry("Short", strategy.short,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"smc_luxalgo","side":"SHORT","symbol":"{{ticker}}","price":{{close}},"timeframe":"{{interval}}"}')
+    
+    if useStopLoss
+        strategy.exit("Short Exit", "Short", stop=shortSL, limit=shortTP)
+    else if useTakeProfit
+        strategy.exit("Short Exit", "Short", limit=shortTP)
+
+//---------------------------------------------------------------------------------------------------------------------}
+//VISUAL SIGNALS
+//---------------------------------------------------------------------------------------------------------------------{
+plotshape(longCondition, "Long Entry", shape.triangleup, location.belowbar, 
+         color.new(color.green, 0), size=size.normal, text="LONG")
+plotshape(shortCondition, "Short Entry", shape.triangledown, location.abovebar, 
+         color.new(color.red, 0), size=size.normal, text="SHORT")
+
+// Plot SL/TP levels
+var float longEntryPrice = na
+var float shortEntryPrice = na
+
+if strategy.position_size > 0 and na(longEntryPrice)
+    longEntryPrice := close
+
+if strategy.position_size < 0 and na(shortEntryPrice)
+    shortEntryPrice := close
+
+if strategy.position_size == 0
+    longEntryPrice := na
+    shortEntryPrice := na
+
+plot(strategy.position_size > 0 and useStopLoss ? longEntryPrice * (1 - stopLossPct / 100) : na, 
+     "Long SL", color.new(color.red, 0), 2, plot.style_linebr)
+plot(strategy.position_size > 0 and useTakeProfit ? longEntryPrice * (1 + takeProfitPct / 100) : na, 
+     "Long TP", color.new(color.green, 0), 2, plot.style_linebr)
+
+plot(strategy.position_size < 0 and useStopLoss ? shortEntryPrice * (1 + stopLossPct / 100) : na, 
+     "Short SL", color.new(color.red, 0), 2, plot.style_linebr)
+plot(strategy.position_size < 0 and useTakeProfit ? shortEntryPrice * (1 - takeProfitPct / 100) : na, 
+     "Short TP", color.new(color.green, 0), 2, plot.style_linebr)
+
+//---------------------------------------------------------------------------------------------------------------------}

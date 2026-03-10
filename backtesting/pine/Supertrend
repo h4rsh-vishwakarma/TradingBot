@@ -1,0 +1,137 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// Modified for Webhook Strategy Integration
+
+//@version=6
+strategy("Supertrend - Webhook", overlay=true, format=format.price, precision=2,
+         default_qty_type=strategy.percent_of_equity,
+         default_qty_value=100,
+         commission_type=strategy.commission.percent,
+         commission_value=0.075,
+         slippage=2)
+
+//              ╔════════════════════════════════╗              //
+//              ║   WEBHOOK CONFIGURATION        ║              //
+//              ╚════════════════════════════════╝              //
+
+var string webhook_settings = '════════ Webhook Configuration ════════'
+enable_webhook = input.bool(true, "Enable Webhook Alerts", group=webhook_settings)
+webhook_url = input.string("http://13.236.143.201/webhook/tradingview", "Webhook URL", group=webhook_settings, tooltip="Your bot webhook endpoint")
+WEBHOOK_SECRET = input.string("hybrid_tradingview_cluster_2026_secure", "Webhook Secret", group=webhook_settings, tooltip="Must match bot configuration")
+STRATEGY_ID = "supertrend_basic"
+
+//              ╔════════════════════════════════╗              //
+//              ║      RISK MANAGEMENT           ║              //
+//              ╚════════════════════════════════╝              //
+
+var string risk_settings = '════════ Risk Management ════════'
+stop_loss_pct = input.float(1.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1, group=risk_settings)
+take_profit_pct = input.float(2.0, "Take Profit %", minval=0.5, maxval=10.0, step=0.5, group=risk_settings)
+
+//              ╔════════════════════════════════╗              //
+//              ║      SUPERTREND SETTINGS       ║              //
+//              ╚════════════════════════════════╝              //
+
+var string st_settings = '════════ Supertrend Parameters ════════'
+Periods = input.int(10, title="ATR Period", minval=1, group=st_settings)
+src = input.source(hl2, title="Source", group=st_settings)
+Multiplier = input.float(3.0, title="ATR Multiplier", step=0.1, minval=0.1, group=st_settings)
+changeATR = input.bool(true, title="Change ATR Calculation Method ?", group=st_settings)
+showsignals = input.bool(true, title="Show Buy/Sell Signals ?", group=st_settings)
+highlighting = input.bool(true, title="Highlighter On/Off ?", group=st_settings)
+
+//              ╔════════════════════════════════╗              //
+//              ║      SUPERTREND CALCULATION    ║              //
+//              ╚════════════════════════════════╝              //
+
+atr2 = ta.sma(ta.tr, Periods)
+atr = changeATR ? ta.atr(Periods) : atr2
+
+up = src - (Multiplier * atr)
+up1 = nz(up[1], up)
+up := close[1] > up1 ? math.max(up, up1) : up
+
+dn = src + (Multiplier * atr)
+dn1 = nz(dn[1], dn)
+dn := close[1] < dn1 ? math.min(dn, dn1) : dn
+
+var int trend = 1
+trend := nz(trend[1], trend)
+trend := trend == -1 and close > dn1 ? 1 : trend == 1 and close < up1 ? -1 : trend
+
+buySignal = trend == 1 and trend[1] == -1
+sellSignal = trend == -1 and trend[1] == 1
+
+//              ╔════════════════════════════════╗              //
+//              ║    CONFIDENCE CALCULATION      ║              //
+//              ╚════════════════════════════════╝              //
+
+base_conf = 0.75
+atr_current = ta.atr(Periods)
+atr_ma = ta.sma(atr_current, Periods * 2)
+atr_strength = atr_ma != 0 ? math.min(atr_current / atr_ma, 2.0) / 2.0 : 0.5
+
+// Distance from trend line
+distance_pct = trend == 1 ? math.abs(close - up) / close : math.abs(close - dn) / close
+distance_strength = math.min(distance_pct / 0.02, 1.0)
+
+confidence = base_conf + (atr_strength * 0.10) + (distance_strength * 0.05)
+confidence := math.min(confidence, 0.90)
+
+//              ╔════════════════════════════════╗              //
+//              ║    STOP LOSS & TAKE PROFIT     ║              //
+//              ╚════════════════════════════════╝              //
+
+var float long_sl = na
+var float long_tp = na
+var float short_sl = na
+var float short_tp = na
+
+if buySignal
+    long_sl := close * (1 - stop_loss_pct / 100)
+    long_tp := close * (1 + take_profit_pct / 100)
+
+if sellSignal
+    short_sl := close * (1 + stop_loss_pct / 100)
+    short_tp := close * (1 - take_profit_pct / 100)
+
+//              ╔════════════════════════════════╗              //
+//              ║      STRATEGY EXECUTION        ║              //
+//              ╚════════════════════════════════╝              //
+
+if buySignal
+    strategy.entry("Long", strategy.long, comment="ST Long")
+    strategy.exit("Exit Long", "Long", stop=long_sl, limit=long_tp)
+
+if sellSignal
+    strategy.entry("Short", strategy.short, comment="ST Short")
+    strategy.exit("Exit Short", "Short", stop=short_sl, limit=short_tp)
+
+//              ╔════════════════════════════════╗              //
+//              ║   WEBHOOK ALERTS (STANDARD)    ║              //
+//              ╚════════════════════════════════╝              //
+
+if enable_webhook and barstate.isconfirmed and buySignal
+    string long_msg = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"' + STRATEGY_ID + '","side":"LONG","symbol":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"entry_price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(long_sl) + ',"take_profit":' + str.tostring(long_tp) + ',"timeframe":"' + timeframe.period + '","timestamp":"' + str.tostring(time) + '","confidence":' + str.tostring(confidence) + ',"atr_value":' + str.tostring(atr_current) + ',"trend_line":' + str.tostring(up) + '}'
+    alert(long_msg, alert.freq_once_per_bar_close)
+
+if enable_webhook and barstate.isconfirmed and sellSignal
+    string short_msg = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"' + STRATEGY_ID + '","side":"SHORT","symbol":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"entry_price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(short_sl) + ',"take_profit":' + str.tostring(short_tp) + ',"timeframe":"' + timeframe.period + '","timestamp":"' + str.tostring(time) + '","confidence":' + str.tostring(confidence) + ',"atr_value":' + str.tostring(atr_current) + ',"trend_line":' + str.tostring(dn) + '}'
+    alert(short_msg, alert.freq_once_per_bar_close)
+
+//              ╔════════════════════════════════╗              //
+//              ║          VISUALIZATION         ║              //
+//              ╚════════════════════════════════╝              //
+
+upPlot = plot(trend == 1 ? up : na, title="Up Trend", style=plot.style_linebr, linewidth=2, color=color.green)
+plotshape(buySignal ? up : na, title="UpTrend Begins", location=location.absolute, style=shape.circle, size=size.tiny, color=color.green)
+plotshape(buySignal and showsignals ? up : na, title="Buy", text="Buy", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.green, textcolor=color.white)
+
+dnPlot = plot(trend == 1 ? na : dn, title="Down Trend", style=plot.style_linebr, linewidth=2, color=color.red)
+plotshape(sellSignal ? dn : na, title="DownTrend Begins", location=location.absolute, style=shape.circle, size=size.tiny, color=color.red)
+plotshape(sellSignal and showsignals ? dn : na, title="Sell", text="Sell", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.red, textcolor=color.white)
+
+mPlot = plot(ohlc4, title="", style=plot.style_circles, linewidth=1, display=display.none)
+longFillColor = highlighting ? (trend == 1 ? color.new(color.green, 90) : color.new(color.white, 100)) : color.new(color.white, 100)
+shortFillColor = highlighting ? (trend == -1 ? color.new(color.red, 90) : color.new(color.white, 100)) : color.new(color.white, 100)
+fill(mPlot, upPlot, title="UpTrend Highlighter", color=longFillColor)
+fill(mPlot, dnPlot, title="DownTrend Highlighter", color=shortFillColor)

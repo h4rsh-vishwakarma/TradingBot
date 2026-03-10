@@ -1,0 +1,134 @@
+//@version=5
+strategy("Hackathon V3 FIXED - Institutional Matrix", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+//==================================================
+// 1. WEBHOOK CONFIG
+//==================================================
+grp_webhook    = "Webhook Configuration"
+enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
+webhook_secret = input.string("hybrid_tradingview_cluster_2026_secure", "Webhook Secret", group=grp_webhook)
+
+//==================================================
+// 2. INPUTS
+//==================================================
+st_len   = input.int(10, "SuperTrend Length", group="1. Core")
+st_fac   = input.float(3.0, "SuperTrend Factor", group="1. Core")
+rsi_len  = input.int(14, "RSI Length", group="1. Core")
+adx_len  = input.int(14, "ADX Length", group="1. Core")
+adx_min  = input.int(20, "Min ADX Strength", group="1. Core")
+
+htf_res = input.timeframe("60", "Higher Timeframe", group="2. Institutional Filter")
+
+stop_loss_perc = input.float(3.0, "Stop Loss %", group="3. Risk")
+use_trail      = input.bool(true, "Use Trailing Stop", group="3. Risk")
+trail_act      = input.float(1.0, "Trail Activation %", group="3. Risk")
+trail_off      = input.float(1.0, "Trail Offset %", group="3. Risk")
+
+//==================================================
+// 3. INDICATORS
+//==================================================
+[st_val, st_dir] = ta.supertrend(st_fac, st_len)
+[_, st_htf_dir]  = request.security(syminfo.tickerid, htf_res, ta.supertrend(st_fac, st_len))
+
+rsi_val = ta.rsi(close, rsi_len)
+[dip, dim, adx_val] = ta.dmi(adx_len, adx_len)
+
+// realistic volume filter
+vol_cond = volume > ta.sma(volume, 20)
+
+//==================================================
+// 4. LOGIC
+//==================================================
+bull_trend = st_dir == -1
+bear_trend = st_dir == 1
+
+htf_bull = st_htf_dir == -1
+htf_bear = st_htf_dir == 1
+
+long_momentum  = rsi_val > 45 and rsi_val < 75
+short_momentum = rsi_val < 55 and rsi_val > 25
+
+strength_ok = adx_val > adx_min
+
+long_signal  = bull_trend  and htf_bull and long_momentum  and strength_ok and vol_cond
+short_signal = bear_trend  and htf_bear and short_momentum and strength_ok and vol_cond
+
+//==================================================
+// 5. STATE
+//==================================================
+var float long_sl  = na
+var float long_tp  = na
+var float short_sl = na
+var float short_tp = na
+
+//==================================================
+// 6. ENTRIES + ALERTS (SAFE)
+//==================================================
+if long_signal and strategy.position_size == 0
+    strategy.entry("LONG", strategy.long)
+    long_sl := na
+    long_tp := na
+
+    if enable_webhook
+        alert_msg =
+            '{"strategy":"institutional_matrix",' +
+            '"side":"BUY",' +
+            '"symbol":"' + syminfo.ticker + '",' +
+            '"timeframe":"' + timeframe.period + '",' +
+            '"price":' + str.tostring(close) + ',' +
+            '"secret":"' + webhook_secret + '"}'
+        alert(alert_msg, alert.freq_once_per_bar_close)
+
+if short_signal and strategy.position_size == 0
+    strategy.entry("SHORT", strategy.short)
+    short_sl := na
+    short_tp := na
+
+    if enable_webhook
+        alert_msg =
+            '{"strategy":"institutional_matrix",' +
+            '"side":"SELL",' +
+            '"symbol":"' + syminfo.ticker + '",' +
+            '"timeframe":"' + timeframe.period + '",' +
+            '"price":' + str.tostring(close) + ',' +
+            '"secret":"' + webhook_secret + '"}'
+        alert(alert_msg, alert.freq_once_per_bar_close)
+
+//==================================================
+// 7. SL / TP AFTER ENTRY
+//==================================================
+if strategy.position_size > 0 and na(long_sl)
+    long_sl := strategy.position_avg_price * (1 - stop_loss_perc / 100)
+    long_tp := strategy.position_avg_price * (1 + stop_loss_perc * 1.5 / 100)
+
+if strategy.position_size < 0 and na(short_sl)
+    short_sl := strategy.position_avg_price * (1 + stop_loss_perc / 100)
+    short_tp := strategy.position_avg_price * (1 - stop_loss_perc * 1.5 / 100)
+
+//==================================================
+// 8. EXITS
+//==================================================
+if strategy.position_size > 0
+    if use_trail
+        strategy.exit("Exit Long", "LONG", stop=long_sl,
+            trail_price=strategy.position_avg_price * (1 + trail_act / 100),
+            trail_offset=strategy.position_avg_price * (trail_off / 100))
+    else
+        strategy.exit("Exit Long", "LONG", stop=long_sl, limit=long_tp)
+
+if strategy.position_size < 0
+    if use_trail
+        strategy.exit("Exit Short", "SHORT", stop=short_sl,
+            trail_price=strategy.position_avg_price * (1 - trail_act / 100),
+            trail_offset=strategy.position_avg_price * (trail_off / 100))
+    else
+        strategy.exit("Exit Short", "SHORT", stop=short_sl, limit=short_tp)
+
+//==================================================
+// 9. VISUALS
+//==================================================
+plot(st_val, color=st_dir == -1 ? color.green : color.red, linewidth=2)
+bgcolor(htf_bull ? color.new(color.green, 90) : htf_bear ? color.new(color.red, 90) : na)
+
+plotchar(long_signal  and strategy.position_size == 0, char="L", location=location.belowbar, color=color.lime)
+plotchar(short_signal and strategy.position_size == 0, char="S", location=location.abovebar, color=color.red)

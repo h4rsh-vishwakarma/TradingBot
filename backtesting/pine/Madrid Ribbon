@@ -1,0 +1,270 @@
+//@version=5
+
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║                                                                              ║
+// ║ Madrid Moving Average Ribbon — WEBHOOK VERSION                               ║
+// ║                                                                              ║
+// ║ © Madrid : 141017TH2251                                                      ║
+// ║ Modified: 260121 - Webhook Integration for Automated Trading                ║
+// ║                                                                              ║
+// ║ TRADING SIGNALS:                                                             ║
+// ║ • LONG: Price crosses above MA ribbon + ribbon turns LIME                    ║
+// ║ • SHORT: Price crosses below MA ribbon + ribbon turns RED                    ║
+// ║                                                                              ║
+// ║ OPTIMIZED FOR: ETHUSDT 4H TIMEFRAME                                          ║
+// ║                                                                              ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+strategy("Madrid Ribbon — Webhook", shorttitle="Madrid Webhook", overlay=true, 
+         default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+
+// ╔══════════════════════════════════════╗
+// ║       WEBHOOK CONFIGURATION          ║
+// ╚══════════════════════════════════════╝
+
+webhookUrl = input.string("http://13.236.143.201:5000/webhook/tradingview", 
+                          title="Webhook URL", group="Webhook Settings")
+webhookSecret = input.string("hybrid_tradingview_cluster_2026_secure", 
+                             title="Webhook Secret", group="Webhook Settings")
+
+
+// ╔══════════════════════════════════════╗
+// ║         RISK MANAGEMENT              ║
+// ╚══════════════════════════════════════╝
+
+stopLossPercent = input.float(2.5, title="Stop Loss %", minval=0.1, maxval=10, step=0.1, group="Risk Management")
+takeProfitPercent = input.float(4.0, title="Take Profit %", minval=0.1, maxval=20, step=0.1, group="Risk Management")
+positionSize = input.float(0.031, title="Position Size (ETH)", minval=0.001, step=0.001, group="Risk Management",
+                           tooltip="Minimum 0.031 ETH for $100 notional at ~$3,250")
+
+
+// ╔══════════════════════════════════════╗
+// ║         MOVING AVERAGES              ║
+// ╚══════════════════════════════════════╝
+
+i_exp = input.bool(true, title="Use Exponential MA", group="Madrid Ribbon Settings")
+showRibbon = input.bool(true, title="Show MA Ribbon", group="Madrid Ribbon Settings")
+
+
+// ╔══════════════════════════════════════╗
+// ║              COLORS                  ║
+// ╚══════════════════════════════════════╝
+
+LIME    = #00FF00
+GREEN   = #008000
+RUBI    = #FF0000
+MAROON  = #800000
+GRAY    = #808080
+
+
+// ╔══════════════════════════════════════╗
+// ║            FUNCTIONS                 ║
+// ╚══════════════════════════════════════╝
+
+maColor(_ma, _maRef) =>
+    diffMA = ta.change(_ma)
+    diffMA>=0 and _ma>_maRef ? LIME : diffMA<0 and _ma>_maRef ? MAROON : diffMA<=0 and _ma<_maRef ? RUBI : diffMA>=0 and _ma<_maRef ? GREEN : GRAY
+
+
+// ╔══════════════════════════════════════╗
+// ║      CALCULATE MOVING AVERAGES       ║
+// ╚══════════════════════════════════════╝
+
+src = close
+
+ma05  = i_exp ? ta.ema(src, 05) : ta.sma(src, 05)
+ma10  = i_exp ? ta.ema(src, 10) : ta.sma(src, 10)
+ma15  = i_exp ? ta.ema(src, 15) : ta.sma(src, 15)
+ma20  = i_exp ? ta.ema(src, 20) : ta.sma(src, 20)
+ma25  = i_exp ? ta.ema(src, 25) : ta.sma(src, 25)
+ma30  = i_exp ? ta.ema(src, 30) : ta.sma(src, 30)
+ma35  = i_exp ? ta.ema(src, 35) : ta.sma(src, 35)
+ma40  = i_exp ? ta.ema(src, 40) : ta.sma(src, 40)
+ma45  = i_exp ? ta.ema(src, 45) : ta.sma(src, 45)
+ma50  = i_exp ? ta.ema(src, 50) : ta.sma(src, 50)
+ma55  = i_exp ? ta.ema(src, 55) : ta.sma(src, 55)
+ma60  = i_exp ? ta.ema(src, 60) : ta.sma(src, 60)
+ma65  = i_exp ? ta.ema(src, 65) : ta.sma(src, 65)
+ma70  = i_exp ? ta.ema(src, 70) : ta.sma(src, 70)
+ma75  = i_exp ? ta.ema(src, 75) : ta.sma(src, 75)
+ma80  = i_exp ? ta.ema(src, 80) : ta.sma(src, 80)
+ma85  = i_exp ? ta.ema(src, 85) : ta.sma(src, 85)
+ma90  = i_exp ? ta.ema(src, 90) : ta.sma(src, 90)
+ma100 = i_exp ? ta.ema(src, 100): ta.sma(src, 100)
+
+
+// ╔══════════════════════════════════════╗
+// ║         SIGNAL LOGIC                 ║
+// ╚══════════════════════════════════════╝
+
+// Calculate ribbon strength (how many MAs are above/below ma100)
+bullishMAs = (ma05 > ma100 ? 1 : 0) + (ma10 > ma100 ? 1 : 0) + (ma15 > ma100 ? 1 : 0) + 
+             (ma20 > ma100 ? 1 : 0) + (ma25 > ma100 ? 1 : 0) + (ma30 > ma100 ? 1 : 0) + 
+             (ma35 > ma100 ? 1 : 0) + (ma40 > ma100 ? 1 : 0) + (ma45 > ma100 ? 1 : 0) + 
+             (ma50 > ma100 ? 1 : 0) + (ma55 > ma100 ? 1 : 0) + (ma60 > ma100 ? 1 : 0) + 
+             (ma65 > ma100 ? 1 : 0) + (ma70 > ma100 ? 1 : 0) + (ma75 > ma100 ? 1 : 0) + 
+             (ma80 > ma100 ? 1 : 0) + (ma85 > ma100 ? 1 : 0) + (ma90 > ma100 ? 1 : 0)
+
+ribbonStrength = bullishMAs / 18.0 * 100  // Percentage of bullish MAs
+
+// Trend determination
+strongBullTrend = ribbonStrength > 70  // More than 70% of MAs bullish
+strongBearTrend = ribbonStrength < 30  // Less than 30% of MAs bullish
+
+// Price position relative to ribbon
+priceAboveRibbon = close > ma05 and close > ma10 and close > ma20
+priceBelowRibbon = close < ma05 and close < ma10 and close < ma20
+
+// Ribbon color (fast MA relative to slow MA)
+ribbonBullish = ma05 > ma100 and ta.change(ma05) > 0
+ribbonBearish = ma05 < ma100 and ta.change(ma05) < 0
+
+// Entry conditions with confirmation
+longCondition = ta.crossover(close, ma20) and strongBullTrend and ribbonBullish
+shortCondition = ta.crossunder(close, ma20) and strongBearTrend and ribbonBearish
+
+// Prevent multiple signals in same direction
+var float lastLongBar = na
+var float lastShortBar = na
+
+isNewLong = longCondition and (na(lastLongBar) or bar_index - lastLongBar > 5)
+isNewShort = shortCondition and (na(lastShortBar) or bar_index - lastShortBar > 5)
+
+if isNewLong
+    lastLongBar := bar_index
+if isNewShort
+    lastShortBar := bar_index
+
+
+// ╔══════════════════════════════════════╗
+// ║       CALCULATE SL/TP LEVELS         ║
+// ╚══════════════════════════════════════╝
+
+var float entryPrice = na
+var float stopLoss = na
+var float takeProfit = na
+
+if isNewLong
+    entryPrice := close
+    stopLoss := entryPrice * (1 - stopLossPercent / 100)
+    takeProfit := entryPrice * (1 + takeProfitPercent / 100)
+    
+if isNewShort
+    entryPrice := close
+    stopLoss := entryPrice * (1 + stopLossPercent / 100)
+    takeProfit := entryPrice * (1 - takeProfitPercent / 100)
+
+
+// ╔══════════════════════════════════════╗
+// ║         WEBHOOK PAYLOAD              ║
+// ╚══════════════════════════════════════╝
+
+generateWebhookPayload(signal, price, sl, tp) =>
+    timestamp = str.format("{0,date,yyyy-MM-dd} {0,time,HH:mm:ss}", timenow)
+    signalId = "TV-" + str.replace_all(timestamp, " ", "") + str.replace_all(timestamp, ":", "") + str.replace_all(timestamp, "-", "") + "-madrid_"
+    
+    payload = '{\n' +
+              '  "strategy": "madrid_ribbon",\n' +
+              '  "signal_id": "' + signalId + '",\n' +
+              '  "action": "' + signal + '",\n' +
+              '  "symbol": "' + syminfo.ticker + '",\n' +
+              '  "timeframe": "' + timeframe.period + '",\n' +
+              '  "price": ' + str.tostring(price) + ',\n' +
+              '  "stop_loss": ' + str.tostring(sl) + ',\n' +
+              '  "take_profit": ' + str.tostring(tp) + ',\n' +
+              '  "position_size": ' + str.tostring(positionSize) + ',\n' +
+              '  "ribbon_strength": ' + str.tostring(ribbonStrength, "#.##") + ',\n' +
+              '  "timestamp": "' + timestamp + '",\n' +
+              '  "exchange": "binance",\n' +
+              '  "secret": "' + webhookSecret + '"\n' +
+              '}'
+    payload
+
+
+// ╔══════════════════════════════════════╗
+// ║      SEND WEBHOOK ALERTS             ║
+// ╚══════════════════════════════════════╝
+
+if isNewLong
+    webhookMessage = generateWebhookPayload("LONG", entryPrice, stopLoss, takeProfit)
+    alert(webhookMessage, alert.freq_once_per_bar)
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit Long", "Long", stop=stopLoss, limit=takeProfit)
+
+if isNewShort
+    webhookMessage = generateWebhookPayload("SHORT", entryPrice, stopLoss, takeProfit)
+    alert(webhookMessage, alert.freq_once_per_bar)
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Exit Short", "Short", stop=stopLoss, limit=takeProfit)
+
+
+// ╔══════════════════════════════════════╗
+// ║         PLOT RIBBON                  ║
+// ╚══════════════════════════════════════╝
+
+p05 = plot(showRibbon ? ma05 : na, color=maColor(ma05,ma100), style=plot.style_line, title="MMA05", linewidth=3)
+p10 = plot(showRibbon ? ma10 : na, color=maColor(ma10,ma100), style=plot.style_line, title="MMA10", linewidth=1)
+p15 = plot(showRibbon ? ma15 : na, color=maColor(ma15,ma100), style=plot.style_line, title="MMA15", linewidth=1)
+p20 = plot(showRibbon ? ma20 : na, color=maColor(ma20,ma100), style=plot.style_line, title="MMA20", linewidth=1)
+p25 = plot(showRibbon ? ma25 : na, color=maColor(ma25,ma100), style=plot.style_line, title="MMA25", linewidth=1)
+p30 = plot(showRibbon ? ma30 : na, color=maColor(ma30,ma100), style=plot.style_line, title="MMA30", linewidth=1)
+p35 = plot(showRibbon ? ma35 : na, color=maColor(ma35,ma100), style=plot.style_line, title="MMA35", linewidth=1)
+p40 = plot(showRibbon ? ma40 : na, color=maColor(ma40,ma100), style=plot.style_line, title="MMA40", linewidth=1)
+p45 = plot(showRibbon ? ma45 : na, color=maColor(ma45,ma100), style=plot.style_line, title="MMA45", linewidth=1)
+p50 = plot(showRibbon ? ma50 : na, color=maColor(ma50,ma100), style=plot.style_line, title="MMA50", linewidth=1)
+p55 = plot(showRibbon ? ma55 : na, color=maColor(ma55,ma100), style=plot.style_line, title="MMA55", linewidth=1)
+p60 = plot(showRibbon ? ma60 : na, color=maColor(ma60,ma100), style=plot.style_line, title="MMA60", linewidth=1)
+p65 = plot(showRibbon ? ma65 : na, color=maColor(ma65,ma100), style=plot.style_line, title="MMA65", linewidth=1)
+p70 = plot(showRibbon ? ma70 : na, color=maColor(ma70,ma100), style=plot.style_line, title="MMA70", linewidth=1)
+p75 = plot(showRibbon ? ma75 : na, color=maColor(ma75,ma100), style=plot.style_line, title="MMA75", linewidth=1)
+p80 = plot(showRibbon ? ma80 : na, color=maColor(ma80,ma100), style=plot.style_line, title="MMA80", linewidth=1)
+p85 = plot(showRibbon ? ma85 : na, color=maColor(ma85,ma100), style=plot.style_line, title="MMA85", linewidth=1)
+p90 = plot(showRibbon ? ma90 : na, color=maColor(ma90,ma100), style=plot.style_line, title="MMA90", linewidth=3)
+
+
+// ╔══════════════════════════════════════╗
+// ║         PLOT SIGNALS                 ║
+// ╚══════════════════════════════════════╝
+
+plotshape(isNewLong, style=shape.triangleup, location=location.belowbar, 
+          color=color.new(color.green, 0), size=size.small, title="Long Signal")
+plotshape(isNewShort, style=shape.triangledown, location=location.abovebar, 
+          color=color.new(color.red, 0), size=size.small, title="Short Signal")
+
+// Background color for trend
+bgcolor(strongBullTrend ? color.new(color.green, 95) : strongBearTrend ? color.new(color.red, 95) : na)
+
+
+// ╔══════════════════════════════════════╗
+// ║         PLOT SL/TP LEVELS            ║
+// ╚══════════════════════════════════════╝
+
+plot(strategy.position_size != 0 ? stopLoss : na, color=color.red, 
+     style=plot.style_linebr, linewidth=2, title="Stop Loss")
+plot(strategy.position_size != 0 ? takeProfit : na, color=color.green, 
+     style=plot.style_linebr, linewidth=2, title="Take Profit")
+
+
+// ╔══════════════════════════════════════╗
+// ║         DISPLAY INFO                 ║
+// ╚══════════════════════════════════════╝
+
+var table infoTable = table.new(position.top_right, 2, 4, border_width=1)
+
+if barstate.islast
+    table.cell(infoTable, 0, 0, "Ribbon Strength", text_color=color.white, bgcolor=color.gray)
+    table.cell(infoTable, 1, 0, str.tostring(ribbonStrength, "#.#") + "%", 
+               text_color=color.white, bgcolor=ribbonStrength > 70 ? color.green : ribbonStrength < 30 ? color.red : color.orange)
+    
+    table.cell(infoTable, 0, 1, "Trend", text_color=color.white, bgcolor=color.gray)
+    table.cell(infoTable, 1, 1, strongBullTrend ? "BULL" : strongBearTrend ? "BEAR" : "NEUTRAL", 
+               text_color=color.white, bgcolor=strongBullTrend ? color.green : strongBearTrend ? color.red : color.orange)
+    
+    table.cell(infoTable, 0, 2, "Position", text_color=color.white, bgcolor=color.gray)
+    table.cell(infoTable, 1, 2, strategy.position_size > 0 ? "LONG" : strategy.position_size < 0 ? "SHORT" : "NONE", 
+               text_color=color.white, bgcolor=strategy.position_size != 0 ? color.blue : color.gray)
+    
+    table.cell(infoTable, 0, 3, "Signal ID", text_color=color.white, bgcolor=color.gray)
+    table.cell(infoTable, 1, 3, syminfo.ticker + " " + timeframe.period, 
+               text_color=color.white, bgcolor=color.gray)

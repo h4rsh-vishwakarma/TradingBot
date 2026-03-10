@@ -1,0 +1,199 @@
+// This script is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+// https://creativecommons.org/licenses/by-nc-sa/4.0/
+// © QuantAlgo - Modified for Webhook Strategy Integration
+
+//@version=6
+strategy('ATR Supertrend [QuantAlgo] - Webhook', 
+         'ATR-ST-Webhook', 
+         overlay=true, 
+         max_labels_count=500,
+         default_qty_type=strategy.percent_of_equity,
+         default_qty_value=100,
+         commission_type=strategy.commission.percent,
+         commission_value=0.075,
+         slippage=2)
+
+//              ╔════════════════════════════════╗              //
+//              ║   WEBHOOK CONFIGURATION        ║              //
+//              ╚════════════════════════════════╝              //
+
+var string webhook_settings = '════════ Webhook Configuration ════════'
+enable_webhook = input.bool(true, "Enable Webhook Alerts", group=webhook_settings)
+webhook_url = input.string("http://13.236.143.201/webhook/tradingview", "Webhook URL", group=webhook_settings, tooltip="Your bot webhook endpoint")
+WEBHOOK_SECRET = input.string("hybrid_tradingview_cluster_2026_secure", "Webhook Secret", group=webhook_settings, tooltip="Must match bot configuration")
+STRATEGY_ID = "atr_supertrend"
+
+//              ╔════════════════════════════════╗              //
+//              ║      RISK MANAGEMENT           ║              //
+//              ╚════════════════════════════════╝              //
+
+var string risk_settings = '════════ Risk Management ════════'
+stop_loss_pct = input.float(1.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1, group=risk_settings)
+take_profit_pct = input.float(2.0, "Take Profit %", minval=0.5, maxval=10.0, step=0.5, group=risk_settings)
+
+//              ╔════════════════════════════════╗              //
+//              ║      USER-DEFINED SETTINGS     ║              //
+//              ╚════════════════════════════════╝              //
+
+var string calculation_settings = '════════ Calculation Parameters ════════'
+var string visual_settings = '════════ Visualization Settings ════════'
+
+tooltip_source = 'The price data used for Supertrend calculations. Close is most common for end-of-bar signals. High/Low can be used for more aggressive entries. HL2 (midpoint) provides balanced signals.'
+tooltip_atr_length = 'Period for calculating the Average True Range. Shorter periods (7-14) make the indicator more responsive. Longer periods (20-30) create wider bands that filter out noise better.'
+tooltip_atr_multiplier = 'Multiplier applied to the ATR to set the distance of Supertrend bands. Lower values (2.0-3.0) create tighter bands. Higher values (4.0-6.0) create wider bands with fewer whipsaws.'
+tooltip_smoothing = 'EMA smoothing applied to the price source before calculation to reduce noise. Lower values (1-3) preserve more detail. Higher values (5-10) create smoother trend changes.'
+tooltip_preset = 'Select a predefined configuration optimized for different trading styles and market conditions.'
+
+source = input.source(close, 'Price Source', group = calculation_settings, tooltip = tooltip_source)
+atrLength = input.int(14, 'ATR Length', minval = 1, group = calculation_settings, tooltip = tooltip_atr_length)
+atrMultiplier = input.float(3.5, 'ATR Multiplier', step = 0.1, minval = 0.1, group = calculation_settings, tooltip = tooltip_atr_multiplier)
+smoothingPeriod = input.int(1, 'Signal Smoothing', minval = 1, group = calculation_settings, tooltip = tooltip_smoothing)
+
+presetConfig = input.string('Default', 'Preset Configuration', options = ['Default', 'Fast Response', 'Smooth Trend'], group = calculation_settings, tooltip = tooltip_preset)
+
+if presetConfig == 'Fast Response'
+    atrLength := 10
+    atrMultiplier := 2.5
+    smoothingPeriod := 2
+    smoothingPeriod
+else if presetConfig == 'Smooth Trend'
+    atrLength := 21
+    atrMultiplier := 5.0
+    smoothingPeriod := 5
+    smoothingPeriod
+
+colorPreset = input.string('Custom', 'Color Preset', options = ['Classic', 'Aqua', 'Cosmic', 'Ember', 'Neon', 'Custom'], group = visual_settings)
+bullColorInput = input.color(#00ffaa, 'Bullish Trend Color', group = visual_settings)
+bearColorInput = input.color(#ff0000, 'Bearish Trend Color', group = visual_settings)
+cloudTransparency = input.int(70, 'Cloud Transparency', minval = 0, maxval = 100, group = visual_settings)
+barTransparency = input.int(10, 'Bar Color Transparency', minval = 0, maxval = 100, group = visual_settings)
+showShapes = input.bool(true, 'Show Trend Reversal Signals', group = visual_settings)
+enableBarColoring = input.bool(true, 'Enable Bar Coloring', group = visual_settings)
+
+[bullColor, bearColor] = switch colorPreset
+    'Classic' => [#00ff00, #ff0000]
+    'Aqua' => [#00bfff, #ff8c00]
+    'Cosmic' => [#49ffce, #9932cc]
+    'Ember' => [#ff6600, #00cccc]
+    'Neon' => [#ffff00, #ff00ff]
+    'Custom' => [bullColorInput, bearColorInput]
+
+//              ╔════════════════════════════════╗              //
+//              ║        CORE CALCULATION        ║              //
+//              ╚════════════════════════════════╝              //
+
+smoothedSource = ta.ema(source, smoothingPeriod)
+
+atr = ta.rma(ta.tr(true), atrLength) * atrMultiplier
+
+var float supertrend = na
+var int trend = 1
+
+if na(supertrend)
+    supertrend := smoothedSource - atr
+    supertrend
+
+if trend == 1
+    if smoothedSource < supertrend
+        trend := -1
+        supertrend := smoothedSource + atr
+        supertrend
+    else
+        supertrend := math.max(supertrend, smoothedSource - atr)
+        supertrend
+else
+    if smoothedSource > supertrend
+        trend := 1
+        supertrend := smoothedSource - atr
+        supertrend
+    else
+        supertrend := math.min(supertrend, smoothedSource + atr)
+        supertrend
+
+bullSignal = trend == 1 and trend[1] == -1
+bearSignal = trend == -1 and trend[1] == 1
+trendColor = trend == 1 ? bullColor : bearColor
+
+//              ╔════════════════════════════════╗              //
+//              ║    CONFIDENCE CALCULATION      ║              //
+//              ╚════════════════════════════════╝              //
+
+// Base confidence from ATR strength
+base_conf = 0.76
+atr_current = ta.atr(atrLength)
+atr_ma = ta.sma(atr_current, atrLength * 2)
+atr_strength = atr_ma != 0 ? math.min(atr_current / atr_ma, 2.0) / 2.0 : 0.5
+
+// Distance from Supertrend adds confidence
+distance_pct = math.abs(close - supertrend) / close
+distance_strength = math.min(distance_pct / 0.02, 1.0)
+
+confidence = base_conf + (atr_strength * 0.08) + (distance_strength * 0.06)
+confidence := math.min(confidence, 0.90)
+
+//              ╔════════════════════════════════╗              //
+//              ║    STOP LOSS & TAKE PROFIT     ║              //
+//              ╚════════════════════════════════╝              //
+
+var float long_sl = na
+var float long_tp = na
+var float short_sl = na
+var float short_tp = na
+
+if bullSignal
+    long_sl := close * (1 - stop_loss_pct / 100)
+    long_tp := close * (1 + take_profit_pct / 100)
+
+if bearSignal
+    short_sl := close * (1 + stop_loss_pct / 100)
+    short_tp := close * (1 - take_profit_pct / 100)
+
+//              ╔════════════════════════════════╗              //
+//              ║      STRATEGY EXECUTION        ║              //
+//              ╚════════════════════════════════╝              //
+
+if bullSignal
+    strategy.entry("Long", strategy.long, comment="ATR ST Long")
+    strategy.exit("Exit Long", "Long", stop=long_sl, limit=long_tp)
+
+if bearSignal
+    strategy.entry("Short", strategy.short, comment="ATR ST Short")
+    strategy.exit("Exit Short", "Short", stop=short_sl, limit=short_tp)
+
+//              ╔════════════════════════════════╗              //
+//              ║   WEBHOOK ALERTS (STANDARD)    ║              //
+//              ╚════════════════════════════════╝              //
+
+if enable_webhook and barstate.isconfirmed and bullSignal
+    string long_msg = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"' + STRATEGY_ID + '","side":"LONG","symbol":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"entry_price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(long_sl) + ',"take_profit":' + str.tostring(long_tp) + ',"timeframe":"' + timeframe.period + '","timestamp":"' + str.tostring(time) + '","confidence":' + str.tostring(confidence) + ',"atr_value":' + str.tostring(atr_current) + ',"supertrend":' + str.tostring(supertrend) + '}'
+    alert(long_msg, alert.freq_once_per_bar_close)
+
+if enable_webhook and barstate.isconfirmed and bearSignal
+    string short_msg = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"' + STRATEGY_ID + '","side":"SHORT","symbol":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"entry_price":' + str.tostring(close) + ',"stop_loss":' + str.tostring(short_sl) + ',"take_profit":' + str.tostring(short_tp) + ',"timeframe":"' + timeframe.period + '","timestamp":"' + str.tostring(time) + '","confidence":' + str.tostring(confidence) + ',"atr_value":' + str.tostring(atr_current) + ',"supertrend":' + str.tostring(supertrend) + '}'
+    alert(short_msg, alert.freq_once_per_bar_close)
+
+//              ╔════════════════════════════════╗              //
+//              ║          VISUALIZATION         ║              //
+//              ╚════════════════════════════════╝              //
+
+pSupertrend = plot(supertrend, 'Supertrend Ribbon', color = trendColor, linewidth = 2, style = plot.style_steplinebr)
+pPrice = plot(smoothedSource, 'Price Source', display = display.none)
+fill(pSupertrend, pPrice, supertrend, smoothedSource, color.new(trendColor, cloudTransparency), color.new(trendColor, 100), 'Trend Cloud Fill')
+
+plotshape(showShapes and bullSignal ? supertrend : na, 'Bullish Signal Core', shape.circle, location.absolute, bullColor, size = size.tiny)
+plotshape(showShapes and bullSignal ? supertrend : na, 'Bullish Signal Glow', shape.circle, location.absolute, color.new(bullColor, 50), size = size.small)
+plotshape(showShapes and bearSignal ? supertrend : na, 'Bearish Signal Core', shape.circle, location.absolute, bearColor, size = size.tiny)
+plotshape(showShapes and bearSignal ? supertrend : na, 'Bearish Signal Glow', shape.circle, location.absolute, color.new(bearColor, 50), size = size.small)
+
+barcolor(enableBarColoring ? color.new(trendColor, barTransparency) : na, title = 'Supertrend Bar Color')
+
+//              ╔════════════════════════════════╗              //
+//              ║           CREATED BY           ║              //
+//              ╚════════════════════════════════╝              //
+
+// ██████╗ ██╗   ██╗ █████╗ ███╗   ██╗████████╗     █████╗ ██╗      ██████╗  ██████╗ 
+//██╔═══██╗██║   ██║██╔══██╗████╗  ██║╚══██╔══╝    ██╔══██╗██║     ██╔════╝ ██╔═══██╗
+//██║   ██║██║   ██║███████║██╔██╗ ██║   ██║       ███████║██║     ██║  ███╗██║   ██║
+//██║▄▄ ██║██║   ██║██╔══██║██║╚██╗██║   ██║       ██╔══██║██║     ██║   ██║██║   ██║
+//╚██████╔╝╚██████╔╝██║  ██║██║ ╚████║   ██║       ██║  ██║███████╗╚██████╔╝╚██████╔╝
+// ╚══▀▀═╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝       ╚═╝  ╚═╝╚══════╝ ╚═════╝  ╚═════╝

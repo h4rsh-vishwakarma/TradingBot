@@ -1,0 +1,415 @@
+//@version=6
+// ═══════════════════════════════════════════════════════════════════════════
+// Hybrid Smart Money Concepts [MarkitTick] - WEBHOOK ENABLED
+// ═══════════════════════════════════════════════════════════════════════════
+// Original: MarkitTick (CC BY-NC-SA 4.0)
+// Modified: Webhook integration for automated trading
+// 
+// ENTRY LOGIC:
+// - LONG: Bullish CHoCH + Seller Exhaustion OR Breakaway/Runaway Gap (bullish)
+// - SHORT: Bearish CHoCH + Buyer Exhaustion OR Breakaway/Runaway Gap (bearish)
+//
+// Strategy: Hybrid SMC combining structure breaks, exhaustion signals, and gaps
+// Timeframe: 1h (recommended)
+// Symbol: BTCUSDT
+// ═══════════════════════════════════════════════════════════════════════════
+
+strategy("Hybrid Smart Money Concepts [MarkitTick] - Webhook", 
+         "Hybrid-SMC-WH",
+         overlay = true, 
+         max_lines_count = 500, 
+         max_boxes_count = 2000, 
+         max_labels_count = 500,
+         default_qty_type = strategy.percent_of_equity,
+         default_qty_value = 100,
+         commission_type = strategy.commission.percent,
+         commission_value = 0.1,
+         slippage = 2,
+         initial_capital = 10000,
+         pyramiding = 0,
+         calc_on_every_tick = false,
+         calc_on_order_fills = false,
+         process_orders_on_close = true)
+
+// -----------------------------------------------------------------------------
+// 1. Constants & Configuration
+// -----------------------------------------------------------------------------
+
+// --- Group: Date Range Filter ---
+string GRP_TIME = "Date Range Filter"
+bool   useDateFilter = input.bool(false, "Use Date Filter", group=GRP_TIME)
+int    startTime     = input.time(timestamp("2020-01-01 00:00"), "Start Date", group=GRP_TIME)
+
+// --- Group: Gap Analysis ---
+string G_LOGIC      = 'Gap Analysis: Logic'
+string G_VISUAL     = 'Gap Analysis: Visuals'
+float  inGapMin     = input.float(0.0, 'Min Gap Size (Points)', minval=0.0, group=G_LOGIC)
+int    inPivotL     = input.int(5, 'Structure Lookback Left', minval=1, group=G_LOGIC)
+int    inPivotR     = input.int(5, 'Structure Lookback Right', minval=1, group=G_LOGIC)
+int    inVolLen     = input.int(20, 'Volume Avg Length', minval=1, group=G_LOGIC)
+float  inVolMult    = input.float(1.5, 'Volume Spike Multiplier', minval=1.0, step=0.1, group=G_LOGIC)
+int    inTrendMat   = input.int(20, 'Trend Maturity Threshold', minval=1, group=G_LOGIC)
+int    inGapExt     = input.int(10, 'Gap Box Extension', minval=1, group=G_VISUAL)
+
+color  colBreak     = input.color(color.new(color.blue, 75), 'Breakaway Gap', group=G_VISUAL)
+color  colRun       = input.color(color.new(color.orange, 75), 'Runaway Gap', group=G_VISUAL)
+color  colExhaust   = input.color(color.new(color.red, 75), 'Exhaustion Gap', group=G_VISUAL)
+
+// --- Group: Market Structure ---
+string GRP_STRUC    = "Market Structure: Logic"
+string GRP_S_VIS    = "Market Structure: Visuals"
+int    inSwingLen   = input.int(5, "Swing Detection Length", minval=2, group=GRP_STRUC)
+bool   inShowChoch  = input.bool(true, "Show CHoCH", group=GRP_STRUC)
+bool   inShowOb     = input.bool(true, "Show Order Blocks", group=GRP_STRUC)
+color  colBullOb    = input.color(color.new(color.green, 95), "Bullish OB", group=GRP_S_VIS)
+color  colBearOb    = input.color(color.new(color.red, 95), "Bearish OB", group=GRP_S_VIS)
+color  colChochBull = input.color(color.green, "Bullish CHoCH", group=GRP_S_VIS)
+color  colChochBear = input.color(color.red, "Bearish CHoCH", group=GRP_S_VIS)
+
+// --- Group: Stress Model ---
+string GRP_STRESS   = "Exhaustion & Stress Model"
+int    inLenTrend   = input.int(50, "Trend Filter Length", minval=10, group=GRP_STRESS)
+int    inLenStats   = input.int(20, "Statistical Lookback", minval=5, group=GRP_STRESS)
+float  inThreshSigma= input.float(2.0, "Stress Threshold (Sigma)", step=0.1, group=GRP_STRESS)
+
+// --- Group: Trading Settings ---
+string GRP_TRADE    = "Trading Settings"
+bool   enableLongTrades   = input.bool(true, 'Enable Long Trades', group=GRP_TRADE)
+bool   enableShortTrades  = input.bool(true, 'Enable Short Trades', group=GRP_TRADE)
+bool   useExhaustion      = input.bool(false, 'Use Exhaustion Signals', group=GRP_TRADE)
+bool   useGaps            = input.bool(false, 'Use Gap Signals', group=GRP_TRADE)
+bool   useChoch           = input.bool(true, 'Use CHoCH Signals', group=GRP_TRADE)
+bool   useStopLoss        = input.bool(true, 'Use Stop Loss', group=GRP_TRADE)
+float  stopLossPct        = input.float(1.5, 'Stop Loss %', group=GRP_TRADE, minval=0.1, maxval=10, step=0.1)
+bool   useTakeProfit      = input.bool(true, 'Use Take Profit', group=GRP_TRADE)
+float  takeProfitPct      = input.float(3.0, 'Take Profit %', group=GRP_TRADE, minval=0.1, maxval=20, step=0.1)
+
+// -----------------------------------------------------------------------------
+// 2. Type Definitions 
+// -----------------------------------------------------------------------------
+
+type SwingPoint
+    float price
+    int   index
+
+type MarketStructure
+    float lastHighPrice
+    int   lastHighIndex
+    float lastLowPrice
+    int   lastLowIndex
+    int   trendDir
+    int   trendStartBar
+
+type OrderBlock
+    box   id
+    float top
+    float bottom
+    bool  isBullish
+
+// -----------------------------------------------------------------------------
+// 3. Global Variables 
+// -----------------------------------------------------------------------------
+
+var array<box>        gapBoxes         = array.new<box>()
+var array<line>       gapLines         = array.new<line>()
+var array<float>      gapLevels        = array.new<float>()
+var array<bool>       gapIsBull        = array.new<bool>()
+var array<string>     gapTypes         = array.new<string>()
+var array<OrderBlock> activeOrderBlocks= array.new<OrderBlock>()
+
+var MarketStructure msState = MarketStructure.new(na, na, na, na, 0, 0)
+
+var bool dateFilterActive = false
+var bool inRangeCache = true
+
+var bool bullishChochOccurred = false
+var bool bearishChochOccurred = false
+
+// -----------------------------------------------------------------------------
+// 4. Methods 
+// -----------------------------------------------------------------------------
+
+inRange() => 
+    inRangeCache
+
+draw_choch_label(int idx, float price, bool isBull, color c) =>
+    if not na(idx)
+        label.new(idx, price, "CHoCH", xloc=xloc.bar_index, 
+             style = isBull ? label.style_label_down : label.style_label_up, 
+             color=color.new(color.white, 100), textcolor=c, size=size.small)
+
+draw_choch_line(int x1, float y1, int x2, float y2, color c) =>
+    if not na(x1)
+        line.new(x1, y1, x2, y2, color=c, style=line.style_dashed)
+
+method findOrderBlock(MarketStructure state, bool isBull) =>
+    int breakIndex = isBull ? state.lastHighIndex : state.lastLowIndex
+    
+    if not na(breakIndex)
+        int lookback = math.min(bar_index - breakIndex, 50) 
+        
+        if lookback > 1
+            int extremeIdx = bar_index
+            
+            if isBull
+                float lowest = low
+                for i = 1 to lookback
+                    if low[i] < lowest
+                        lowest := low[i]
+                        extremeIdx := bar_index - i
+            else
+                float highest = high
+                for i = 1 to lookback
+                    if high[i] > highest
+                        highest := high[i]
+                        extremeIdx := bar_index - i
+            
+            int offset = bar_index - extremeIdx
+            int finalOffset = offset
+            
+            int searchLimit = math.min(5, lookback - offset)
+            for j = 0 to searchLimit
+                int idx = offset + j
+                if idx < bar_index
+                    bool isTargetCandle = isBull ? (close[idx] < open[idx]) : (close[idx] > open[idx])
+                    if isTargetCandle
+                        finalOffset := idx
+                        break
+            
+            if inRangeCache
+                float obTop    = high[finalOffset]
+                float obBottom = low[finalOffset]
+                int   obLeft   = bar_index - finalOffset
+                color bg = isBull ? colBullOb : colBearOb
+                
+                box b = box.new(obLeft, obTop, bar_index + 5, obBottom, 
+                     border_color=na, bgcolor=bg, xloc=xloc.bar_index)
+                array.push(activeOrderBlocks, OrderBlock.new(b, obTop, obBottom, isBull))
+
+method analyzeGap(MarketStructure state, float volAvg, float volMult, int maturityThresh, float minGap) =>
+    bool isValid = false
+    bool isBullish = false
+    float top = na
+    float bottom = na
+    string gapType = "Standard"
+    
+    if bar_index >= 2
+        bool bullGap = low > high[2] and close[1] > open[1]
+        bool bearGap = high < low[2] and close[1] < open[1]
+
+        if bullGap
+            float size = low - high[2]
+            if size >= minGap
+                isValid := true
+                isBullish := true
+                top := low
+                bottom := high[2]
+                
+                bool isBreakout = not na(state.lastHighPrice) and 
+                                  close[1] > state.lastHighPrice and 
+                                  close[2] <= state.lastHighPrice
+                
+                bool isHighVol = volume[1] > (volAvg * volMult)
+                bool isExtended = (bar_index - state.trendStartBar) > maturityThresh
+                
+                gapType := isBreakout ? "Breakaway" : 
+                          (isHighVol and isExtended ? "Exhaustion" : "Runaway")
+                          
+        else if bearGap
+            float size = low[2] - high
+            if size >= minGap
+                isValid := true
+                isBullish := false
+                top := low[2]
+                bottom := high
+                
+                bool isBreakout = not na(state.lastLowPrice) and 
+                                  close[1] < state.lastLowPrice and 
+                                  close[2] >= state.lastLowPrice
+                
+                bool isHighVol = volume[1] > (volAvg * volMult)
+                bool isExtended = (bar_index - state.trendStartBar) > maturityThresh
+                
+                gapType := isBreakout ? "Breakaway" : 
+                          (isHighVol and isExtended ? "Exhaustion" : "Runaway")
+    
+    [isValid, isBullish, top, bottom, gapType]
+
+calc_stress(int len, float threshold) =>
+    float volSafe = math.max(volume, 1.0)  
+    float impact = ta.tr(true) / volSafe
+    float raw = math.log(impact + 1)
+    float mean = ta.sma(raw, len)
+    float std = ta.stdev(raw, len)
+    float z = std == 0 ? 0.0 : (raw - mean) / std
+    z > threshold
+
+// -----------------------------------------------------------------------------
+// 5. Main Execution
+// -----------------------------------------------------------------------------
+
+float ph = ta.pivothigh(high, inSwingLen, inSwingLen)
+float pl = ta.pivotlow(low, inSwingLen, inSwingLen)
+
+if not na(ph)
+    msState.lastHighPrice := ph
+    msState.lastHighIndex := bar_index - inSwingLen
+
+if not na(pl)
+    msState.lastLowPrice := pl
+    msState.lastLowIndex := bar_index - inSwingLen
+
+bool crossOverHigh = not na(msState.lastHighPrice) and close > msState.lastHighPrice
+bool crossUnderLow = not na(msState.lastLowPrice) and close < msState.lastLowPrice
+
+bullishChochOccurred := false
+bearishChochOccurred := false
+
+if crossOverHigh and msState.trendDir != 1
+    msState.trendDir := 1
+    msState.trendStartBar := bar_index
+    bullishChochOccurred := true
+    
+    if inShowChoch
+        draw_choch_line(msState.lastHighIndex, msState.lastHighPrice, 
+                       bar_index, msState.lastHighPrice, colChochBull)
+        draw_choch_label(int(math.avg(msState.lastHighIndex, bar_index)), 
+                        msState.lastHighPrice, true, colChochBull)
+    
+    if inShowOb
+        msState.findOrderBlock(true)
+
+else if crossOverHigh and msState.trendDir == 1 and inShowOb
+    msState.findOrderBlock(true)
+
+if crossUnderLow and msState.trendDir != -1
+    msState.trendDir := -1
+    msState.trendStartBar := bar_index
+    bearishChochOccurred := true
+    
+    if inShowChoch
+        draw_choch_line(msState.lastLowIndex, msState.lastLowPrice, 
+                       bar_index, msState.lastLowPrice, colChochBear)
+        draw_choch_label(int(math.avg(msState.lastLowIndex, bar_index)), 
+                        msState.lastLowPrice, false, colChochBear)
+    
+    if inShowOb
+        msState.findOrderBlock(false)
+
+else if crossUnderLow and msState.trendDir == -1 and inShowOb
+    msState.findOrderBlock(false)
+
+float volMA = ta.sma(volume, inVolLen)
+[gapValid, gapBull, gapTop, gapBot, gapTypeStr] = msState.analyzeGap(volMA, inVolMult, inTrendMat, inGapMin)
+
+if gapValid and inRangeCache
+    color c = gapTypeStr == "Breakaway" ? colBreak : 
+              (gapTypeStr == "Runaway" ? colRun : colExhaust)
+    string t = gapTypeStr == "Breakaway" ? "BREAKAWAY" : 
+               (gapTypeStr == "Runaway" ? "RUNAWAY" : "EXHAUSTION")
+    
+    box b = box.new(bar_index[2], gapTop, bar_index + inGapExt, gapBot, 
+         bgcolor=c, border_color=na, text=t, text_color=color.white, text_size=size.tiny)
+    
+    float mid = (gapTop + gapBot) * 0.5
+    line l = line.new(bar_index[2], mid, bar_index + inGapExt, mid, 
+         color=color.new(c, 20), style=line.style_dotted)
+         
+    array.push(gapBoxes, b)
+    array.push(gapLines, l)
+    array.push(gapLevels, mid)
+    array.push(gapIsBull, gapBull)
+    array.push(gapTypes, gapTypeStr)
+
+bool isHighStress = calc_stress(inLenStats, inThreshSigma)
+float trendBase = ta.ema(close, inLenTrend)
+
+bool sellExhaustion = isHighStress and close < trendBase and close < open
+bool buyExhaustion = isHighStress and close > trendBase and close > open
+
+plotshape(buyExhaustion, "Buyer Exhaustion", shape.labeldown, 
+         location.abovebar, color.red, 0, "BE", color.white)
+plotshape(sellExhaustion, "Seller Exhaustion", shape.labelup, 
+         location.belowbar, color.green, 0, "SE", color.white)
+
+// -----------------------------------------------------------------------------
+// 7. Trading Logic
+// -----------------------------------------------------------------------------
+
+bool bullishGapSignal = gapValid and gapBull and (gapTypeStr == "Breakaway" or gapTypeStr == "Runaway")
+bool bearishGapSignal = gapValid and not gapBull and (gapTypeStr == "Breakaway" or gapTypeStr == "Runaway")
+
+longCondition = enableLongTrades and strategy.position_size == 0 and (
+     (useChoch and bullishChochOccurred) or
+     (useExhaustion and sellExhaustion) or
+     (useGaps and bullishGapSignal)
+ )
+
+shortCondition = enableShortTrades and strategy.position_size == 0 and (
+     (useChoch and bearishChochOccurred) or
+     (useExhaustion and buyExhaustion) or
+     (useGaps and bearishGapSignal)
+ )
+
+if longCondition
+    longSL = useStopLoss ? close * (1 - stopLossPct / 100) : na
+    longTP = useTakeProfit ? close * (1 + takeProfitPct / 100) : na
+    
+    strategy.entry("Long", strategy.long,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"hybrid_smc","side":"LONG","symbol":"{{ticker}}","price":{{close}},"timeframe":"{{interval}}"}')
+    
+    if useStopLoss
+        strategy.exit("Long Exit", "Long", stop=longSL, limit=longTP)
+    else if useTakeProfit
+        strategy.exit("Long Exit", "Long", limit=longTP)
+
+if shortCondition
+    shortSL = useStopLoss ? close * (1 + stopLossPct / 100) : na
+    shortTP = useTakeProfit ? close * (1 - takeProfitPct / 100) : na
+    
+    strategy.entry("Short", strategy.short,
+                   alert_message='{"secret":"hybrid_tradingview_cluster_2026_secure","strategy":"hybrid_smc","side":"SHORT","symbol":"{{ticker}}","price":{{close}},"timeframe":"{{interval}}"}')
+    
+    if useStopLoss
+        strategy.exit("Short Exit", "Short", stop=shortSL, limit=shortTP)
+    else if useTakeProfit
+        strategy.exit("Short Exit", "Short", limit=shortTP)
+
+// Visual signals
+plotshape(longCondition, "Long Entry", shape.triangleup, location.belowbar, 
+         color.new(color.green, 0), size=size.normal, text="LONG")
+plotshape(shortCondition, "Short Entry", shape.triangledown, location.abovebar, 
+         color.new(color.red, 0), size=size.normal, text="SHORT")
+
+// -----------------------------------------------------------------------------
+// 8. Cleanup & Management 
+// -----------------------------------------------------------------------------
+
+int gapSize = array.size(gapBoxes)
+if gapSize > 0
+    for i = gapSize - 1 to 0
+        float lvl = array.get(gapLevels, i)
+        bool isB = array.get(gapIsBull, i)
+        
+        bool mitigated = (isB and low <= lvl) or (not isB and high >= lvl)
+            
+        if mitigated
+            box.delete(array.get(gapBoxes, i))
+            line.delete(array.get(gapLines, i))
+            array.remove(gapBoxes, i)
+            array.remove(gapLines, i)
+            array.remove(gapLevels, i)
+            array.remove(gapIsBull, i)
+            array.remove(gapTypes, i)
+
+int obSize = array.size(activeOrderBlocks)
+if obSize > 0
+    for i = obSize - 1 to 0
+        OrderBlock ob = array.get(activeOrderBlocks, i)
+        bool broken = (ob.isBullish and low < ob.bottom) or (not ob.isBullish and high > ob.top)
+
+        if broken
+            box.delete(ob.id)
+            array.remove(activeOrderBlocks, i)
+        else if barstate.islast
+            box.set_right(ob.id, bar_index + 5)

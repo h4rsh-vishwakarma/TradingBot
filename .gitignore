@@ -50,3 +50,7 @@ storage/*.jsonl
 __pycache__/
 *.pyc
 venv/
+storage/*.json
+storage/*.db
+storage/*.offset
+.env

@@ -1,0 +1,19 @@
+//@version=5
+indicator("Mean Reversion Scalper Hybrid", overlay=true)
+
+// Bollinger Bands
+[middle, upper, lower] = ta.bb(close, 20, 2.5) // Increased multiplier for higher accuracy
+
+// Stochastic
+k = ta.stoch(close, high, low, 14)
+d = ta.sma(k, 3)
+
+// Conditions
+buyCond = ta.crossunder(low, lower) and k < 20
+sellCond = ta.crossover(high, upper) and k > 80
+
+plot(upper, color=color.red)
+plot(lower, color=color.green)
+
+plotshape(buyCond, "Scalp Buy", shape.circle, location.belowbar, color.lime)
+plotshape(sellCond, "Scalp Sell", shape.circle, location.abovebar, color.orange)

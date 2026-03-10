@@ -1,0 +1,110 @@
+//@version=5
+// Original: Squeeze Momentum Indicator [LazyBear]
+// Modified for webhook integration
+strategy("Squeeze Momentum - Webhook", "SQZ-WH", overlay=false,
+         initial_capital=10000,
+         default_qty_type=strategy.percent_of_equity,
+         default_qty_value=100,
+         commission_type=strategy.commission.percent,
+         commission_value=0.1,
+         slippage=2)
+
+// ===============================
+// WEBHOOK SECRET
+// ===============================
+SECRET = "hybrid_tradingview_cluster_2026_secure"
+
+// ===============================
+// TRADING SETTINGS
+// ===============================
+grpTrade = "Trading Settings"
+useLongTrades  = input.bool(true, "Enable Long Trades", group=grpTrade)
+useShortTrades = input.bool(true, "Enable Short Trades", group=grpTrade)
+stopLossPct    = input.float(1.5, "Stop Loss %", minval=0.1, step=0.1, group=grpTrade)
+takeProfitPct  = input.float(3.0, "Take Profit %", minval=0.1, step=0.1, group=grpTrade)
+
+// ===============================
+// SQUEEZE MOMENTUM SETTINGS
+// ===============================
+grpSqz = "Squeeze Momentum"
+length = input.int(20, title="BB Length", group=grpSqz)
+mult = input.float(2.0, title="BB MultFactor", group=grpSqz)
+lengthKC = input.int(20, title="KC Length", group=grpSqz)
+multKC = input.float(1.5, title="KC MultFactor", group=grpSqz)
+useTrueRange = input.bool(true, title="Use TrueRange (KC)", group=grpSqz)
+
+// ===============================
+// SQUEEZE MOMENTUM CALCULATION
+// ===============================
+// Calculate BB
+source = close
+basis = ta.sma(source, length)
+dev = mult * ta.stdev(source, length)
+upperBB = basis + dev
+lowerBB = basis - dev
+
+// Calculate KC
+ma = ta.sma(source, lengthKC)
+range_val = useTrueRange ? ta.tr : (high - low)
+rangema = ta.sma(range_val, lengthKC)
+upperKC = ma + rangema * multKC
+lowerKC = ma - rangema * multKC
+
+// Squeeze conditions
+sqzOn  = (lowerBB > lowerKC) and (upperBB < upperKC)
+sqzOff = (lowerBB < lowerKC) and (upperBB > upperKC)
+noSqz  = not sqzOn and not sqzOff
+
+// Momentum value
+val = ta.linreg(source - math.avg(math.avg(ta.highest(high, lengthKC), ta.lowest(low, lengthKC)), ta.sma(close, lengthKC)), lengthKC, 0)
+
+// Color logic
+bcolor = val > 0 ? (val > nz(val[1]) ? color.lime : color.green) : (val < nz(val[1]) ? color.red : color.maroon)
+scolor = noSqz ? color.blue : sqzOn ? color.black : color.gray
+
+// ===============================
+// ENTRY SIGNALS (Squeeze Fire: first momentum cross after squeeze release)
+// ===============================
+// Track squeeze release (sqzOn goes false)
+sqzRelease = sqzOn[1] and not sqzOn
+
+// Only take first signal after squeeze fires
+var bool waitingForSignal = false
+waitingForSignal := sqzRelease ? true : (ta.crossover(val, 0) or ta.crossunder(val, 0)) ? false : waitingForSignal
+
+// Enter long: first momentum cross above 0 after squeeze release
+longCondition = waitingForSignal and ta.crossover(val, 0) and val > nz(val[1])
+
+// Enter short: first momentum cross below 0 after squeeze release
+shortCondition = waitingForSignal and ta.crossunder(val, 0) and val < nz(val[1])
+
+// ===============================
+// STRATEGY EXECUTION WITH WEBHOOK
+// ===============================
+if useLongTrades and longCondition and strategy.position_size == 0
+    slPrice = close * (1 - stopLossPct / 100)
+    tpPrice = close * (1 + takeProfitPct / 100)
+    
+    alertMessage = '{"secret":"' + SECRET + '","strategy":"squeeze_momentum","side":"LONG","symbol":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"timeframe":"' + timeframe.period + '","stop_loss":' + str.tostring(slPrice) + ',"take_profit":' + str.tostring(tpPrice) + '}'
+    
+    strategy.entry("Long", strategy.long, alert_message=alertMessage)
+    strategy.exit("Long Exit", "Long", stop=slPrice, limit=tpPrice)
+
+if useShortTrades and shortCondition and strategy.position_size == 0
+    slPrice = close * (1 + stopLossPct / 100)
+    tpPrice = close * (1 - takeProfitPct / 100)
+    
+    alertMessage = '{"secret":"' + SECRET + '","strategy":"squeeze_momentum","side":"SHORT","symbol":"' + syminfo.ticker + '","price":' + str.tostring(close) + ',"timeframe":"' + timeframe.period + ',"stop_loss":' + str.tostring(slPrice) + ',"take_profit":' + str.tostring(tpPrice) + '}'
+    
+    strategy.entry("Short", strategy.short, alert_message=alertMessage)
+    strategy.exit("Short Exit", "Short", stop=slPrice, limit=tpPrice)
+
+// ===============================
+// VISUALS
+// ===============================
+plot(val, color=bcolor, style=plot.style_histogram, linewidth=4, title="Momentum")
+plot(0, color=scolor, style=plot.style_cross, linewidth=2, title="Zero Line")
+
+// Entry markers
+plotshape(longCondition, "Long Entry", shape.triangleup, location.bottom, color.new(color.green, 0), size=size.small)
+plotshape(shortCondition, "Short Entry", shape.triangledown, location.top, color.new(color.red, 0), size=size.small)
