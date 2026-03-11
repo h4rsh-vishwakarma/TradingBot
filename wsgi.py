@@ -1,49 +1,51 @@
 import sys
 import os
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 
-# 1. Project Root ki absolute path nikaalein
+# 1. Project Root Setup
 BASE_DIR = Path(__file__).resolve().parent
-ROOT_STR = str(BASE_DIR)
+# Subfolder jahan main logic (core, storage) hai
+SUB_APP_DIR = BASE_DIR / "tradingview_webhook_bot"
 
-# 2. Path Injection (Bulletproof Fix):
-# Hum sys.path ko puri tarah reconstruct kar rahe hain taaki 
-# Project Root (index 0) par rahe aur venv ke paths interfere na karein.
-sys.path = [ROOT_STR, os.path.join(ROOT_STR, "tradingview_webhook_bot")] + [
-    p for p in sys.path if p not in [ROOT_STR, os.path.join(ROOT_STR, "tradingview_webhook_bot")]
-]
+# Path injection - Dono paths zaroori hain
+sys.path.insert(0, str(BASE_DIR))
+sys.path.insert(0, str(SUB_APP_DIR))
 
-# 3. Environment variables load karein
-load_dotenv(os.path.join(ROOT_STR, ".env"))
+# 2. Load Environment (Production path)
+load_dotenv("/etc/tradingbot/env_vars")
 
 try:
-    # Diagnostic Info: Senior-level logging for startup issues
-    print(f"--- Gunicorn Startup Diagnostic ---")
-    print(f"ROOT_DIR: {ROOT_STR}")
-    print(f"SYS.PATH[0]: {sys.path[0]}")
+    print(f"--- 🚀 Gunicorn Startup (Integrated Mode) ---")
     
-    # Sabse pehle 'schemas' ko as a package verify karein
-    import schemas.models
-    print("✅ Schemas package verified.")
+    # 3. Precise Path Resolution based on your 'find' output
+    config_path = BASE_DIR / "config" / "settings.json"
+    signals_file = SUB_APP_DIR / "storage" / "signals.jsonl"
 
-    # Phir main app load karein bina sub-folder prefix ke
-    from tradingview_webhook_server import create_app
-    app = create_app()
-    print("✅ Webhook Server module loaded correctly.")
+    print(f"✅ Root: {BASE_DIR}")
+    print(f"✅ Config: {config_path}")
+    print(f"✅ Queue: {signals_file}")
 
-except ImportError as e:
-    # Day 4 Requirement: Error logging for diagnostic purposes
-    print(f"❌ Critical Import Error: {e}")
-    print(f"Check if {ROOT_STR}/schemas/__init__.py exists!")
-    sys.exit(1)
+    if not config_path.exists():
+        raise FileNotFoundError(f"Missing settings.json at {config_path}")
+
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+
+    # 4. Import WebhookServer (Ab SUB_APP_DIR path mein hai toh core mil jayega)
+    from core.webhook_server import WebhookServer
+    
+    server_instance = WebhookServer(config, str(signals_file))
+    app = server_instance.app 
+    
+    print("✅ Integrated Webhook Server loaded successfully!")
+
 except Exception as e:
-    print(f"❌ Unexpected Error during startup: {e}")
+    print(f"❌ Startup Error: {e}")
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
 
-# Gunicorn entries ke liye 'app' object globally available hai
 if __name__ == "__main__":
-    # Manual testing mode (Day 5 Dry-run check)
-    port = int(os.getenv("PORT", 5000))
-    print(f"🚀 Manual Startup on http://0.0.0.0:{port}")
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=5000)
