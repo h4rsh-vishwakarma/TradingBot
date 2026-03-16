@@ -2,11 +2,11 @@
     "positions": {
         "BTCUSDT": {
             "symbol": "BTCUSDT",
-            "quantity": -0.07700000000000001,
+            "quantity": -0.07100000000000001,
             "avg_price": 64622.529473684175,
-            "realized_pnl": 958.0955305263149,
-            "daily_realized_pnl": 950.3555305263151,
-            "last_update_date": "2026-03-10"
+            "realized_pnl": 919.83070736842,
+            "daily_realized_pnl": -38.26482315789495,
+            "last_update_date": "2026-03-14"
         },
         "ETHUSDT": {
             "symbol": "ETHUSDT",
@@ -15,6 +15,14 @@
             "realized_pnl": 0.0,
             "daily_realized_pnl": 0.0,
             "last_update_date": ""
+        },
+        "binance:BTCUSDT": {
+            "symbol": "binance:BTCUSDT",
+            "quantity": -0.003,
+            "avg_price": 71000.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-14"
         }
     },
     "trade_history": [
@@ -53,6 +61,18 @@
             "symbol": "BTCUSDT",
             "pnl": -18.982411578947474,
             "exit_price": 70950.0
+        },
+        {
+            "timestamp": "2026-03-14T08:08:08.509729",
+            "symbol": "BTCUSDT",
+            "pnl": -19.132411578947476,
+            "exit_price": 71000.0
+        },
+        {
+            "timestamp": "2026-03-14T08:10:38.749752",
+            "symbol": "BTCUSDT",
+            "pnl": -19.132411578947476,
+            "exit_price": 71000.0
         }
     ]
 }
