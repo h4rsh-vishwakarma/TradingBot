@@ -53,4 +53,10 @@ venv/
 storage/*.json
 storage/*.db
 storage/*.offset
-.env
+
+
+
+/etc/tradingbot/env_vars
+storage/*.json
+storage/*.jsonl
+storage/reports/*.csv

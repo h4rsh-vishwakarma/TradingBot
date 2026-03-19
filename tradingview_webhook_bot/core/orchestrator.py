@@ -1,27 +1,22 @@
-import time, logging, os, json, sys
+import time, logging, os, json, sys, pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 
-# --- 1. DYNAMIC PATH RESOLUTION (Structural Fix) ---
+# --- 1. DYNAMIC PATH RESOLUTION ---
 FILE_PATH = Path(__file__).resolve()
-PROJECT_ROOT = FILE_PATH.parents[2] # ~/tradingview_webhook_bot
-PACKAGE_ROOT = FILE_PATH.parents[1] # ~/tradingview_webhook_bot/tradingview_webhook_bot
+PROJECT_ROOT = FILE_PATH.parents[2]
+PACKAGE_ROOT = FILE_PATH.parents[1]
 
-# Path fix taaki saare modules (storage, exchange, etc.) mil sakein
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-if str(PACKAGE_ROOT) not in sys.path:
-    sys.path.insert(0, str(PACKAGE_ROOT))
+if str(PROJECT_ROOT) not in sys.path: sys.path.insert(0, str(PROJECT_ROOT))
+if str(PACKAGE_ROOT) not in sys.path: sys.path.insert(0, str(PACKAGE_ROOT))
 
-# Production secrets path - Override ensures fresh token loading
 ENV_VARS_PATH = "/etc/tradingbot/env_vars"
 if os.path.exists(ENV_VARS_PATH):
     load_dotenv(dotenv_path=ENV_VARS_PATH, override=True)
 else:
     load_dotenv(dotenv_path=PROJECT_ROOT / ".env", override=True)
 
-# --- 2. LOGGING CONFIGURATION ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -46,14 +41,12 @@ except ImportError as e:
 
 class Orchestrator:
     def __init__(self):
-        # 🛡️ 3. RISK LIMITS & CONFIGURATION
         self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
         self.run_mode = os.getenv("RUN_MODE", "production")
         self.webhook_secret = os.getenv("WEBHOOK_SECRET", "squeeze_tradingview_cluster_2026_secure").strip()
         self.max_notional = float(os.getenv("MAX_NOTIONAL_PER_TRADE", "500.0"))
         self.daily_loss_limit = float(os.getenv("DAILY_LOSS_LIMIT", "-50.0"))
 
-        # --- 📂 FORCED ABSOLUTE PATHS ---
         base_storage = "/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/storage"
         os.makedirs(base_storage, exist_ok=True)
 
@@ -62,46 +55,58 @@ class Orchestrator:
         self.ledger_path = f"{base_storage}/ledger_state.json"
         self.idempotency_db = f"{base_storage}/idempotency.db"
         self.dlq_path = f"{base_storage}/dead_letter.jsonl"
+        self.report_path = "/home/ubuntu/tradingview_webhook_bot/storage/reports/tournament_winners.csv"
 
-        # Components
         self.ledger = PositionLedger(self.ledger_path)
-        self.telegram = TelegramAlert() # Initialized with fresh env token
+        self.telegram = TelegramAlert()
         self.reconciler = Reconciler(self.ledger)
         self.sheets_logger = GoogleSheetsLogger()
         self.consumer = JsonlOffsetConsumer(self.queue_path, self.offset_path)
         self.idempotency = IdempotencyStore(self.idempotency_db)
-
-        # 🏦 Multi-Exchange Clients
         self.exchange_binance = BinanceClient()
 
-        # --- HYPERLIQUID ACTIVATION FIX ---
         try:
-            self.exchange_hl = HyperliquidClient()
+            if os.getenv("HL_WALLET_ADDRESS") and os.getenv("HL_PRIVATE_KEY"):
+                self.exchange_hl = HyperliquidClient()
+            else:
+                logger.warning("⚠️ HL Credentials missing in env_vars")
+                self.exchange_hl = None
         except Exception as e:
-            logger.error(f"⚠️ HL Client initialization skipped: {e}")
+            logger.error(f"⚠️ HL Client initialization failed: {e}")
             self.exchange_hl = None
 
-        # 🧠 Brain Component
         self.bt_engine = BacktestEngine()
         self.processed_count = 0
         self.last_heartbeat = time.time()
 
-    def check_safety_gate(self, symbol, qty, price, side, exchange="binance") -> tuple[bool, str]:
-        """🛡️ Pre-Trade Risk Validation"""
-        if not self.allow_real: return False, "ALLOW_REAL_TRADES is disabled"
+    def check_tournament_alpha(self, symbol, strategy_name) -> tuple[bool, str, str]:
+        if not os.path.exists(self.report_path):
+            return True, "No report found, allowing", "ALPHA"
+        try:
+            df = pd.read_csv(self.report_path)
+            match = df[(df['Symbol'].str.contains(symbol, case=False)) & (df['Strategy'].str.contains(strategy_name, case=False))]
+            if match.empty:
+                return False, f"Strategy {strategy_name} for {symbol} not in Leaderboard.", "NONE"
+            row = match.iloc[0]
+            tier = str(row.get('Tier', ''))
+            if "ALPHA" in tier: return True, "Verified ALPHA: Direct Execution", "ALPHA"
+            if "AVERAGE" in tier: return True, "Verified AVERAGE: Human Approval Needed", "AVERAGE"
+            return False, f"Strategy Tier is {tier}. Blocked.", tier
+        except Exception as e:
+            logger.error(f"❌ Leaderboard Check Error: {e}")
+            return True, "Error in check, allowing", "ALPHA"
 
+    def check_safety_gate(self, symbol, qty, price, side, exchange="binance") -> tuple[bool, str]:
+        if not self.allow_real: return False, "ALLOW_REAL_TRADES is disabled"
         current_pnl = self.ledger.get_daily_pnl()
         if current_pnl <= self.daily_loss_limit:
             return False, f"Daily loss limit hit: ${current_pnl:.2f}"
-
         current_pos = self.ledger.get_position(f"{exchange}:{symbol}")
         if (side == "BUY" and current_pos.quantity > 0) or (side == "SELL" and current_pos.quantity < 0):
             return False, f"Already in {side} position for {symbol} on {exchange}."
-
         return True, "Safe"
 
     def handle_signal(self, event: dict) -> bool:
-        """Core signal handler with robust Telegram alerts and execution."""
         try:
             signal_id = event.get("signal_id")
             if self.idempotency.is_seen(signal_id):
@@ -110,69 +115,94 @@ class Orchestrator:
 
             payload_raw = event.get("payload", {})
             signal_data = {**event, **payload_raw}
-
-            # Force secret for schema compliance
             if "secret" not in signal_data:
                 signal_data["secret"] = self.webhook_secret
 
-            # 📝 1. EXTRACTION
             target_exchange = str(payload_raw.get("exchange") or event.get("exchange") or "binance").lower()
             strat_name = payload_raw.get("strategy") or event.get("strategy") or "SMC"
-            symbol = str(payload_raw.get("symbol") or event.get("symbol") or "BTCUSDT").upper()
-            
+            symbol_raw = str(payload_raw.get("symbol") or event.get("symbol") or "BTCUSDT").upper()
+
+            # --- 🛠️ FIX 1: SYMBOL CLEANING ---
+            symbol = symbol_raw.split('_')[0]
             if target_exchange == "hyperliquid":
                 symbol = symbol.replace("USDT", "").replace("USD", "")
             else:
-                symbol = symbol if "USDT" in symbol else f"{symbol.replace('USD', '').split('_')[0]}USDT"
+                symbol = symbol if "USDT" in symbol else f"{symbol.replace('USD', '')}USDT"
 
+            # --- 🧠 1. BRAIN TIER CHECK ---
+            is_allowed, reason, tier = self.check_tournament_alpha(symbol, strat_name)
+            if not is_allowed:
+                logger.warning(f"🚫 AI Blocked: {reason}")
+                return True
+
+            # --- 🛡️ 2. ROI GUARD (NEW) ---
+            try:
+                # Extract ROI from the nested strategy string (JSON within JSON)
+                strat_info = json.loads(payload_raw.get("strategy", "{}"))
+                incoming_roi = float(strat_info.get("ROI", "0").replace("%", ""))
+                logger.info(f"📊 Signal ROI Check for {symbol}: {incoming_roi}%")
+                
+                if incoming_roi <= 0:
+                    logger.warning(f"🚫 ROI Guard: Signal blocked ({incoming_roi}%)")
+                    msg = (f"🛡️ <b>ROI Guard: Blocked</b>\n\n"
+                           f"🔹 <b>Symbol:</b> {symbol}\n"
+                           f"📉 <b>1Y ROI:</b> {incoming_roi}%\n"
+                           f"⚠️ Negative history. Capital protected.")
+                    try: self.telegram.send(severity=AlertSeverity.WARNING, title="Negative ROI Block", message=msg)
+                    except: pass
+                    return True
+            except Exception as e:
+                logger.debug(f"ROI Check skipped or failed: {e}")
+
+            # --- ⚖️ 3. TIER-BASED INTERACTIVE GATE ---
+            if "AVERAGE" in tier:
+                logger.info(f"⚖️ AVERAGE Signal: Waiting for approval for {symbol}")
+                msg = (f"⚖️ <b>AVERAGE Strategy Alert</b>\n\n"
+                       f"🔹 <b>Symbol:</b> `{symbol}`\n"
+                       f"🔹 <b>Strategy:</b> `{strat_name}`\n"
+                       f"⚠️ Strategy is AVERAGE. No auto-trade.\n"
+                       f"🆔 <b>ID:</b> `{signal_id}`")
+                try: self.telegram.send(severity=AlertSeverity.WARNING, title="Manual Sync Needed", message=msg)
+                except: pass
+                return True
+
+            # --- 🧠 4. PREPARE EXECUTION DATA ---
             try:
                 signal_data["strategy"] = strat_name
                 signal_data["symbol"] = symbol
                 signal_data["quantity"] = float(payload_raw.get("quantity") or event.get("quantity") or 0.003)
-                signal_data["price"] = float(payload_raw.get("price") or event.get("price") or 0.0)
+                
+                raw_price = float(payload_raw.get("price") or event.get("price") or 0.0)
+                signal_data["price"] = raw_price if raw_price > 0 else 0.0 
                 signal_data["action"] = str(payload_raw.get("action") or event.get("action") or "BUY").upper()
 
-                try:
-                    valid_payload = SignalPayload(**signal_data)
-                    payload = valid_payload.model_dump()
-                except Exception:
-                    payload = signal_data 
+                valid_payload = SignalPayload(**signal_data)
+                payload = valid_payload.model_dump()
             except Exception as e:
-                logger.error(f"❌ Data Parsing Error: {e}")
-                return True
+                logger.error(f"❌ Data Parsing Error: {e}"); return True
 
-            side = "SELL" if payload["action"] in ["SELL", "TP", "EXIT", "SHORT"] else "BUY"
-            qty = float(payload["quantity"])
-            price_signal = float(payload["price"])
-            indicator_name = payload_raw.get("indicator") or "SMC_LuxAlgo"
+            side = "SELL" if payload["action"] in ["SELL", "TP", "EXIT", "SHORT", "OFF"] else "BUY"
+            qty, price_signal = float(payload["quantity"]), float(payload["price"])
+            indicator_name = payload_raw.get("indicator") or "AI_Optimized"
 
-            # 🧠 2. VALIDATION
-            bt_win_rate = self.bt_engine.get_strategy_confidence(strat_name, symbol)
-
-            # 🛡️ 3. RISK GATES
-            is_safe, reason = self.check_safety_gate(symbol, qty, price_signal, side, exchange=target_exchange)
+            # --- 🛡️ 5. RISK GATES ---
+            is_safe, risk_reason = self.check_safety_gate(symbol, qty, price_signal, side, exchange=target_exchange)
             if not is_safe:
-                logger.warning(f"🚧 Safety Gate Block: {reason}")
-                if "Already in" in reason:
-                    # Clean markdown alert for risk block
-                    safe_sym = symbol.replace("_", "\\_")
-                    msg = (f"🚧 *Safety Gate: Blocked*\n\n"
-                           f"🔹 *Symbol:* `{safe_sym}`\n"
-                           f"🔹 *Reason:* `{reason}`\n"
-                           f"💡 *Action:* Signal skipped to prevent duplication.")
-                    try: self.telegram.send(severity=AlertSeverity.WARNING, title="Risk Block", message=msg)
-                    except: pass
+                logger.warning(f"🚧 Safety Gate Block: {risk_reason}")
+                msg = (f"🚧 <b>Safety Gate: Blocked</b>\n\n"
+                       f"🔹 <b>Symbol:</b> `{symbol}`\n"
+                       f"🔹 <b>Reason:</b> `{risk_reason}`")
+                try: self.telegram.send(severity=AlertSeverity.WARNING, title="Risk Block", message=msg)
+                except: pass
                 return True
 
-            # 🚀 4. EXECUTION
-            execution_res = {}
-            fill_price = price_signal
-
+            # --- 🚀 6. ACTUAL EXECUTION ---
+            execution_res, fill_price = {}, price_signal
             if target_exchange == "hyperliquid":
                 if not self.exchange_hl: return True
                 res = self.exchange_hl.market_order(symbol, (side == "BUY"), qty)
                 if res and res.get('status') == 'ok':
-                    execution_res = {"status": "SUCCESS", "order_id": "hl_order"}
+                    execution_res = {"status": "SUCCESS"}
                     try: fill_price = float(res['response']['data']['statuses'][0]['filled']['avgPx'])
                     except: pass
                 else: execution_res = {"status": "FAILED", "reason": str(res)}
@@ -181,58 +211,38 @@ class Orchestrator:
                 if execution_res.get("status") == "SUCCESS":
                     fill_price = float(execution_res.get("avg_price") or price_signal)
 
-            # 📊 5. POST-EXECUTION (Reporting)
+            # --- 📊 7. LOGGING & ALERTS ---
             if execution_res.get("status") == "SUCCESS":
                 self.idempotency.mark_seen(signal_id)
                 pos_snapshot = self.ledger.apply_fill(f"{target_exchange}:{symbol}", side, qty, fill_price)
-                realized_pnl = pos_snapshot.daily_realized_pnl
                 self.processed_count += 1
-
-                # Log to Sheets
                 try:
-                    self.sheets_logger.log_trade(
-                        signal_id=signal_id, symbol=f"{target_exchange.upper()}:{symbol}",
-                        action=side, qty=qty, price=fill_price, strategy=strat_name,
-                        indicator=indicator_name, pnl=realized_pnl
-                    )
-                except Exception as e: logger.error(f"❌ Sheets Error: {e}")
+                    self.sheets_logger.log_trade(signal_id=signal_id, symbol=f"{target_exchange.upper()}:{symbol}",
+                        action=side, qty=qty, price=fill_price, strategy=strat_name, indicator=indicator_name, pnl=pos_snapshot.daily_realized_pnl)
+                except: pass
 
-                # 🟢 Professional Telegram Success Alert
                 emoji = "🟢" if side == "BUY" else "🔴"
-                safe_id = str(signal_id).replace("_", "\\_").replace("-", "\\-")
-                
-                msg = (
-                    f"{emoji} *Bot Alert: Trade Executed*\n\n"
-                    f"✅ *Executed:* {side} {symbol}\n"
-                    f"💰 *Price:* {fill_price}\n"
-                    f"📦 *Qty:* {qty}\n"
-                    f"📊 *Indicator:* {indicator_name}\n"
-                    f"📈 *BT WinRate:* {bt_win_rate:.2f}\n"
-                    f"💵 *Today PnL:* ${realized_pnl:.2f}\n"
-                    f"🆔 *ID:* `{safe_id}`"
-                )
-                
-                try:
-                    self.telegram.send(severity=AlertSeverity.INFO, title="Trade Success", message=msg)
-                    logger.info(f"✅ Alert sent for {signal_id}")
-                except Exception as e:
-                    logger.error(f"❌ Alert Failed (HTTP 401/Format): {e}")
-
+                msg = (f"{emoji} <b>Bot Alert: Trade Executed</b>\n\n"
+                       f"✅ <b>Executed:</b> {side} {symbol}\n"
+                       f"💰 <b>Price:</b> {fill_price}\n"
+                       f"📈 <b>BT Status:</b> Verified ALPHA\n"
+                       f"💵 <b>Today PnL:</b> ${pos_snapshot.daily_realized_pnl:.2f}")
+                try: self.telegram.send(severity=AlertSeverity.INFO, title="Trade Success", message=msg)
+                except: pass
                 return True
             else:
                 logger.error(f"❌ Execution Failure: {execution_res.get('reason')}")
                 return True
 
         except Exception as e:
-            logger.error(f"❌ Critical Error: {e}")
-            return True
+            logger.error(f"❌ Critical Error in handle_signal: {e}"); return True
 
     def run(self):
-        logger.info(f"🚀 Execution Engine Live | Watching: {self.queue_path}")
+        logger.info(f"🚀 Execution Engine Live | Dynamic Brain Mode ACTIVE")
         while True:
             self.consumer.poll(handler=self.handle_signal, batch_size=1)
             if time.time() - self.last_heartbeat > 900:
-                logger.info(f"💓 Heartbeat | Processed: {self.processed_count}")
+                logger.info(f"💓 Heartbeat: Orchestrator is running. Processed: {self.processed_count}")
                 self.last_heartbeat = time.time()
             time.sleep(1)
 

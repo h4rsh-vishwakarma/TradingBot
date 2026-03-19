@@ -1,0 +1,25 @@
+//@version=5
+strategy("AI {{SYMBOL}} Alpha [1Y]", 
+     overlay=true, 
+     initial_capital=10000, 
+     default_qty_type=strategy.percent_of_equity, 
+     default_qty_value=10, 
+     pyramiding=2, 
+     max_bars_back=5000)
+
+// --- 1-Year Window ---
+start_time = timestamp(2025, 03, 19, 00, 00)
+is_in_window = time >= start_time
+
+[st, dir] = ta.supertrend({{MULT}}, {{LEN}})
+ema200 = ta.ema(close, 200)
+
+float strategy_roi = (strategy.netprofit / strategy.initial_capital) * 100
+
+long = is_in_window and ta.crossover(close, st) and close > ema200
+short = is_in_window and ta.crossunder(close, st) and close < ema200
+
+if long
+    strategy.entry("Long", strategy.long, comment='{"strategy":"{{STRAT}}", "ROI":"' + str.tostring(strategy_roi, "#.##") + '%"}')
+if short
+    strategy.entry("Short", strategy.short, comment='{"strategy":"{{STRAT}}", "ROI":"' + str.tostring(strategy_roi, "#.##") + '%"}')
