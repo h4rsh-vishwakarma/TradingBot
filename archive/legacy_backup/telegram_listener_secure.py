@@ -94,3 +94,38 @@ def handle_trade(message):
 
 if __name__ == "__main__":
     bot.infinity_polling()
+
+@bot.message_handler(commands=['help'])
+def send_help(message):
+    help_text = """
+🤖 <b>Alpha Engine - Manual</b> 🛡️
+
+🚀 <b>/alpha</b> - Deploys Top Alpha strategies with Zero-Error God Mode.
+📊 <b>/status</b> - Checks system connection health.
+🛡️ <b>/help</b> - Show this manual.
+
+<b>Optimization v9.5:</b>
+• <b>ADX Filter:</b> DD reduced by avoiding sideways markets.
+• <b>God Mode:</b> Fixed $100M capital buffer to stop TV crashes.
+• <b>Fixed Contracts:</b> Decoupled from equity for 100% stability.
+"""
+    bot.reply_to(message, help_text, parse_mode='HTML')
+
+@bot.message_handler(commands=['help'])
+def send_help(message):
+    help_text = """
+🤖 <b>Alpha Engine - Command Center</b> 🛡️
+
+🚀 <b>/alpha</b> - Deploys Top 11 Alpha & Alpha++ strategies with Zero-Error God Mode logic.
+📊 <b>/status</b> - Checks the health of the connection between TradingView and Binance.
+🔍 <b>/audit</b> - Generates a report of the latest winners from the tournament.
+🛡️ <b>/help</b> - Show this manual.
+
+<b>Key Features:</b>
+• <b>God Mode:</b> Scripts are auto-fixed for TradingView engine stability.
+• <b>Risk Control:</b> All strategies start from 2024 to avoid historical gaps.
+• <b>DD Reduction:</b> ADX Trend filters integrated to reduce drawdown.
+
+<i>Need more info? Contact the Admin.</i>
+"""
+    bot.reply_to(message, help_text, parse_mode='HTML')
