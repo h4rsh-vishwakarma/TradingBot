@@ -34,3 +34,21 @@
 /home/ubuntu/tradingview_webhook_bot/venv/lib/python3.10/site-packages/requests/__init__.py:109: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.0.1)/charset_normalizer (3.4.5) doesn't match a supported version!
   warnings.warn(
 ❌ Failed to push: {"ok":false,"error_code":404,"description":"Not Found"}
+/home/ubuntu/tradingview_webhook_bot/venv/lib/python3.10/site-packages/requests/__init__.py:109: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.0.1)/charset_normalizer (3.4.5) doesn't match a supported version!
+  warnings.warn(
+❌ Failed to push: {"ok":false,"error_code":404,"description":"Not Found"}
+/home/ubuntu/tradingview_webhook_bot/venv/lib/python3.10/site-packages/requests/__init__.py:109: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.0.1)/charset_normalizer (3.4.5) doesn't match a supported version!
+  warnings.warn(
+❌ Failed to push: {"ok":false,"error_code":404,"description":"Not Found"}
+/home/ubuntu/tradingview_webhook_bot/venv/lib/python3.10/site-packages/requests/__init__.py:109: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.0.1)/charset_normalizer (3.4.5) doesn't match a supported version!
+  warnings.warn(
+❌ Failed to push: {"ok":false,"error_code":404,"description":"Not Found"}
+/home/ubuntu/tradingview_webhook_bot/venv/lib/python3.10/site-packages/requests/__init__.py:109: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.0.1)/charset_normalizer (3.4.5) doesn't match a supported version!
+  warnings.warn(
+❌ Failed to push: {"ok":false,"error_code":404,"description":"Not Found"}
+/home/ubuntu/tradingview_webhook_bot/venv/lib/python3.10/site-packages/requests/__init__.py:109: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.0.1)/charset_normalizer (3.4.5) doesn't match a supported version!
+  warnings.warn(
+❌ Failed to push: {"ok":false,"error_code":404,"description":"Not Found"}
+/home/ubuntu/tradingview_webhook_bot/venv/lib/python3.10/site-packages/requests/__init__.py:109: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.0.1)/charset_normalizer (3.4.5) doesn't match a supported version!
+  warnings.warn(
+❌ Failed to push: {"ok":false,"error_code":404,"description":"Not Found"}

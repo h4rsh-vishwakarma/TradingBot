@@ -1,0 +1,11 @@
+# 1. Daily 3-Year Data Refresh (Every night at Midnight)
+0 0 * * * cd /home/ubuntu/tradingview_webhook_bot && /home/ubuntu/tradingview_webhook_bot/venv/bin/python3 scripts/fetch_historical_data.py >> cron_logs.log 2>&1
+
+# 2. Daily Grid-Search Tournament (Every night at 00:15 AM)
+15 0 * * * cd /home/ubuntu/tradingview_webhook_bot && /home/ubuntu/tradingview_webhook_bot/venv/bin/python3 scripts/strategy_tournament.py >> cron_logs.log 2>&1
+
+# 3. Daily Alpha Dispatch to Telegram (Every morning at 09:00 AM)
+0 9 * * * cd /home/ubuntu/tradingview_webhook_bot && /home/ubuntu/tradingview_webhook_bot/venv/bin/python3 tradingview_webhook_bot/core/script_vault.py >> cron_logs.log 2>&1
+
+# 4. Hourly System Heartbeat (Optional - to check if bot is alive)
+0 * * * * /usr/bin/python3 /home/ubuntu/tradingview_webhook_bot/scripts/auto_injector.py >> auto_scan.log 2>&1
