@@ -95,9 +95,9 @@ class TelegramAlert:
             }
 
             # Retry with backoff for HTTP 429 (rate limit)
-            max_retries = 3
+            max_retries = 2
             for attempt in range(max_retries):
-                response = requests.post(url, json=payload, timeout=10)
+                response = requests.post(url, json=payload, timeout=5)
 
                 if response.status_code == 200:
                     logger.info(f"Alert sent: {title}")
@@ -105,11 +105,11 @@ class TelegramAlert:
                         self.last_alert_time[alert_key] = time.time()
                     return True
                 elif response.status_code == 429:
-                    # Telegram rate limit — extract retry_after or default to backoff
+                    # Telegram rate limit — extract retry_after, cap at 3s
                     try:
-                        retry_after = response.json().get('parameters', {}).get('retry_after', 5)
+                        retry_after = min(response.json().get('parameters', {}).get('retry_after', 2), 3)
                     except Exception:
-                        retry_after = 3 * (attempt + 1)
+                        retry_after = 2
                     logger.warning(f"Rate limited (429). Retrying in {retry_after}s (attempt {attempt+1}/{max_retries})")
                     time.sleep(retry_after)
                 else:

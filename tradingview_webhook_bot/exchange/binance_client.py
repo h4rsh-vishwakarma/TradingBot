@@ -1,6 +1,7 @@
 import os
 import logging
 import time
+import math
 import requests
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
@@ -9,6 +10,49 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 # Standard project logger
 logger = logging.getLogger("tradingview_webhook_bot.exchange")
+
+# Quantity precision rules per symbol (stepSize from Binance exchangeInfo)
+# Format: symbol -> (minQty, stepSize)
+QUANTITY_RULES = {
+    "BTCUSDT":  (0.001, 0.001),
+    "ETHUSDT":  (0.001, 0.001),
+    "SOLUSDT":  (0.01,  0.01),
+    "BNBUSDT":  (0.01,  0.01),
+    "XRPUSDT":  (0.1,   0.1),
+    "DOGEUSDT": (1.0,   1.0),
+    "ADAUSDT":  (0.1,   0.1),
+    "AVAXUSDT": (0.01,  0.01),
+    "DOTUSDT":  (0.1,   0.1),
+    "LINKUSDT": (0.01,  0.01),
+    "MATICUSDT":(0.1,   0.1),
+    "LTCUSDT":  (0.001, 0.001),
+}
+
+def fix_quantity(symbol, quantity, price=None):
+    """Adjust quantity to match Binance precision and minimum notional ($5) rules."""
+    min_qty, step_size = QUANTITY_RULES.get(symbol, (0.001, 0.001))
+    precision = max(0, int(round(-math.log10(step_size))))
+
+    # Enforce minimum notional of $5.5 (buffer above $5 minimum)
+    if price and price > 0:
+        min_notional_qty = 5.5 / price
+        if quantity < min_notional_qty:
+            quantity = min_notional_qty
+
+    # Round UP to nearest step (to meet minimum)
+    adjusted = math.ceil(quantity / step_size) * step_size
+    adjusted = round(adjusted, precision)
+
+    # Enforce minimum qty
+    if adjusted < min_qty:
+        adjusted = min_qty
+
+    if adjusted != quantity:
+        notional = adjusted * (price or 0)
+        logger.info(f"📐 Qty adjusted: {quantity} -> {adjusted} (notional=${notional:.2f}) for {symbol}")
+
+    return adjusted
+
 
 class BinanceClient:
     """
@@ -91,6 +135,9 @@ class BinanceClient:
             price = mainnet_price
 
         try:
+            # Fix quantity precision and minimum notional for this symbol
+            quantity = fix_quantity(symbol, quantity, price=price)
+
             client_order_id = signal_id if signal_id else f"bot_{int(time.time())}"
             params = {
                 "symbol": symbol,
@@ -111,6 +158,7 @@ class BinanceClient:
             return response
 
         except BinanceAPIException as e:
+            logger.error(f"❌ Binance API Error: code={e.code} msg={e.message} status={getattr(e, 'status_code', 'N/A')}")
             if e.code == -2011:
                 return {"status": "SKIPPED", "reason": "duplicate_id", "msg": e.message}
             status_code = getattr(e, 'status_code', 0)

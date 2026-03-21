@@ -23,6 +23,14 @@
             "realized_pnl": 0.0,
             "daily_realized_pnl": 0.0,
             "last_update_date": "2026-03-14"
+        },
+        "binance:SOLUSDT": {
+            "symbol": "binance:SOLUSDT",
+            "quantity": 1.0,
+            "avg_price": 90.11,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-21"
         }
     },
     "trade_history": [

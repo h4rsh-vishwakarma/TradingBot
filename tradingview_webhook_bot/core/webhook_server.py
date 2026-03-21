@@ -1,4 +1,4 @@
-import sys, os, json, time, random, csv, threading
+import sys, os, json, time, re, csv, threading
 from pathlib import Path
 from flask import Flask, request, jsonify
 from datetime import datetime
@@ -22,6 +22,57 @@ except ImportError:
     from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert, AlertSeverity
 
 logger = setup_logger('webhook_server')
+
+# --- PLAIN TEXT PARSER FOR TRADINGVIEW DEFAULT ALERTS ---
+# Format: "Strategy Name | SYMBOL - Webhook (secret): order buy @ 0.003 filled on EXCHANGE:SYMBOL.P. New strategy position is 1"
+PLAIN_TEXT_PATTERN = re.compile(
+    r'^(?P<strategy>.+?)\s*\|\s*(?P<symbol_hint>\S+)\s*-\s*Webhook\s*\((?P<secret>[^)]+)\)\s*:\s*'
+    r'order\s+(?P<action>\w+)\s*@\s*(?P<quantity>[\d.]+)\s*filled\s+on\s+(?P<ticker>\S+)\.\s*'
+    r'New\s+strategy\s+position\s+is\s+(?P<position>[+-]?\d+)',
+    re.IGNORECASE
+)
+
+
+def parse_plain_text_alert(text):
+    """Parse TradingView default plain text alert into structured data."""
+    text = text.strip()
+    match = PLAIN_TEXT_PATTERN.match(text)
+    if not match:
+        return None
+
+    strategy = match.group('strategy').strip()
+    action_raw = match.group('action').strip().upper()
+    quantity = match.group('quantity').strip()
+    ticker_raw = match.group('ticker').strip()
+    secret = match.group('secret').strip()
+
+    # Clean symbol: "BINANCE:SOLUSDT.P" -> "SOLUSDT", "SOLUSDT_PREMIUM" -> "SOLUSDT"
+    symbol = ticker_raw.split(':')[-1]       # Remove exchange prefix
+    symbol = symbol.split('.')[0]             # Remove .P suffix
+    symbol = symbol.split('_')[0]             # Remove _PREMIUM etc
+    symbol = symbol.upper()
+    if symbol and "USDT" not in symbol:
+        symbol = f"{symbol.replace('USD', '')}USDT"
+
+    # Map position_size to action: positive = BUY/LONG, negative = SELL/SHORT, 0 = EXIT
+    position = int(match.group('position'))
+    if position > 0:
+        side = "BUY"
+    elif position < 0:
+        side = "SELL"
+    else:
+        # Position closed - use the order action
+        side = "SELL" if action_raw in ("SELL", "SHORT") else "BUY"
+
+    return {
+        "secret": secret,
+        "strategy": strategy,
+        "symbol": symbol,
+        "side": side,
+        "quantity": float(quantity),
+        "indicator": strategy.replace(' ', '_'),
+    }
+
 
 class BacktestIngestor:
     def __init__(self, project_root, telegram):
@@ -75,68 +126,158 @@ class WebhookServer:
 
         self.setup_routes()
 
+    def _fetch_live_price(self, symbol):
+        """Fetch live price from Binance mainnet (fast, cached)."""
+        try:
+            from exchange.price_provider import get_price_provider
+            provider = get_price_provider()
+            price = provider.get_current_price(symbol)
+            if price and price > 0:
+                return price
+        except Exception as e:
+            logger.warning(f"Price provider failed: {e}")
+
+        # Fallback: direct Binance public API (no auth needed)
+        try:
+            import requests as req
+            resp = req.get(f"https://fapi.binance.com/fapi/v1/ticker/price?symbol={symbol}", timeout=3)
+            if resp.status_code == 200:
+                return float(resp.json()['price'])
+        except Exception as e:
+            logger.warning(f"Binance API fallback failed: {e}")
+
+        return 0.0
+
     def setup_routes(self):
         @self.app.route('/webhook/tradingview', methods=['POST'])
         def receive_signal():
             try:
-                # 1. Parse JSON Data
-                data = request.get_json(force=True)
-                payload = data.get('payload', data)
-                
-                # 2. Smart Secret Check (Bypass TradingView placeholders)
-                received_secret = str(data.get('secret', payload.get('secret', ''))).strip()
-                if received_secret == "your_secret_key":
-                    return jsonify({'status': 'ignored', 'message': 'Placeholder secret detected'}), 200
+                raw_body = request.get_data(as_text=True).strip()
+                logger.info(f"📨 Webhook received: {raw_body[:200]}")
 
-                if received_secret != self.webhook_secret:
-                    logger.warning(f"❌ Unauthorized attempt with secret: {received_secret}")
-                    return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
+                # --- DETECT FORMAT: JSON or Plain Text ---
+                parsed = None
+                is_json = False
 
-                # 3. Extract Data (Smart Mapping for Orchestrator)
-                symbol = payload.get('symbol')
-                side = payload.get('side') or payload.get('action') or payload.get('signal')
-                price = payload.get('price')
+                # Try JSON first
+                try:
+                    data = json.loads(raw_body)
+                    if isinstance(data, dict):
+                        is_json = True
+                except (json.JSONDecodeError, ValueError):
+                    pass
 
-                if not all([symbol, side, price]):
-                    return jsonify({'status': 'error', 'message': 'Missing symbol, action, or price'}), 400
+                if is_json:
+                    # === JSON FORMAT (existing flow) ===
+                    payload = data.get('payload', data)
+                    received_secret = str(data.get('secret', payload.get('secret', ''))).strip()
 
-                # 4. Background Execution Task
-                def process_trade_task():
-                    signal_id = data.get('signal_id') or f"TV-{int(time.time())}"
-                    
-                    # Construct clean payload for Orchestrator
-                    clean_payload = {
-                        "signal_id": signal_id,
-                        "secret": self.webhook_secret,
-                        "payload": {
-                            "strategy": payload.get("strategy", "SMC"),
-                            "symbol": symbol,
-                            "action": str(side).upper(),
-                            "price": float(price),
-                            "quantity": float(payload.get("quantity") or 0.003),
-                            "exchange": payload.get("exchange", "binance"),
-                            "indicator": payload.get("indicator", "SMC_LuxAlgo")
-                        }
+                    if received_secret == "your_secret_key":
+                        return jsonify({'status': 'ignored', 'message': 'Placeholder secret detected'}), 200
+                    if received_secret != self.webhook_secret:
+                        logger.warning(f"❌ Unauthorized JSON attempt")
+                        return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
+
+                    raw_symbol = str(payload.get('symbol', '')).upper().strip()
+                    side = payload.get('side') or payload.get('action') or payload.get('signal')
+                    price = payload.get('price')
+
+                    if not all([raw_symbol, side, price]):
+                        return jsonify({'status': 'error', 'message': 'Missing symbol, action, or price'}), 400
+
+                    # Clean symbol
+                    symbol = raw_symbol.split('_')[0]
+                    if symbol and "USDT" not in symbol:
+                        symbol = f"{symbol.replace('USD', '')}USDT"
+
+                    # Validate price
+                    try:
+                        price_val = float(price)
+                    except (ValueError, TypeError):
+                        return jsonify({'status': 'error', 'message': f'Invalid price: {price}'}), 400
+
+                    if price_val <= 0:
+                        logger.warning(f"❌ Rejected: negative price {price_val} for {symbol}")
+                        return jsonify({'status': 'rejected', 'message': f'Invalid price: {price_val}'}), 400
+
+                    strategy = payload.get("strategy", "SMC")
+                    indicator = payload.get("indicator", "SMC_LuxAlgo")
+                    quantity = float(payload.get("quantity") or 0.003)
+                    exchange = payload.get("exchange", "binance")
+
+                else:
+                    # === PLAIN TEXT FORMAT (TradingView default alerts) ===
+                    parsed = parse_plain_text_alert(raw_body)
+                    if not parsed:
+                        logger.warning(f"❌ Could not parse alert: {raw_body[:200]}")
+                        return jsonify({'status': 'error', 'message': 'Unrecognized alert format'}), 400
+
+                    # Verify secret
+                    if parsed['secret'] != self.webhook_secret:
+                        logger.warning(f"❌ Unauthorized plain text attempt")
+                        return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
+
+                    symbol = parsed['symbol']
+                    side = parsed['side']
+                    strategy = parsed['strategy']
+                    indicator = parsed['indicator']
+                    quantity = parsed['quantity']
+                    exchange = "binance"
+
+                    # Fetch live price from Binance (plain text alerts don't include price)
+                    price_val = self._fetch_live_price(symbol)
+                    if price_val <= 0:
+                        logger.error(f"❌ Could not fetch live price for {symbol}")
+                        return jsonify({'status': 'error', 'message': f'Could not fetch price for {symbol}'}), 500
+
+                    logger.info(f"📊 Live price fetched for {symbol}: ${price_val}")
+
+                # --- COMMON: Build payload, queue, respond ---
+                signal_id = f"TV-{int(time.time())}"
+                if is_json:
+                    signal_id = data.get('signal_id') or signal_id
+
+                clean_payload = {
+                    "signal_id": signal_id,
+                    "secret": self.webhook_secret,
+                    "payload": {
+                        "strategy": strategy,
+                        "symbol": symbol,
+                        "action": str(side).upper(),
+                        "price": price_val,
+                        "quantity": quantity,
+                        "exchange": exchange,
+                        "indicator": indicator
                     }
-                    
-                    # Push to signals.jsonl
-                    self.queue.enqueue(clean_payload)
-                    logger.info(f"✅ Signal Queued: {symbol} {side} (ID: {signal_id})")
+                }
 
-                    # Immediate Receipt Notification via Telegram
-                    self.telegram.send(
-                        severity=AlertSeverity.INFO,
-                        title=f"📥 Signal Received: {symbol}",
-                        message=(f"🏹 <b>Action:</b> <code>{str(side).upper()}</code>\n"
-                                 f"💰 <b>Price:</b> <code>{price}</code>\n"
-                                 f"🆔 <b>ID:</b> <code>{signal_id}</code>\n\n"
-                                 f"⏳ <i>Processing via Orchestrator...</i>")
-                    )
+                # Queue signal (fast file write, ~1ms)
+                self.queue.enqueue(clean_payload)
+                logger.info(f"✅ Signal Queued: {symbol} {side} @ ${price_val} | Strategy: {strategy} (ID: {signal_id})")
 
-                # Start the background thread (No Timeout for TV)
-                threading.Thread(target=process_trade_task).start()
+                # Return 200 IMMEDIATELY
+                response = jsonify({'status': 'success', 'message': 'Signal received and processing'})
 
-                return jsonify({'status': 'success', 'message': 'Signal received and processing'}), 200
+                # Fire-and-forget Telegram notification (daemon thread)
+                _sym, _side, _price, _sig, _strat = symbol, side, price_val, signal_id, strategy
+                def _notify_telegram():
+                    try:
+                        self.telegram.send(
+                            severity=AlertSeverity.INFO,
+                            title=f"📥 Signal Received: {_sym}",
+                            message=(f"🏹 <b>Action:</b> <code>{str(_side).upper()}</code>\n"
+                                     f"💰 <b>Price:</b> <code>${_price:,.2f}</code>\n"
+                                     f"📋 <b>Strategy:</b> <code>{_strat}</code>\n"
+                                     f"🆔 <b>ID:</b> <code>{_sig}</code>\n\n"
+                                     f"⏳ <i>Processing via Orchestrator...</i>")
+                        )
+                    except Exception as e:
+                        logger.warning(f"Telegram notify failed (non-critical): {e}")
+
+                t = threading.Thread(target=_notify_telegram, daemon=True)
+                t.start()
+
+                return response, 200
 
             except Exception as e:
                 logger.error(f"🔥 Webhook Server Error: {str(e)}")

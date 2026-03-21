@@ -84,7 +84,12 @@ class Orchestrator:
             return True, "No report found, allowing", "ALPHA"
         try:
             df = pd.read_csv(self.report_path)
-            match = df[(df['Symbol'].str.contains(symbol, case=False)) & (df['Strategy'].str.contains(strategy_name, case=False))]
+            # Normalize: underscores <-> spaces for fuzzy matching
+            strat_clean = strategy_name.replace('_', ' ').strip()
+            def _strat_match(row_strat):
+                row_clean = str(row_strat).replace('_', ' ').strip()
+                return strat_clean.lower() in row_clean.lower() or row_clean.lower() in strat_clean.lower()
+            match = df[(df['Symbol'].str.contains(symbol, case=False)) & (df['Strategy'].apply(_strat_match))]
             if match.empty:
                 return False, f"Strategy {strategy_name} for {symbol} not in Leaderboard.", "NONE"
             row = match.iloc[0]
@@ -123,11 +128,14 @@ class Orchestrator:
             symbol_raw = str(payload_raw.get("symbol") or event.get("symbol") or "BTCUSDT").upper()
 
             # --- 🛠️ FIX 1: SYMBOL CLEANING ---
+            # Strip suffixes like _PREMIUM, _PERP, _SPOT
             symbol = symbol_raw.split('_')[0]
+            # Ensure proper format per exchange
             if target_exchange == "hyperliquid":
                 symbol = symbol.replace("USDT", "").replace("USD", "")
             else:
-                symbol = symbol if "USDT" in symbol else f"{symbol.replace('USD', '')}USDT"
+                if "USDT" not in symbol:
+                    symbol = f"{symbol.replace('USD', '')}USDT"
 
             # --- 🧠 1. BRAIN TIER CHECK ---
             is_allowed, reason, tier = self.check_tournament_alpha(symbol, strat_name)
@@ -185,7 +193,10 @@ class Orchestrator:
                 signal_data["quantity"] = float(payload_raw.get("quantity") or event.get("quantity") or 0.003)
                 
                 raw_price = float(payload_raw.get("price") or event.get("price") or 0.0)
-                signal_data["price"] = raw_price if raw_price > 0 else 0.0 
+                if raw_price <= 0:
+                    logger.warning(f"🚫 Invalid price {raw_price} for {symbol}. Skipping.")
+                    return True
+                signal_data["price"] = raw_price
                 signal_data["action"] = str(payload_raw.get("action") or event.get("action") or "BUY").upper()
 
                 valid_payload = SignalPayload(**signal_data)
@@ -250,7 +261,8 @@ class Orchestrator:
                 return True
             else:
                 exec_reason = execution_res.get('reason', 'Unknown API Error')
-                logger.error(f"❌ Execution Failure: {exec_reason}")
+                exec_msg = execution_res.get('msg', '')
+                logger.error(f"❌ Execution Failure: {exec_reason} | Detail: {exec_msg}")
                 try:
                     self.sheets_logger.log_blocked_trade(
                         symbol=symbol, side=side, strategy=strat_name,

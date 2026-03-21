@@ -7,7 +7,7 @@ User=ubuntu
 Group=www-data
 WorkingDirectory=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems
 Environment="PATH=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems/venv/bin"
-ExecStart=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems/venv/bin/gunicorn --workers 3 --bind unix:app.sock -m 007 wsgi:app
+ExecStart=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems/venv/bin/gunicorn --workers 4 --threads 4 --worker-class gthread --timeout 60 --bind unix:app.sock -m 007 wsgi:app
 
 [Install]
 WantedBy=multi-user.target
