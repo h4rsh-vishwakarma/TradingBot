@@ -52,34 +52,53 @@ def dispatch_top_strategies(force=False):
         else:
              core_logic = f"basis = ta.sma(close, {length})\ndev = {mult} * ta.stdev(close, {length})\nlong = close < basis - dev\nshort = close > basis + dev"
 
+        # Clean strategy name for JSON (remove special chars)
+        strat_clean = strat.replace("'", "").replace('"', '').replace(" ", "_").replace("[", "").replace("]", "").replace("+", "").replace("—", "-")
+
+        # Professional display name: "Squeeze Flow Expansion | ETHUSDT - Webhook"
+        strat_display = strat.replace("'", "").replace('"', '').strip()
+        pine_name = f"{strat_display} | {symbol} - Webhook"
+
         # 🔥 THE "GOD MODE" TEMPLATE (No Equity Dependency)
         # 🛡️ UPDATE 1: ADX > 25 Filter + 4% Trailing Stop for DD Reduction
+        # 🌐 UPDATE 2: Auto Webhook JSON — No manual JSON needed in TradingView
         pine_code = f"""//@version=5
-strategy("AI {symbol} Rank{i+1}", overlay=true, initial_capital=100000000, currency=currency.USD, margin_long=0, margin_short=0)
+strategy("{pine_name}", overlay=true, initial_capital=100000000, currency=currency.USD, margin_long=0, margin_short=0)
+
+// --- Webhook Configuration ---
+grp_wh = "Webhook Settings"
+enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_wh)
+webhook_secret = input.string("squeeze_tradingview_cluster_2026_secure", "Webhook Secret", group=grp_wh)
 
 // --- Strategy Logic ---
 {core_logic}
 
-// --- 🛡️ Institutional DD Reduction: ADX Filter ---
+// --- Institutional DD Reduction: ADX Filter ---
 // Choppy market filter: Only trade when ADX > 25 (strong trend confirmed)
 [diPlus, diMinus, adxValue] = ta.dmi(14, 14)
 adx_filter = adxValue > 25
 
-// --- 🛡️ Zero-Error Execution Engine ---
-// Hum fixed qty use kar rahe hain taaki TV engine crash na ho
+// --- Zero-Error Execution Engine ---
 fixed_qty = 10
 start_time = timestamp(2024, 01, 01, 00, 00)
 
-// --- 🔒 4% Trailing Stop Loss (Profit Locking) ---
+// --- 4% Trailing Stop Loss (Profit Locking) ---
 trail_pct = 4.0
+
+// --- Timeframe Detection ---
+tf_str = timeframe.period == "1D" ? "1d" : timeframe.period == "240" ? "4h" : timeframe.period == "60" ? "1h" : timeframe.period == "30" ? "30m" : timeframe.period == "15" ? "15m" : timeframe.period == "5" ? "5m" : timeframe.period == "1" ? "1m" : timeframe.period
 
 if (time >= start_time)
     if long and adx_filter
         strategy.entry("Long", strategy.long, qty=fixed_qty, comment='{{"ROI": "{roi}%"}}')
         strategy.exit("Trail Long", "Long", trail_points=close * trail_pct / 100 / syminfo.mintick, trail_offset=close * trail_pct / 100 / syminfo.mintick)
+        if enable_webhook
+            alert('{{"secret":"' + webhook_secret + '","strategy":"{strat_clean}","side":"BUY","symbol":"' + syminfo.ticker + '","timeframe":"' + tf_str + '","price":' + str.tostring(close) + ',"quantity":0.003,"exchange":"binance","indicator":"{strat_clean}","ROI":"{roi}%"}}', alert.freq_once_per_bar_close)
     if short and adx_filter
         strategy.entry("Short", strategy.short, qty=fixed_qty, comment='{{"ROI": "{roi}%"}}')
         strategy.exit("Trail Short", "Short", trail_points=close * trail_pct / 100 / syminfo.mintick, trail_offset=close * trail_pct / 100 / syminfo.mintick)
+        if enable_webhook
+            alert('{{"secret":"' + webhook_secret + '","strategy":"{strat_clean}","side":"SELL","symbol":"' + syminfo.ticker + '","timeframe":"' + tf_str + '","price":' + str.tostring(close) + ',"quantity":0.003,"exchange":"binance","indicator":"{strat_clean}","ROI":"{roi}%"}}', alert.freq_once_per_bar_close)
 """
         safe_code = html.escape(pine_code)
         
