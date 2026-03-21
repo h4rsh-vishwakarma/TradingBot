@@ -133,6 +133,12 @@ class Orchestrator:
             is_allowed, reason, tier = self.check_tournament_alpha(symbol, strat_name)
             if not is_allowed:
                 logger.warning(f"🚫 AI Blocked: {reason}")
+                try:
+                    self.sheets_logger.log_blocked_trade(
+                        symbol=symbol, side="N/A", strategy=strat_name,
+                        reason=f"Tier Block: {reason}", signal_id=signal_id)
+                except Exception:
+                    pass
                 return True
 
             # --- 🛡️ 2. ROI GUARD (NEW) ---
@@ -150,6 +156,12 @@ class Orchestrator:
                            f"⚠️ Negative history. Capital protected.")
                     try: self.telegram.send(severity=AlertSeverity.WARNING, title="Negative ROI Block", message=msg)
                     except: pass
+                    try:
+                        self.sheets_logger.log_blocked_trade(
+                            symbol=symbol, side="N/A", strategy=strat_name,
+                            reason=f"ROI Guard: {incoming_roi}% (Negative)", signal_id=signal_id)
+                    except Exception:
+                        pass
                     return True
             except Exception as e:
                 logger.debug(f"ROI Check skipped or failed: {e}")
@@ -194,6 +206,12 @@ class Orchestrator:
                        f"🔹 <b>Reason:</b> `{risk_reason}`")
                 try: self.telegram.send(severity=AlertSeverity.WARNING, title="Risk Block", message=msg)
                 except: pass
+                try:
+                    self.sheets_logger.log_blocked_trade(
+                        symbol=symbol, side=side, strategy=strat_name,
+                        reason=f"Safety Gate: {risk_reason}", signal_id=signal_id)
+                except Exception:
+                    pass
                 return True
 
             # --- 🚀 6. ACTUAL EXECUTION ---
@@ -231,7 +249,14 @@ class Orchestrator:
                 except: pass
                 return True
             else:
-                logger.error(f"❌ Execution Failure: {execution_res.get('reason')}")
+                exec_reason = execution_res.get('reason', 'Unknown API Error')
+                logger.error(f"❌ Execution Failure: {exec_reason}")
+                try:
+                    self.sheets_logger.log_blocked_trade(
+                        symbol=symbol, side=side, strategy=strat_name,
+                        reason=f"Execution Failed: {exec_reason}", signal_id=signal_id)
+                except Exception:
+                    pass
                 return True
 
         except Exception as e:

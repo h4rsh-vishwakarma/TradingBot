@@ -15,9 +15,9 @@ from scripts.strategy_tournament import strategy_tournament
 from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert, AlertSeverity
 
 def run_full_automation():
-    print(f"🌅 Starting Automated Alpha Scan...")
+    print(f"Starting Automated Alpha Scan...")
     telegram = TelegramAlert()
-    
+
     # 1. Update Leaderboard
     try:
         strategy_tournament()
@@ -29,31 +29,35 @@ def run_full_automation():
     if not os.path.exists(report_path): return
 
     df = pd.read_csv(report_path)
-    winner = df.iloc[0] 
-    
-    # Clean data for message
-    sym = winner['Symbol']
-    strat = winner['Strategy']
-    daily = winner['Daily_%']
-    tier = winner['Tier']
+    top5 = df.head(5)
 
-    # 3. Pine Code
-    pine_code = f"//@version=5\nstrategy('AI_{strat[:10]}', overlay=true)\nema200 = ta.ema(close, 200)\nadx = ta.adx(14)\nlong = (close > ema200) and (adx > 25)\nif long\n    strategy.entry('Long', strategy.long)\nstrategy.exit('Exit', stop=close*0.975, limit=close*1.075)"
+    # 3. Build summary message with all new columns
+    lines = ["<b>DAILY ALPHA REPORT</b>\n"]
+    for i, row in top5.iterrows():
+        sym = row['Symbol']
+        strat = str(row['Strategy'])[:35]
+        daily_roi = round(row.get('Daily_ROI_%', 0), 3)
+        gross_dd = round(row.get('Gross_DD_%', row.get('Max_DD_%', 0)), 2)
+        net_dd = round(row.get('Net_DD_%', gross_dd), 2)
+        win_rate = round(row.get('Win_Rate_%', 0), 1)
+        sharpe = round(row.get('Sharpe_Ratio', 0), 2)
+        tier = row.get('Tier', 'N/A')
 
-    # 4. Message (HTML Format for Stability)
-    msg = (f"<b>🏆 WINNER STRATEGY FOUND</b>\n\n"
-           f"📊 <b>Symbol:</b> {sym}\n"
-           f"🧠 <b>Strategy:</b> {strat}\n"
-           f"📈 <b>Daily:</b> {daily}%\n"
-           f"🏅 <b>Tier:</b> {tier}\n\n"
-           f"🚀 <b>Optimized Pine Script:</b>\n"
-           f"<code>{pine_code}</code>")
+        lines.append(
+            f"<b>#{i+1}</b> {tier} | {sym}\n"
+            f"   {strat}\n"
+            f"   ROI: <code>{daily_roi}%</code>/day\n"
+            f"   Gross DD: <code>{gross_dd}%</code> | Net DD: <code>{net_dd}%</code>\n"
+            f"   Win: <code>{win_rate}%</code> | Sharpe: <code>{sharpe}</code>\n"
+        )
+
+    msg = "\n".join(lines)
 
     try:
         telegram.send(severity=AlertSeverity.INFO, title="Daily Alpha Report", message=msg)
-        print("✅ Message successfully sent to Telegram!")
+        print("Message successfully sent to Telegram!")
     except Exception as e:
-        print(f"❌ Telegram Error: {e}")
+        print(f"Telegram Error: {e}")
 
 if __name__ == "__main__":
     run_full_automation()

@@ -93,18 +93,32 @@ class TelegramAlert:
                 'parse_mode': 'HTML',
                 'disable_web_page_preview': True
             }
-            
-            response = requests.post(url, json=payload, timeout=10)
-            
-            if response.status_code == 200:
-                logger.info(f"✅ Alert sent: {title}")
-                if alert_key:
-                    self.last_alert_time[alert_key] = time.time()
-                return True
-            else:
-                logger.error(f"Failed to send alert: HTTP {response.status_code}")
-                return False
-                
+
+            # Retry with backoff for HTTP 429 (rate limit)
+            max_retries = 3
+            for attempt in range(max_retries):
+                response = requests.post(url, json=payload, timeout=10)
+
+                if response.status_code == 200:
+                    logger.info(f"Alert sent: {title}")
+                    if alert_key:
+                        self.last_alert_time[alert_key] = time.time()
+                    return True
+                elif response.status_code == 429:
+                    # Telegram rate limit — extract retry_after or default to backoff
+                    try:
+                        retry_after = response.json().get('parameters', {}).get('retry_after', 5)
+                    except Exception:
+                        retry_after = 3 * (attempt + 1)
+                    logger.warning(f"Rate limited (429). Retrying in {retry_after}s (attempt {attempt+1}/{max_retries})")
+                    time.sleep(retry_after)
+                else:
+                    logger.error(f"Failed to send alert: HTTP {response.status_code}")
+                    return False
+
+            logger.error(f"Failed after {max_retries} retries (429 rate limit)")
+            return False
+
         except Exception as e:
             logger.error(f"Failed to send Telegram alert: {e}")
             return False

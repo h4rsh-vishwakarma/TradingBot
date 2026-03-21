@@ -1,170 +1,529 @@
-# 📡 TradingView Webhook Trading Bot - Technical Documentation
+# TradingView Webhook Bot
 
-**Project:** Multi-Strategy TradingView Signal Trading Bot (Production Grade)  
-**Last Updated:** February 25, 2026  
-**Status:** Active Deployment (Branch: `harsh`)  
-**Server:** `ubuntu@ip-172-31-11-197`
+**Production-Grade Multi-Strategy Cryptocurrency Trading System**
+**Version:** 3.0.0 | **Status:** Active | **Last Updated:** March 21, 2026
 
 ---
 
-## 📚 Table of Contents
-1. [New Production Features](#-new-production-features)
-2. [System Architecture](#-system-architecture)
-3. [Setup & Deployment](#-setup--deployment)
-4. [Signal Validation (Pydantic v2)](#-signal-validation-pydantic-v2)
-5. [Deterministic Position Ledger](#-deterministic-position-ledger)
-6. [CI/CD & Automation](#-cicd--automation)
-7. [File Structure](#-file-structure)
-8. [Monitoring & Runbook](#-monitoring--runbook)
+## Overview
+
+Automated cryptocurrency trading system that receives trading signals from TradingView Pine Script indicators via HTTP webhooks and executes trades on Binance Futures. Designed for production reliability with multi-strategy concurrent support, 4-layer risk management, and real-time monitoring.
+
+**Key Characteristics:**
+- **Signal-Driven:** Receives alerts from TradingView Pine Script indicators
+- **Multi-Strategy:** 8+ concurrent strategies running independently
+- **Mainnet Price Authority:** All prices fetched from Binance mainnet (live spot/futures data)
+- **Testnet Execution:** All orders executed on Binance Futures Testnet (no real money risk)
+- **Deterministic Ledger:** Accurate P&L tracking using Weighted Average Entry Price (WAEP)
+- **Crash-Safe:** Atomic JSONL queue storage with offset management
+- **Production Hardened:** Pydantic v2 schemas, CI/CD automation, reconciliation logic
 
 ---
 
-## 🚀 New Production Features
-The system has been hardened with the following enterprise-grade features:
+## System Architecture
 
-* **Pydantic v2 Schemas**: Strict "Type-Safe" validation for all incoming signals. Malformed data is rejected at the gateway before reaching the engine.
-* **Deterministic Ledger**: Advanced accounting using **Weighted Average Entry Price (WAEP)** and **Realized PnL** with JSON persistence.
-* **GitHub Actions CI**: Automated testing pipeline that audits Ledger math and Schema integrity on every push to the `harsh` branch.
-* **Atomic JSONL Storage**: Crash-safe signal queuing with offset management to ensure no signal is ever lost or double-processed.
-* **Interactive Telegram Control**: Real-time status reports (`/status`) and emergency stop (`/stop`) capabilities.
-
----
-
-## 🏗 System Architecture
-The bot operates on a decoupled architecture to ensure maximum uptime and reliability:
-
-
-
-* **Webhook Server (Flask/Gunicorn)**: Receives, validates, and enqueues signals.
-* **JSONL Queue**: Serves as a persistent buffer between the web and the trading engine.
-* **Orchestrator (The Engine)**: Consumes signals, manages risk, executes trades on Binance, and maintains the Ledger.
-* **Reconciliation Loop**: Periodically audits the local Ledger against actual Binance positions to detect "drift".
-
----
-
-## ⚙️ Setup & Deployment
-
-### 1. Installation
-```bash
-# Navigate to project root
-cd /home/ubuntu/Multi-Strategy-Crypto-Trading-Systems
-source venv/bin/activate
-
-# Install Production Requirements
-pip install pydantic flask gunicorn python-dotenv ccxt
-
-2. Service Management (Systemd)
-The bot is managed as two independent background services:
-
-Webhook Server (The Receiver):
-
-Bash
-sudo systemctl restart tv-webhook
-sudo systemctl status tv-webhook
-Trading Engine (The Consumer):
-
-Bash
-sudo systemctl restart tv-engine
-sudo systemctl status tv-engine
-📡 Signal Validation (Pydantic v2)
-Every signal must conform to the schemas/models.py contract. If a field like quantity is missing or price is negative, the server rejects the request with a 422 Unprocessable Entity error.
-
-Valid Payload Example:
-
-JSON
-{
-  "symbol": "BTCUSDT",
-  "action": "BUY",
-  "quantity": 0.01,
-  "price": 60000.0,
-  "secret": "your_secure_secret"
-}
-📊 Deterministic Position Ledger
-The Ledger tracks your true trading performance independently of the exchange:
-
-WAEP Calculation: Correctly averages multiple entries into a single position.
-
-Realized PnL: Subtracts trading fees from gross profit to provide net PnL.
-
-State Persistence: State is saved in storage/ledger_state.json. If the bot restarts, it resumes with exactly the same PnL and position data.
-
-Run Math Audit:
-
-Bash
-export PYTHONPATH=$PYTHONPATH:.
-python3 test_ledger.py
-🤖 CI/CD & Automation
-We utilize GitHub Actions (.github/workflows/main.yml) to maintain code quality.
-
-Triggers: Active on push to harsh and main branches.
-
-Automated Steps:
-
-Sets up Python 3.12 environment.
-
-Installs all production dependencies.
-
-Ledger Integrity Test: Executes test_ledger.py to ensure math logic hasn't regressed.
-
-📁 File Structure
 ```
-/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems/
-├── schemas/
-│   └── models.py             # Pydantic validation rules
-├── tradingview-webhook-bot/
-│   ├── storage/              # Offset & Idempotency logic
-│   ├── ledger/
-│   │   └── positions.py      # PnL & WAEP Accounting
-│   ├── recon/
-│   │   └── reconciler.py     # Drift Audit Engine
-│   └── tradingview_webhook_server.py
-├── .github/workflows/
-│   └── main.yml              # GitHub Actions CI config
-├── storage/
-│   ├── signals.jsonl         # Signal Buffer (Queue)
-│   ├── ledger_state.json     # Persisted PnL Data
-│   └── idempotency.db        # Duplicate trade protection
-└── enhanced_trading_bot_remote.py # Main Bot Orchestrator
-🛠 Monitoring & Runbook
-Log Inspection
-Bash
-# Monitor Webhook Traffic
-sudo journalctl -u tv-webhook -f
-# 📖 Trading Bot Operator Runbook
+TradingView Indicator (Pine Script)
+        |
+        v
+Webhook Server (Flask) -- Port 5000
+  |-- Secret Validation
+  |-- Data Validation (Pydantic v2)
+  |-- Generates Signal ID
+        |
+        v
+JSONL Queue (signals.jsonl) -- Atomic, Crash-Safe
+  |-- Offset File (signals.offset)
+  |-- Dead Letter Queue (dead_letter.jsonl)
+        |
+        v
+Orchestrator (Core Engine)
+  |-- Tournament Alpha Check (Leaderboard Validation)
+  |-- Safety Gate (Risk Management)
+  |-- ROI Guard (Negative History Block)
+  |-- Tier-Based Interactive Gate
+        |
+        v
+Exchange Layer (Binance)
+  |-- Mainnet Price Substitution
+  |-- Testnet Order Execution
+  |-- Position Tracking
+        |
+        v
+Storage & Monitoring
+  |-- Ledger State (ledger_state.json)
+  |-- Google Sheets Logging
+  |-- Telegram Alerts
+  |-- Reconciliation Audit
+```
 
-### 🚨 1. Service Down Alert
-If you receive a Telegram alert saying a service is **DOWN**:
-1. SSH into the EC2 instance.
-2. Restart the failed service:
-   - `sudo systemctl restart tv-engine`
-   - `sudo systemctl restart tv-webhook`
-3. Check logs for the cause: `sudo journalctl -u tv-engine -f -n 50`
+---
 
-### ⚠️ 2. DLQ (Dead Letter Queue) Alert
-If signals are failing and landing in the DLQ:
-1. Run the inspector to see the error: `python3 dlq_inspector.py`
-2. **If it's a network error:** Fix connectivity and run `python3 dlq_replay.py`
-3. **If it's a Pydantic/Validation error:** Update your signal mapping in the orchestrator before replaying.
+## Core Modules
 
-### 🔄 3. Reconciliation Drift
-If you see a "RECON DRIFT" alert (local ledger doesn't match Binance):
-1. The bot automatically fixes this on restart using `sync_ledger.py`.
-2. Manual fix: `python3 sync_ledger.py`.
+### Webhook Server (`core/webhook_server.py`)
 
-### 🔐 4. Rotating Secrets
-If API keys are compromised:
-1. Update `tradingview-webhook-bot/.env` with new keys.
-2. Restart both services.
-3. Verify connection: `sudo journalctl -u tv-engine -f | grep "Connected to Binance"`.
-# Monitor Trade Executions
-sudo journalctl -u tv-engine -f
-Emergency Procedures
-Stop Engine: Send /stop via Telegram or run sudo systemctl stop tv-engine.
+Receives and validates trading signals from TradingView.
 
-Data Recovery: If the queue becomes corrupted, the bot will automatically move malformed signals to a Dead Letter Queue (dlq.jsonl) to prevent a total crash.
+- **Endpoint:** `POST /webhook/tradingview`
+- **Secret Validation:** Verifies webhook secret matches `WEBHOOK_SECRET` env var
+- **Smart Mapping:** Extracts strategy, symbol, action, price from flexible payload structures
+- **Backtest Ingestion:** Secondary `/backtest-report` endpoint for strategy statistics
+- **Non-blocking:** Spawns background thread, returns HTTP 200 immediately
 
-Developed by: Harsh
+**Payload Example:**
+```json
+{
+  "signal_id": "sig_20260221_123456_BTCUSDT_LONG",
+  "secret": "your_webhook_secret",
+  "payload": {
+    "strategy": "squeeze_flow_expansion",
+    "symbol": "BTCUSDT",
+    "action": "BUY",
+    "price": 67850.50,
+    "quantity": 0.003,
+    "exchange": "binance",
+    "indicator": "SMC_LuxAlgo"
+  }
+}
+```
 
-Version: 2.6.0 (Production Stable)
+---
 
-Environment: Binance Futures Testnet (Mainnet Price Authority)
+### Orchestrator (`core/orchestrator.py`) -- The Decision Engine
+
+Core trading logic that consumes signals and executes trades with multi-layer validation.
+
+**4-Layer Risk Gate System:**
+
+| Layer | Gate | Action |
+|-------|------|--------|
+| 1 | **Tournament Alpha** | Validates strategy against Leaderboard. ALPHA = auto-execute, AVERAGE = manual approval, NONE = blocked |
+| 2 | **ROI Guard** | Blocks signals with negative or zero historical ROI |
+| 3 | **Safety Gate** | Enforces `ALLOW_REAL_TRADES`, daily loss limit (-$50 default), prevents duplicate positions |
+| 4 | **Tier-Based Interactive Gate** | ALPHA executes immediately, AVERAGE requires Telegram approval |
+
+**Execution Flow:**
+1. Parse signal (extract symbol, strategy, quantity, price, action)
+2. Apply symbol cleaning (BTCUSDT normalization)
+3. Check tournament tier -- block if not ALPHA/AVERAGE
+4. Check ROI history -- block if negative
+5. Check safety gates -- block if risky
+6. Execute order (Binance Testnet via BinanceClient)
+7. Apply fill to ledger (WAEP calculation)
+8. Log to Google Sheets
+9. Send Telegram alerts
+
+---
+
+### Position Ledger (`ledger/positions.py`)
+
+Deterministic position accounting using Weighted Average Entry Price (WAEP).
+
+**WAEP Formula:**
+```
+new_WAEP = (old_qty * old_price + new_qty * new_price) / total_qty
+```
+
+**Position Snapshot Structure:**
+```json
+{
+  "symbol": "binance:BTCUSDT",
+  "quantity": 0.003,
+  "avg_price": 67500.00,
+  "realized_pnl": 150.00,
+  "daily_realized_pnl": 45.00,
+  "last_update_date": "2026-03-21"
+}
+```
+
+- Survives crashes via JSON persistence (`storage/ledger_state.json`)
+- Tracks `trade_history` for Hybrid Scoring (last 50 trades)
+- Daily PnL resets at UTC midnight
+
+---
+
+### Telegram Listener (`core/telegram_listener.py`)
+
+Interactive command-based control and monitoring via Telegram bot.
+
+| Command | Purpose |
+|---------|---------|
+| `/help` | Display full command reference |
+| `/status` | Live system health (net profit, trade count, strategy) |
+| `/alpha` | Deploy top Alpha strategies (auto-runs daily 9 AM UTC) |
+| `/audit` | Tournament Leaderboard -- Top 10 strategies |
+| `/buy SYMBOL` | Manual BUY signal (e.g., `/buy SOLUSDT`) |
+| `/sell SYMBOL` | Manual SELL signal |
+| `/override SYMBOL` | Force BUY (bypasses tier check) |
+
+---
+
+### Script Vault (`core/script_vault.py`)
+
+Dynamically generates and deploys Pine Script indicators to Telegram.
+
+- **GOD MODE Template:** Zero-margin Pine Script with error bypass logic
+- **Logic Injection:** Automatically inserts strategy-specific logic based on type:
+  - SMC/Liquidity/Flow/BarUpDn: Lookback-based logic
+  - Supertrend: ATR-based trend following
+  - Default: Bollinger Bands logic
+- **DD Reduction:** ADX > 25 filter + 4% trailing stop
+- **Rate Limiting:** 3-4 second delays to avoid Telegram HTTP 429 errors
+
+---
+
+### Google Sheets Logger (`storage/sheets_logger.py`)
+
+Real-time P&L and trade logging to Google Sheets for dashboards.
+
+- **OAuth 2.0 Auth:** Uses service account credentials (`service_account.json`)
+- **Dual Tabs:** "Trades" (executed trades) + "Blocked Trades" (rejected signals)
+- **Row Structure:** Signal ID | Timestamp | Symbol | Action | Qty | Price | PnL | Indicator | Strategy
+
+---
+
+### Telegram Alerts (`alerts/telegram_alerts.py`)
+
+Real-time notifications for critical trading events.
+
+**Alert Severity Levels:**
+
+| Level | Icon | Usage |
+|-------|------|-------|
+| DEBUG | (magnifier) | Detailed diagnostics |
+| INFO | (info) | General information |
+| WARNING | (warning) | Caution needed |
+| HIGH | (orange) | Important alerts |
+| CRITICAL | (siren) | System failures |
+
+**Built-in Alerts:** `circuit_breaker_tripped`, `position_stuck`, `no_signals_received`, `api_error_spike`, `position_opened`, `position_closed`, `daily_summary`, `bot_started`, `bot_stopped`
+
+Rate limited: 60-second minimum between identical alerts (configurable).
+
+---
+
+### JSONL Queue & Offset Consumer (`storage/jsonl_consumer.py`)
+
+Crash-safe, offset-based signal queuing.
+
+- Signals written to `signals.jsonl` as newline-delimited JSON
+- Offset tracked in `signals.offset` file (O(1) seek on restart)
+- Only advances offset after successful processing
+- Corrupt lines moved to `dead_letter.jsonl` with error reason
+- File truncation detection: resets offset to 0 if file shrinks
+
+---
+
+### Idempotency Store (`storage/idempotency_store.py`)
+
+Prevents duplicate order execution (exactly-once semantics).
+
+- SQLite-based (`idempotency.db`)
+- Handles TradingView re-fires, network retries
+- Survives system restarts
+
+---
+
+### Binance Client (`exchange/binance_client.py`)
+
+Hardened Binance Futures API wrapper.
+
+- **Mainnet Price Substitution:** Fetches real prices from `fapi.binance.com`
+- **Testnet Execution:** Orders placed on testnet
+- **Retry Logic:** Exponential backoff (up to 3 attempts)
+- **Account Health:** Available balance, margin ratio monitoring
+- **Audit Data:** Returns open positions for reconciliation
+
+---
+
+### Reconciliation Engine (`recon/reconciler.py`)
+
+Audits ledger against actual Binance positions.
+
+- Compares local ledger vs Binance balances
+- Detects and logs drift
+- Auto-fixes by syncing ledger to Binance reality
+
+---
+
+## Active Strategies
+
+| # | Strategy | Type |
+|---|----------|------|
+| 1 | Institutional Flow Hybrid | Volume profile + Smart money |
+| 2 | Squeeze Flow Expansion | Bollinger squeeze breakout |
+| 3 | SMA Crossover 9/21 | Moving average crossover |
+| 4 | Supertrend BTC 4H | ATR-based trend following |
+| 5 | OBV WaveTrend Scalper | Volume oscillator scalping |
+| 6 | Madrid Ribbon | Multi-timeframe EMA ribbon |
+| 7 | Institutional Matrix | Order flow analysis |
+| 8 | Lorentzian Classification | ML-based price prediction |
+
+Pine Script source files are in `strategies/` directory.
+
+---
+
+## Storage Structure
+
+```
+storage/
+|-- signals.jsonl              # Primary signal queue
+|-- signals.offset             # Consumer offset tracking
+|-- dead_letter.jsonl          # Corrupt/failed signals
+|-- ledger_state.json          # Position ledger & trade history
+|-- idempotency.db             # SQLite DB for duplicate detection
+|-- alerts.jsonl               # Alert history (rotated)
+|-- sheets_logger.py           # Google Sheets integration
+|-- jsonl_consumer.py          # Offset-based queue consumer
+|-- idempotency_store.py       # Duplicate prevention
+`-- trading_system.db          # Legacy database
+```
+
+---
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# Binance API
+BINANCE_API_KEY=your_api_key
+BINANCE_API_SECRET=your_api_secret
+BINANCE_TESTNET=true
+
+# Trading
+ALLOW_REAL_TRADES=false
+RUN_MODE=production
+WEBHOOK_SECRET=your_secret
+MAX_NOTIONAL_PER_TRADE=500.0
+DAILY_LOSS_LIMIT=-50.0
+
+# Telegram
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+
+# Google Sheets
+GOOGLE_SERVICE_ACCOUNT_FILE=/etc/tradingbot/service_account.json
+GOOGLE_SHEET_NAME=Trading_Bot_Ledger
+```
+
+### Settings File (`config/settings.json`)
+
+```json
+{
+  "strategy_name": "multi_strategy",
+  "virtual_balance": 1000.0,
+  "trading": {
+    "symbols_allowed": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+    "timeframes_allowed": ["1", "5", "15", "60", "240", "D"],
+    "leverage": 1,
+    "order_type": "LIMIT"
+  },
+  "risk": {
+    "max_positions": 5,
+    "position_size_type": "PERCENT_OF_BALANCE",
+    "position_size_value": 10.0,
+    "stop_loss_pct": 2.0,
+    "take_profit_pct": 4.0,
+    "max_drawdown_limit": 10.0
+  },
+  "webhook": {
+    "host": "0.0.0.0",
+    "port": 5000,
+    "secret": "your_secret"
+  }
+}
+```
+
+---
+
+## Deployment
+
+### Systemd Services
+
+```bash
+# Webhook Server
+sudo systemctl start tv-webhook
+sudo systemctl status tv-webhook
+journalctl -u tv-webhook -f
+
+# Trading Engine
+sudo systemctl start tv-engine
+sudo systemctl status tv-engine
+journalctl -u tv-engine -f
+```
+
+Service files: `deploy/systemd/tv-webhook.service`, `deploy/systemd/tv-engine.service`
+
+Nginx configs: `deploy/nginx/`
+
+### Pre-Flight Checklist
+
+- ALLOW_REAL_TRADES set correctly in env_vars
+- Backtest CSVs exist in `backtesting/A_Leaderboard/backtest_imports/`
+- Telegram bot token and chat ID configured
+- Google Sheets service account authenticated
+- Binance API keys (Testnet) working
+- Webhook secret matches TradingView alerts
+- Nginx reverse proxy running (if HTTPS required)
+
+---
+
+## Monitoring
+
+```bash
+# Watch orchestrator logs
+sudo journalctl -u tv-engine -f -n 50
+
+# Check processed signals count
+sqlite3 storage/idempotency.db \
+  "SELECT COUNT(*) FROM processed_signals;"
+
+# View recent trades
+sqlite3 storage/idempotency.db \
+  "SELECT signal_id, processed_at FROM processed_signals ORDER BY processed_at DESC LIMIT 10;"
+
+# Check ledger state
+cat storage/ledger_state.json | python3 -m json.tool
+
+# Check signal queue offset
+cat storage/signals.offset
+```
+
+---
+
+## Runbook
+
+### Service Down
+1. SSH into the server
+2. Restart: `sudo systemctl restart tv-engine` / `sudo systemctl restart tv-webhook`
+3. Check logs: `sudo journalctl -u tv-engine -f -n 50`
+
+### DLQ (Dead Letter Queue) Alert
+1. Inspect: `python3 scripts/dlq_inspector.py`
+2. Network error: Fix connectivity, run `python3 scripts/dlq_replay.py`
+3. Validation error: Update signal mapping in orchestrator, then replay
+
+### Reconciliation Drift
+1. Auto-fixes on restart via `sync_ledger.py`
+2. Manual fix: `python3 scripts/sync_ledger.py`
+
+### Emergency Stop
+- Telegram: Send `/stop`
+- CLI: `python3 scripts/kill_switch.py`
+- Systemd: `sudo systemctl stop tv-engine`
+
+### Rotating Secrets
+1. Update `.env` with new keys
+2. Restart both services
+3. Verify: `journalctl -u tv-engine -f | grep "Connected to Binance"`
+
+---
+
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/daily_alpha_check.py` | Daily automated leaderboard update & strategy validation |
+| `scripts/strategy_tournament.py` | Run multi-timeframe backtests, generate leaderboard CSV |
+| `scripts/dlq_inspector.py` | Inspect Dead Letter Queue for failure reasons |
+| `scripts/dlq_replay.py` | Replay failed signals after fixing issues |
+| `scripts/kill_switch.py` | Emergency stop: close all positions & pause trading |
+| `scripts/generate_backtest_csvs.py` | Auto-generate backtest CSVs from historical data |
+| `scripts/auto_injector.py` | Auto-generate Pine Scripts from leaderboard |
+| `scripts/smoke_test_signal.py` | Send test signal to webhook |
+| `scripts/system_health_check.py` | System health diagnostics |
+
+---
+
+## CI/CD
+
+GitHub Actions (`.github/workflows/main.yml`):
+- **Triggers:** Push to `harsh` and `main` branches
+- **Steps:** Python 3.12 setup, dependency install, ledger math tests, schema integrity tests
+
+---
+
+## Testing
+
+```bash
+# Run all tests
+export PYTHONPATH=$PYTHONPATH:.
+pytest tests/
+
+# Ledger math audit
+python3 ledger/test_ledger.py
+
+# Reconciliation tests
+python3 recon/test_recon.py
+
+# Storage tests
+python3 storage/test_storage.py
+```
+
+---
+
+## File Structure
+
+```
+tradingview_webhook_bot/
+|-- core/
+|   |-- orchestrator.py            # Core decision engine
+|   |-- telegram_listener.py       # Telegram bot commands
+|   |-- script_vault.py            # Pine Script generation
+|   |-- webhook_server.py          # Signal reception
+|   |-- signal_processor.py        # Signal parsing
+|   |-- risk_manager.py            # Risk controls
+|   |-- strategy_engine.py         # Strategy logic
+|   |-- balance_manager.py         # Virtual balance tracking
+|   |-- circuit_breaker.py         # Circuit breaker pattern
+|   |-- reconciler.py              # Position reconciliation
+|   `-- schemas.py                 # Pydantic v2 models
+|-- exchange/
+|   |-- binance_client.py          # Binance API wrapper
+|   |-- execution_engine.py        # Testnet order execution
+|   `-- price_provider.py          # Mainnet price feeds
+|-- ledger/
+|   |-- positions.py               # WAEP position ledger
+|   `-- test_ledger.py             # Ledger math tests
+|-- storage/
+|   |-- sheets_logger.py           # Google Sheets logging
+|   |-- jsonl_consumer.py          # Queue consumer
+|   |-- idempotency_store.py       # Duplicate detection
+|   |-- signals.jsonl              # Signal queue
+|   |-- ledger_state.json          # Position state
+|   `-- idempotency.db             # Processed signals DB
+|-- alerts/
+|   |-- telegram_alerts.py         # Alert system
+|   |-- email_notifier.py          # Email alerts
+|   `-- router.py                  # Alert routing
+|-- recon/
+|   |-- reconciler.py              # Position reconciliation
+|   `-- test_recon.py              # Recon tests
+|-- utils/
+|   |-- logger.py                  # Logging setup
+|   |-- dashboard_updater.py       # Dashboard updates
+|   |-- health_checker.py          # Health monitoring
+|   `-- signal_archiver.py         # Signal archival
+|-- main_enhanced.py               # Enhanced bot entry point
+`-- tradingview_webhook_server.py  # Server entry point
+```
+
+---
+
+## Security
+
+- API keys stored as environment variables (never in code)
+- Testnet keys for execution (no real funds at risk)
+- Mainnet read-only access (price data only)
+- Webhook secret token validation on every request
+- HTTPS via Nginx reverse proxy (optional)
+- Position size limits and daily loss controls
+- Kill switch for emergency shutdown
+
+---
+
+**Developed by:** Harsh
+**Environment:** Binance Futures Testnet (Mainnet Price Authority)
+**License:** Proprietary and confidential. All rights reserved.

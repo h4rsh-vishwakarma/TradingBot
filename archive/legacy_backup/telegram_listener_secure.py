@@ -92,24 +92,26 @@ def handle_trade(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"📡 <b>HUB OFFLINE</b>\n{e}")
 
-if __name__ == "__main__":
-    bot.infinity_polling()
-
-
-
 @bot.message_handler(commands=['help'])
 def send_help(message):
-    help_text = """
-🤖 <b>Alpha Engine - Command Center</b> 🛡️
-
-🚀 <b>/alpha</b> - Deploy Top 11 Alpha & Alpha++ strategies.
-📊 <b>/status</b> - Check System & API Health.
-🔍 <b>/audit</b> - Tournament Winner Reports.
-🛡️ <b>/help</b> - Show this manual.
-
-<b>Institutional Updates v10.0:</b>
-• <b>DD Reduction:</b> ADX + Trailing Stops integrated.
-• <b>God Mode:</b> Fixed $100M buffer (No TV Crashes).
-• <b>Data Sync:</b> All trade files synced to Company GitHub.
-"""
+    help_text = (
+        "🤖 <b>Alpha Engine v10.0 — Command Center</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🚀 <b>/alpha</b> — Deploy top Alpha++ strategies (Pine Scripts).\n"
+        "📊 <b>/status</b> — System health, Net Profit, Trade Count.\n"
+        "🔍 <b>/audit</b> — Tournament Leaderboard (Top 10).\n"
+        "💹 <b>/buy SYMBOL</b> — Manual BUY. Ex: /buy SOLUSDT\n"
+        "💹 <b>/sell SYMBOL</b> — Manual SELL. Ex: /sell ETHUSDT\n"
+        "⚡ <b>/override SYMBOL</b> — Force BUY override.\n"
+        "🛡️ <b>/help</b> — This command reference.\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "<b>Institutional Updates v10.0:</b>\n"
+        "• <b>DD Split:</b> Gross DD + Net DD shown separately.\n"
+        "• <b>DD Reduction:</b> ADX &gt; 25 + 4% Trailing Stop.\n"
+        "• <b>Blocked Trades:</b> Auto-logged to Google Sheets.\n"
+        "• <b>Data Sync:</b> Trade files synced to GitHub daily."
+    )
     bot.reply_to(message, help_text, parse_mode='HTML')
+
+if __name__ == "__main__":
+    bot.infinity_polling()

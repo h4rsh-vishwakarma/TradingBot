@@ -45,6 +45,14 @@ class BacktestEngine:
             return None
 
     def get_strategy_confidence(self, strategy_id, symbol):
+        """
+        Returns a confidence score based on BOTH win rate and profit factor.
+        Trend-following strategies can have <50% win rate but still be profitable
+        because their winners are bigger than losers (high profit factor).
+
+        Score = max(win_rate, normalized_profit_factor)
+        This ensures trend strategies aren't falsely rejected.
+        """
         try:
             latest_file = self.find_best_matching_file(strategy_id, symbol)
             if not latest_file:
@@ -61,24 +69,36 @@ class BacktestEngine:
                     break
 
             if not pnl_col:
-                logger.error(f"❌ No PnL column detected in {latest_file.name}")
+                logger.error(f"No PnL column detected in {latest_file.name}")
                 return 0.5
 
-            # --- 🛠️ FIX: Numeric Conversion (Handles string vs int error) ---
-            # Remove symbols like $ or , and convert to float
             pnl_series = pd.to_numeric(
-                df[pnl_col].astype(str).str.replace(r'[$,]', '', regex=True), 
+                df[pnl_col].astype(str).str.replace(r'[$,]', '', regex=True),
                 errors='coerce'
             ).dropna()
 
             wins = len(pnl_series[pnl_series > 0])
             total = len(pnl_series)
-
             win_rate = wins / total if total > 0 else 0.5
-            return win_rate
+
+            # Profit Factor: total_gains / |total_losses|
+            # PF > 1.0 = profitable, PF > 1.5 = strong
+            total_gains = pnl_series[pnl_series > 0].sum()
+            total_losses = abs(pnl_series[pnl_series < 0].sum())
+            profit_factor = total_gains / total_losses if total_losses > 0 else 1.0
+
+            # Normalize PF to 0-1 scale: PF=1.0 → 0.50, PF=1.5 → 0.60, PF=2.0 → 0.70
+            pf_score = min(0.5 + (profit_factor - 1.0) * 0.2, 0.95)
+
+            # Use the better of win_rate or profit_factor score
+            # This lets trend strategies pass via profit factor even with low win rate
+            confidence = max(win_rate, pf_score)
+
+            logger.info(f"Confidence: {confidence:.3f} (WR: {win_rate:.3f}, PF: {profit_factor:.2f}, PF_score: {pf_score:.3f})")
+            return confidence
 
         except Exception as e:
-            logger.error(f"❌ Error parsing CSV {strategy_id}: {e}")
+            logger.error(f"Error parsing CSV {strategy_id}: {e}")
             return 0.5
 
     def get_live_confidence(self, ledger):

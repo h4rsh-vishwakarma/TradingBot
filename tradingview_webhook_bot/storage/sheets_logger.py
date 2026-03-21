@@ -42,9 +42,20 @@ class GoogleSheetsLogger:
             self.sheet = spreadsheet.worksheet("Trades")
             logger.info(f"✅ Google Sheets Connected to tab 'Trades'")
 
+            # 🛡️ Blocked Trades tab — create if missing
+            try:
+                self.blocked_sheet = spreadsheet.worksheet("Blocked Trades")
+            except gspread.exceptions.WorksheetNotFound:
+                self.blocked_sheet = spreadsheet.add_worksheet(
+                    title="Blocked Trades", rows=1000, cols=6
+                )
+                self.blocked_sheet.append_row(["Timestamp", "Symbol", "Side", "Strategy", "Reason", "Signal_ID"])
+                logger.info("✅ Created 'Blocked Trades' worksheet tab")
+
         except Exception as e:
             logger.error(f"❌ Sheets Connection Error: {e}")
             self.sheet = None
+            self.blocked_sheet = None
 
     def log_trade(self, signal_id, symbol, action, qty, price, strategy="N/A", indicator="N/A", pnl=0.0):
         """
@@ -76,3 +87,27 @@ class GoogleSheetsLogger:
             logger.info(f"📊 Sheet Updated: {symbol} | PnL: ${pnl}")
         except Exception as e:
             logger.error(f"❌ Failed to update sheet: {e}")
+
+    def log_blocked_trade(self, symbol, side, strategy="N/A", reason="Unknown", signal_id="N/A"):
+        """
+        Logs blocked/failed trades to the 'Blocked Trades' tab for accountability.
+        Row: [Timestamp, Symbol, Side, Strategy, Reason, Signal_ID]
+        """
+        if not hasattr(self, 'blocked_sheet') or not self.blocked_sheet:
+            logger.warning("⚠️ Skipping Blocked Trade log: Sheet not connected.")
+            return
+
+        try:
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            row = [
+                timestamp,
+                str(symbol).upper(),
+                str(side).upper(),
+                str(strategy),
+                str(reason),
+                str(signal_id)
+            ]
+            self.blocked_sheet.append_row(row)
+            logger.info(f"🚫 Blocked Trade Logged: {symbol} {side} — {reason}")
+        except Exception as e:
+            logger.error(f"❌ Failed to log blocked trade: {e}")
