@@ -79,16 +79,82 @@ class Orchestrator:
         self.processed_count = 0
         self.last_heartbeat = time.time()
 
+        # --- FIX: Anti Flip-Flop Cooldown ---
+        # After executing a trade on a symbol, block further trades for COOLDOWN seconds
+        self._symbol_cooldown = {}  # {symbol: last_trade_timestamp}
+        self.COOLDOWN_SECONDS = 300  # 5 min cooldown - prevents flip-flop across strategies
+
+        # --- FIX: Signal Deduplication (JSON + Plain Text duplicates) ---
+        # Track recent signals by strategy+symbol+side to block duplicates within window
+        self._recent_signals = {}  # {"strategy:symbol:side": timestamp}
+        self.DEDUP_WINDOW_SECONDS = 120  # 2 min dedup - blocks duplicate JSON+PlainText signals
+
+        # --- FIX: Per-Candle Signal Lock (First Signal Wins Per Symbol) ---
+        self._candle_lock = {}  # {symbol: {"side": str, "time": float, "strategy": str}}
+        self.CANDLE_LOCK_SECONDS = 3600  # 1 hour lock (matches hourly candle)
+
+    def _is_candle_locked(self, symbol: str, side: str) -> bool:
+        lock = self._candle_lock.get(symbol)
+        if not lock:
+            return False
+        elapsed = time.time() - lock["time"]
+        if elapsed >= self.CANDLE_LOCK_SECONDS:
+            del self._candle_lock[symbol]
+            return False
+        if lock["side"] != side:
+            logger.info(f"Candle Lock: {symbol} locked to {lock.get('side', '')} by {lock.get('strategy', '')} ({self.CANDLE_LOCK_SECONDS - elapsed:.0f}s left). Blocking {side}.")
+            return True
+        return False
+
+    def _set_candle_lock(self, symbol: str, side: str, strategy: str):
+        self._candle_lock[symbol] = {"side": side, "time": time.time(), "strategy": strategy}
+        logger.info(f"🔒 Candle locked: {symbol} -> {side} by {strategy} for {self.CANDLE_LOCK_SECONDS}s")
+
+    def _is_symbol_in_cooldown(self, symbol: str) -> bool:
+        """Check if symbol is in cooldown period after recent trade."""
+        last_trade = self._symbol_cooldown.get(symbol, 0)
+        elapsed = time.time() - last_trade
+        if elapsed < self.COOLDOWN_SECONDS:
+            logger.info(f"⏳ Cooldown active for {symbol}: {self.COOLDOWN_SECONDS - elapsed:.0f}s remaining")
+            return True
+        return False
+
+    def _mark_symbol_traded(self, symbol: str):
+        """Mark symbol as recently traded (starts cooldown)."""
+        self._symbol_cooldown[symbol] = time.time()
+
+    def _is_duplicate_signal(self, strategy: str, symbol: str, side: str) -> bool:
+        """Check if same strategy+symbol+side was seen within dedup window."""
+        key = f"{strategy}:{symbol}:{side}".lower()
+        now = time.time()
+        last_seen = self._recent_signals.get(key, 0)
+        if now - last_seen < self.DEDUP_WINDOW_SECONDS:
+            logger.info(f"🔁 Duplicate signal blocked: {strategy} {side} {symbol} (seen {now - last_seen:.0f}s ago)")
+            return True
+        self._recent_signals[key] = now
+        # Cleanup old entries every 100 signals
+        if len(self._recent_signals) > 200:
+            cutoff = now - self.DEDUP_WINDOW_SECONDS * 2
+            self._recent_signals = {k: v for k, v in self._recent_signals.items() if v > cutoff}
+        return False
+
     def check_tournament_alpha(self, symbol, strategy_name) -> tuple[bool, str, str]:
         if not os.path.exists(self.report_path):
             return True, "No report found, allowing", "ALPHA"
         try:
             df = pd.read_csv(self.report_path)
             # Normalize: underscores <-> spaces for fuzzy matching
-            strat_clean = strategy_name.replace('_', ' ').strip()
+            import re as _re
+            def _normalize(s):
+                # Strip underscores, quotes, brackets, +, commas, hyphens for fuzzy matching
+                s = str(s)
+                for ch in ['_', "'", '"', '[', ']', '+', ',', '-', '|']:
+                    s = s.replace(ch, ' ')
+                return _re.sub(r"\s+", " ", s).strip().lower()
+            strat_clean = _normalize(strategy_name)
             def _strat_match(row_strat):
-                row_clean = str(row_strat).replace('_', ' ').strip()
-                return strat_clean.lower() in row_clean.lower() or row_clean.lower() in strat_clean.lower()
+                row_clean = _normalize(row_strat)
+                return strat_clean in row_clean or row_clean in strat_clean
             match = df[(df['Symbol'].str.contains(symbol, case=False)) & (df['Strategy'].apply(_strat_match))]
             if match.empty:
                 return False, f"Strategy {strategy_name} for {symbol} not in Leaderboard.", "NONE"
@@ -145,6 +211,28 @@ class Orchestrator:
                     self.sheets_logger.log_blocked_trade(
                         symbol=symbol, side="N/A", strategy=strat_name,
                         reason=f"Tier Block: {reason}", signal_id=signal_id)
+                except Exception:
+                    pass
+                return True
+
+            # --- 🔁 1.5. SIGNAL DEDUP CHECK (JSON + Plain Text duplicates) ---
+            side_hint = str(payload_raw.get("action") or event.get("action") or "").upper()
+            if self._is_duplicate_signal(strat_name, symbol, side_hint):
+                logger.info(f"🔁 Blocked duplicate: {strat_name} {side_hint} {symbol}")
+                return True
+
+            # --- ⏳ 1.6. SYMBOL COOLDOWN CHECK (Anti Flip-Flop) ---
+            if self._is_symbol_in_cooldown(symbol):
+                logger.info(f"⏳ Cooldown block: {symbol} (strategy: {strat_name})")
+                return True
+
+            # --- 🔒 1.7. CANDLE LOCK (First Signal Wins Per Symbol) ---
+            if self._is_candle_locked(symbol, side_hint):
+                logger.info(f"🔒 Candle lock block: {symbol} {side_hint} (strategy: {strat_name})")
+                try:
+                    self.sheets_logger.log_blocked_trade(
+                        symbol=symbol, side=side_hint, strategy=strat_name,
+                        reason=f"Candle Lock: Symbol locked to opposite direction", signal_id=signal_id)
                 except Exception:
                     pass
                 return True
@@ -225,6 +313,13 @@ class Orchestrator:
                     pass
                 return True
 
+            # --- 🛡️ 5.5. MAX QUANTITY CAP (Prevent oversized positions) ---
+            MAX_QTY = {"SOLUSDT": 1.0, "ETHUSDT": 0.05, "BTCUSDT": 0.003}
+            max_allowed = MAX_QTY.get(symbol, 1.0)
+            if qty > max_allowed:
+                logger.warning(f"📐 Qty capped: {qty} -> {max_allowed} for {symbol}")
+                qty = max_allowed
+
             # --- 🚀 6. ACTUAL EXECUTION ---
             execution_res, fill_price = {}, price_signal
             if target_exchange == "hyperliquid":
@@ -244,6 +339,8 @@ class Orchestrator:
             if execution_res.get("status") == "SUCCESS":
                 self.idempotency.mark_seen(signal_id)
                 pos_snapshot = self.ledger.apply_fill(f"{target_exchange}:{symbol}", side, qty, fill_price)
+                self._mark_symbol_traded(symbol)  # Start cooldown for this symbol
+                self._set_candle_lock(symbol, side, strat_name)  # Lock direction for candle
                 self.processed_count += 1
                 try:
                     self.sheets_logger.log_trade(signal_id=signal_id, symbol=f"{target_exchange.upper()}:{symbol}",
