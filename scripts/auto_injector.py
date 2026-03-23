@@ -38,7 +38,7 @@ def send_alert(message):
 
 def check_webhook_server():
     try:
-        r = requests.get("http://127.0.0.1:5000/", timeout=5)
+        r = requests.get("http://127.0.0.1:5000/health", timeout=5)
         return True
     except Exception:
         return False

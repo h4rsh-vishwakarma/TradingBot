@@ -97,7 +97,7 @@ class TelegramAlert:
             # Retry with backoff for HTTP 429 (rate limit)
             max_retries = 2
             for attempt in range(max_retries):
-                response = requests.post(url, json=payload, timeout=5)
+                response = requests.post(url, json=payload, timeout=15)
 
                 if response.status_code == 200:
                     logger.info(f"Alert sent: {title}")

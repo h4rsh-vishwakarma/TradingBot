@@ -197,8 +197,12 @@ class WebhookServer:
                         return jsonify({'status': 'error', 'message': f'Invalid price: {price}'}), 400
 
                     if price_val <= 0:
-                        logger.warning(f"❌ Rejected: negative price {price_val} for {symbol}")
-                        return jsonify({'status': 'rejected', 'message': f'Invalid price: {price_val}'}), 400
+                        logger.warning(f"⚠️ Negative/zero price {price_val} for {symbol}, fetching live price...")
+                        price_val = self._fetch_live_price(symbol)
+                        if price_val <= 0:
+                            logger.error(f"❌ Could not fetch live price for {symbol}, rejecting")
+                            return jsonify({"status": "rejected", "message": f"Could not resolve price for {symbol}"}), 400
+                        logger.info(f"📊 Live price resolved for {symbol}: ${price_val}")
 
                     strategy = payload.get("strategy", "SMC")
                     indicator = payload.get("indicator", "SMC_LuxAlgo")
@@ -300,6 +304,19 @@ class WebhookServer:
             except Exception as e:
                 logger.error(f"🔥 Backtest Route Error: {str(e)}")
                 return jsonify({"status": "error", "message": str(e)}), 500
+
+
+        @self.app.route('/health', methods=['GET'])
+        def health_check():
+            return jsonify({
+                'status': 'ok',
+                'service': 'trading_webhook',
+                'timestamp': datetime.now().isoformat()
+            }), 200
+
+        @self.app.route('/', methods=['GET'])
+        def root():
+            return jsonify({'status': 'ok', 'message': 'TradingView Webhook Server'}), 200
 
     def run(self):
         host = self.config['webhook'].get('host', '0.0.0.0')

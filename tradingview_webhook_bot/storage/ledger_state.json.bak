@@ -1,5 +1,21 @@
 {
     "positions": {
+        "BTCUSDT": {
+            "symbol": "BTCUSDT",
+            "quantity": -0.07100000000000001,
+            "avg_price": 64622.529473684175,
+            "realized_pnl": 919.83070736842,
+            "daily_realized_pnl": -38.26482315789495,
+            "last_update_date": "2026-03-14"
+        },
+        "ETHUSDT": {
+            "symbol": "ETHUSDT",
+            "quantity": 0.05,
+            "avg_price": 3500.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": ""
+        },
         "binance:BTCUSDT": {
             "symbol": "binance:BTCUSDT",
             "quantity": -0.003,
