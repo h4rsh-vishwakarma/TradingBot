@@ -196,8 +196,9 @@ class WebhookServer:
                     if not all([raw_symbol, side, price]):
                         return jsonify({'status': 'error', 'message': 'Missing symbol, action, or price'}), 400
 
-                    # Clean symbol
-                    symbol = raw_symbol.split('_')[0]
+                    # Clean symbol (remove _PREMIUM, _PERP, etc)
+                    symbol = raw_symbol.replace("_PREMIUM", "").replace("_PERP", "").replace("_INDEX", "")
+                    symbol = symbol.split('_')[0]
                     if symbol and "USDT" not in symbol:
                         symbol = f"{symbol.replace('USD', '')}USDT"
 
@@ -225,7 +226,8 @@ class WebhookServer:
                     parsed = parse_plain_text_alert(raw_body)
                     if not parsed:
                         logger.warning(f"❌ Could not parse alert: {raw_body[:200]}")
-                        return jsonify({'status': 'error', 'message': 'Unrecognized alert format'}), 400
+                        logger.info(f'Ignoring unrecognized alert format')
+                        return jsonify({'status': 'ignored', 'message': 'Unrecognized alert format'}), 200
 
                     # Verify secret
                     if parsed['secret'] != self.webhook_secret:
