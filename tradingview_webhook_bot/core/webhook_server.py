@@ -54,14 +54,17 @@ def parse_plain_text_alert(text):
     if symbol and "USDT" not in symbol:
         symbol = f"{symbol.replace('USD', '')}USDT"
 
-    # Map position_size to action: positive = BUY/LONG, negative = SELL/SHORT, 0 = EXIT
+    # Map position_size to action: positive = BUY/LONG, negative = SELL/SHORT, 0 = EXIT/CLOSE
     position = int(match.group('position'))
+    is_exit = False
     if position > 0:
         side = "BUY"
     elif position < 0:
         side = "SELL"
     else:
-        # Position closed - use the order action
+        # position=0 means flat — this is a CLOSE/EXIT, not a new entry
+        # Use the order action to determine which side to close
+        is_exit = True
         side = "SELL" if action_raw in ("SELL", "SHORT") else "BUY"
 
     return {
@@ -71,6 +74,7 @@ def parse_plain_text_alert(text):
         "side": side,
         "quantity": float(quantity),
         "indicator": strategy.replace(' ', '_'),
+        "is_exit": is_exit,
     }
 
 
@@ -241,6 +245,11 @@ class WebhookServer:
                 if is_json:
                     signal_id = data.get('signal_id') or signal_id
 
+                # Detect if this is an exit/close signal (position=0 in plain text)
+                is_exit_signal = False
+                if not is_json and parsed and parsed.get("is_exit", False):
+                    is_exit_signal = True
+
                 clean_payload = {
                     "signal_id": signal_id,
                     "secret": self.webhook_secret,
@@ -251,7 +260,8 @@ class WebhookServer:
                         "price": price_val,
                         "quantity": quantity,
                         "exchange": exchange,
-                        "indicator": indicator
+                        "indicator": indicator,
+                        "is_exit": is_exit_signal,
                     }
                 }
 
@@ -304,19 +314,6 @@ class WebhookServer:
             except Exception as e:
                 logger.error(f"🔥 Backtest Route Error: {str(e)}")
                 return jsonify({"status": "error", "message": str(e)}), 500
-
-
-        @self.app.route('/health', methods=['GET'])
-        def health_check():
-            return jsonify({
-                'status': 'ok',
-                'service': 'trading_webhook',
-                'timestamp': datetime.now().isoformat()
-            }), 200
-
-        @self.app.route('/', methods=['GET'])
-        def root():
-            return jsonify({'status': 'ok', 'message': 'TradingView Webhook Server'}), 200
 
     def run(self):
         host = self.config['webhook'].get('host', '0.0.0.0')

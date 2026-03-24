@@ -296,8 +296,31 @@ class Orchestrator:
             qty, price_signal = float(payload["quantity"]), float(payload["price"])
             indicator_name = payload_raw.get("indicator") or "AI_Optimized"
 
-            # --- 🛡️ 5. RISK GATES ---
-            is_safe, risk_reason = self.check_safety_gate(symbol, qty, price_signal, side, exchange=target_exchange)
+            # --- 🔄 4.5. EXIT/CLOSE HANDLING (strategy.close() sends position=0) ---
+            is_exit = payload_raw.get("is_exit", False)
+            if is_exit:
+                current_pos = self.ledger.get_position(f"{target_exchange}:{symbol}")
+                if current_pos.quantity == 0:
+                    logger.info(f"🔄 Exit signal for {symbol} but no position open. Skipping.")
+                    return True
+                # Close existing position: if long, sell; if short, buy
+                if current_pos.quantity > 0:
+                    side = "SELL"
+                    qty = abs(current_pos.quantity)
+                elif current_pos.quantity < 0:
+                    side = "BUY"
+                    qty = abs(current_pos.quantity)
+                logger.info(f"🔄 Exit signal: closing {symbol} position ({current_pos.quantity}) with {side} {qty}")
+
+            # --- 🛡️ 5. RISK GATES (skip position conflict check for exit signals) ---
+            if is_exit:
+                # Exit signals bypass position conflict check (closing IS the intended action)
+                if not self.allow_real:
+                    is_safe, risk_reason = False, "ALLOW_REAL_TRADES is disabled"
+                else:
+                    is_safe, risk_reason = True, "Exit signal - closing position"
+            else:
+                is_safe, risk_reason = self.check_safety_gate(symbol, qty, price_signal, side, exchange=target_exchange)
             if not is_safe:
                 logger.warning(f"🚧 Safety Gate Block: {risk_reason}")
                 msg = (f"🚧 <b>Safety Gate: Blocked</b>\n\n"
