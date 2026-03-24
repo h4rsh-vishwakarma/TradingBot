@@ -375,7 +375,7 @@ class Orchestrator:
 
                 # Auto-update analytics (rate limited: 1 per 5 min)
                 try:
-                    if time.time() - self._analytics_last_update > 300:
+                    if True:  # Update on every trade
                         self.analytics.update_today()
                         self._analytics_last_update = time.time()
                 except Exception as ae:

@@ -1,5 +1,21 @@
 {
     "positions": {
+        "BTCUSDT": {
+            "symbol": "BTCUSDT",
+            "quantity": -0.07100000000000001,
+            "avg_price": 64622.529473684175,
+            "realized_pnl": 919.83070736842,
+            "daily_realized_pnl": -38.26482315789495,
+            "last_update_date": "2026-03-14"
+        },
+        "ETHUSDT": {
+            "symbol": "ETHUSDT",
+            "quantity": 0.05,
+            "avg_price": 3500.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": ""
+        },
         "binance:BTCUSDT": {
             "symbol": "binance:BTCUSDT",
             "quantity": -0.003,
@@ -10,52 +26,22 @@
         },
         "binance:SOLUSDT": {
             "symbol": "binance:SOLUSDT",
-            "quantity": 0.997,
-            "avg_price": 90.28,
-            "realized_pnl": 25.543059999999993,
-            "daily_realized_pnl": 4.603059999999994,
+            "quantity": -8.003,
+            "avg_price": 91.66,
+            "realized_pnl": 27.056189999999916,
+            "daily_realized_pnl": 6.1161899999999205,
             "last_update_date": "2026-03-24"
         },
         "binance:ETHUSDT": {
             "symbol": "binance:ETHUSDT",
             "quantity": 0.0,
             "avg_price": 0.0,
-            "realized_pnl": -909.6594999999957,
-            "daily_realized_pnl": 0.14050000000002003,
+            "realized_pnl": -909.8297299999956,
+            "daily_realized_pnl": -0.029729999999999562,
             "last_update_date": "2026-03-24"
         }
     },
     "trade_history": [
-        {
-            "timestamp": "2026-03-23T00:00:37.480590",
-            "symbol": "binance:SOLUSDT",
-            "pnl": 0.04999999999999716,
-            "exit_price": 86.34
-        },
-        {
-            "timestamp": "2026-03-23T01:00:14.707998",
-            "symbol": "binance:SOLUSDT",
-            "pnl": 4.860000000000056,
-            "exit_price": 85.8
-        },
-        {
-            "timestamp": "2026-03-23T01:00:21.265134",
-            "symbol": "binance:SOLUSDT",
-            "pnl": 0.0,
-            "exit_price": 85.8
-        },
-        {
-            "timestamp": "2026-03-23T01:00:30.298472",
-            "symbol": "binance:SOLUSDT",
-            "pnl": -0.0,
-            "exit_price": 85.8
-        },
-        {
-            "timestamp": "2026-03-23T01:00:34.925436",
-            "symbol": "binance:SOLUSDT",
-            "pnl": 0.0,
-            "exit_price": 85.8
-        },
         {
             "timestamp": "2026-03-23T02:00:19.735095",
             "symbol": "binance:SOLUSDT",
@@ -285,46 +271,76 @@
             "exit_price": 2137.29
         },
         {
-            "timestamp": "2026-03-24T00:00:18.943599",
+            "timestamp": "2026-03-24T00:00:18.763957",
             "symbol": "binance:SOLUSDT",
             "pnl": 0.0165,
             "exit_price": 91.55
         },
         {
-            "timestamp": "2026-03-24T01:00:14.346088",
+            "timestamp": "2026-03-24T01:00:28.507143",
             "symbol": "binance:SOLUSDT",
-            "pnl": 4.875330000000001,
+            "pnl": 0.014670000000000002,
             "exit_price": 90.94
         },
         {
-            "timestamp": "2026-03-24T02:00:29.939672",
+            "timestamp": "2026-03-24T02:00:33.431579",
             "symbol": "binance:SOLUSDT",
-            "pnl": 0.001709999999999981,
-            "exit_price": 90.37
+            "pnl": 4.304019999999999,
+            "exit_price": 90.38
         },
         {
-            "timestamp": "2026-03-24T03:00:36.560733",
+            "timestamp": "2026-03-24T03:00:10.985734",
             "symbol": "binance:SOLUSDT",
-            "pnl": -0.2891300000000062,
+            "pnl": 2.7017999999999747,
             "exit_price": 90.08
         },
         {
-            "timestamp": "2026-03-24T04:00:44.930689",
+            "timestamp": "2026-03-24T04:00:31.624834",
             "symbol": "binance:SOLUSDT",
-            "pnl": -0.00075,
+            "pnl": 0.24849999999999994,
             "exit_price": 90.33
         },
         {
-            "timestamp": "2026-03-24T06:00:13.791833",
-            "symbol": "binance:ETHUSDT",
-            "pnl": 0.14050000000002003,
-            "exit_price": 2132.2
+            "timestamp": "2026-03-24T05:00:33.149079",
+            "symbol": "binance:SOLUSDT",
+            "pnl": 0.4502999999999744,
+            "exit_price": 90.28
         },
         {
-            "timestamp": "2026-03-24T06:00:29.989411",
+            "timestamp": "2026-03-24T06:00:15.175495",
             "symbol": "binance:SOLUSDT",
-            "pnl": -0.0006000000000000085,
+            "pnl": -0.19880000000000278,
             "exit_price": 90.08
+        },
+        {
+            "timestamp": "2026-03-24T07:00:17.759121",
+            "symbol": "binance:SOLUSDT",
+            "pnl": -2.7918600000000207,
+            "exit_price": 90.39
+        },
+        {
+            "timestamp": "2026-03-24T08:00:42.961136",
+            "symbol": "binance:SOLUSDT",
+            "pnl": 1.2623799999999958,
+            "exit_price": 91.66
+        },
+        {
+            "timestamp": "2026-03-24T09:00:35.200938",
+            "symbol": "binance:SOLUSDT",
+            "pnl": 0.10999999999999943,
+            "exit_price": 91.55
+        },
+        {
+            "timestamp": "2026-03-24T10:00:13.674500",
+            "symbol": "binance:ETHUSDT",
+            "pnl": -0.029729999999999562,
+            "exit_price": 2164.97
+        },
+        {
+            "timestamp": "2026-03-24T10:00:32.571981",
+            "symbol": "binance:SOLUSDT",
+            "pnl": -0.0013199999999999933,
+            "exit_price": 92.1
         }
     ]
 }
