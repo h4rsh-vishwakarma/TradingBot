@@ -128,6 +128,7 @@ class WebhookServer:
         project_root = current_file.parents[1]
         self.ingestor = BacktestIngestor(project_root, self.telegram)
 
+        self.setup_health_route()
         self.setup_routes()
 
     def _fetch_live_price(self, symbol):
@@ -151,6 +152,12 @@ class WebhookServer:
             logger.warning(f"Binance API fallback failed: {e}")
 
         return 0.0
+
+
+    def setup_health_route(self):
+        @self.app.route("/health", methods=["GET"])
+        def health_check():
+            return {"status": "ok", "service": "webhook", "uptime": "running"}, 200
 
     def setup_routes(self):
         @self.app.route('/webhook/tradingview', methods=['POST'])
