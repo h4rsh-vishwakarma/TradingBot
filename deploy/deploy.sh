@@ -8,7 +8,7 @@ set -e  # Exit on error
 
 # Configuration
 SERVER_USER="ubuntu"
-SERVER_IP="13.236.143.201"
+SERVER_IP="15.207.152.119"
 SERVER_PATH="~/Multi-Strategy-Crypto-Trading-Systems"
 SSH_KEY="$HOME/.ssh/pratik-key-new.pem"
 

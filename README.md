@@ -1,594 +1,364 @@
-# 🚀 Bitcoin Automated Trading Systems
+# TradingView Webhook Trading Bot
 
-**Advanced Multi-Strategy Cryptocurrency Trading Platform**  
-**Server:** ubuntu@13.236.143.201  
-**Status:** ✅ Operational (February 18, 2026)
-
----
-
-## 📋 Overview
-
-This repository contains two sophisticated automated trading systems for Bitcoin futures trading:
-
-1. **Liquidation Heatmap Bot** - Data-driven liquidation cluster analysis and trading
-2. **TradingView Webhook Bot** - Multi-strategy signal-based automated execution
-
-Both systems operate on Binance Futures with advanced risk management, real-time monitoring, and comprehensive observability.
+**Automated Multi-Strategy Crypto Trading Platform**
+**Server:** `ubuntu@15.207.152.119` (AWS ap-south-1)
+**Status:** Operational (March 2026)
 
 ---
 
-## 🎯 Trading Systems
+## Overview
 
-###  TradingView Webhook Bot
+Production-grade automated trading system that receives TradingView webhook alerts, validates them through a multi-layer safety pipeline, and executes trades on Binance Futures. Features a daily grid-search tournament that auto-discovers the best-performing strategies and deploys them.
 
-**Strategy:** Receives and executes signals from TradingView indicators via HTTP webhooks.
-
-**Key Features:**
-- ✅ 8+ concurrent strategies running simultaneously
-- ✅ Mainnet price authority (real market data)
-- ✅ Virtual balance tracking per strategy
-- ✅ TradingView alert integration (Pine Script)
-- ✅ Stop-loss and take-profit automation
-- ✅ Real-time P&L tracking with Google Sheets dashboard
-
-**Active Strategies:**
-1. **Institutional Flow Hybrid** - Volume profile + smart money
-2. **Squeeze Flow Expansion** - Bollinger squeeze breakout
-3. **SMA Crossover 9/21** - Moving average crossover
-4. **Supertrend BTC 4H** - ATR-based trend following
-5. **OBV WaveTrend Scalper** - Volume oscillator scalping
-6. **Madrid Ribbon** - Multi-timeframe EMA ribbon
-7. **Institutional Matrix** - Order flow analysis
-8. **Lorentzian Classification** - ML-based price prediction
-
-**Performance:**
-- Total Strategies: 8 active bots
-- Uptime: 99%+ (systemd managed)
-- Signal Processing: Real-time webhook reception
-- Risk Management: Independent virtual balances per strategy
-
-**Location:** `/home/ubuntu/tradingview-bot/`
-
-📖 **[Read Full Documentation →](docs/TRADINGVIEW_BOT_DOCUMENTATION.md)**  
+**Core Loop:**
+1. TradingView Pine Script strategies fire webhook alerts on each candle close
+2. Webhook server validates, normalizes, and queues signals
+3. Orchestrator checks leaderboard tier, deduplicates, applies safety gates
+4. Binance Futures order executes with quantity caps and position tracking
+5. Telegram alerts + Google Sheets logging for full observability
 
 ---
 
-## 🏗️ System Architecture
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     TRADING SYSTEMS OVERVIEW                    │
-└─────────────────────────────────────────────────────────────────┘
-
-┌──────────────────────────┐      ┌──────────────────────────────┐
-│  LIQUIDATION HEATMAP BOT │      │   TRADINGVIEW WEBHOOK BOT    │
-│  ─────────────────────── │      │   ─────────────────────────  │
-│                          │      │                              │
-│  📊 Data Sources:        │      │  📡 Signal Sources:          │
-│  • Coinglass Scraper     │      │  • TradingView Alerts        │
-│  • Binance OI/FR         │      │  • Pine Script Indicators    │
-│  • LSR Data              │      │  • Webhook HTTP POST         │
-│                          │      │                              │
-│  🧮 Analysis:            │      │  🤖 Execution:               │
-│  • DBSCAN Clustering     │      │  • Multi-Strategy Manager    │
-│  • Multi-TF Analysis     │      │  • Virtual Balance Tracking  │
-│  • 5-Layer Validation    │      │  • LIMIT Order Execution     │
-│                          │      │                              │
-│  💹 Execution:           │      │  📈 Strategies:              │
-│  • Cluster-Based Entry   │      │  • 8 Independent Bots        │
-│  • R-Based Position Size │      │  • Concurrent Processing     │
-│  • Dynamic SL/TP         │      │  • Per-Strategy Risk Mgmt    │
-│                          │      │                              │
-│  🎯 Status: ✅ Active    │      │  🎯 Status: ✅ Active        │
-└──────────────────────────┘      └──────────────────────────────┘
-           │                                    │
-           └──────────────┬─────────────────────┘
-                          │
-                          ▼
-           ┌──────────────────────────────┐
-           │    BINANCE FUTURES TESTNET   │
-           │    ─────────────────────────│
-           │    • Order Execution         │
-           │    • Position Management     │
-           │    • Mainnet Price Feed      │
-           └──────────────────────────────┘
-                          │
-                          ▼
-           ┌──────────────────────────────┐
-           │   MONITORING & OBSERVABILITY │
-           │   ──────────────────────────│
-           │   • Google Sheets Dashboards │
-           │   • Real-time P&L Tracking   │
-           │   • Signal Logs              │
-           │   • Health Heartbeats        │
-           └──────────────────────────────┘
+TradingView Alerts (11 Pine Scripts)
+          |
+          v  HTTP POST (JSON / Plain Text)
++---------+----------+
+|  Nginx (port 443)  |
+|  rate-limit + SSL  |
++---------+----------+
+          |
+          v  proxy_pass :5000
++---------+----------+
+|  Gunicorn (4w/4t)  |    trading_webhook.service
+|  webhook_server.py |
++---------+----------+
+          |
+          v  signals.jsonl (append-only queue)
++---------+----------+
+|   Orchestrator     |    trading_orchestrator.service
+|   orchestrator.py  |
+|                    |
+|  1. Idempotency    |  - deduplicate by signal_id
+|  2. Tier Check     |  - must be ALPHA in tournament_winners.csv
+|  3. Signal Dedup   |  - same strategy+symbol+side within 120s
+|  4. Symbol Cooldown|  - 300s between trades per symbol
+|  5. Candle Lock    |  - first signal wins per hourly candle
+|  6. Safety Gate    |  - daily loss limit, position conflict
+|  7. Qty Cap        |  - SOL:1, ETH:0.05, BTC:0.003
++---------+----------+
+          |
+          v
++---------+----------+
+|  Binance Futures   |    Testnet (ALLOW_REAL_TRADES=true)
+|  binance_client.py |    Mainnet price authority
++---------+----------+
+          |
+          v
++----+----+----+-----+
+|Telegram |Sheets|Ledger|
+| alerts  | log  |state |
++---------+------+------+
 ```
 
 ---
 
-## 📊 Current Status
+## Active Strategies (Top 11 from Tournament)
 
-### System Health (February 18, 2026)
+| Rank | Strategy | Symbol | Daily ROI | Gross DD | Net DD | Tier |
+|------|----------|--------|-----------|----------|--------|------|
+| 1 | OPTIMIZED_SOLUSDT (Bollinger) | SOLUSDT | 2.61% | -65.22% | -96.76% | ALPHA++ |
+| 2 | Reversed BarUpDn Strategy | SOLUSDT | 2.55% | -65.64% | -98.0% | ALPHA++ |
+| 3 | SMC Strategy [LuxAlgo] | SOLUSDT | 2.16% | -59.6% | -82.61% | ALPHA++ |
+| 4 | Reverse Liquidity Trap | SOLUSDT | 2.13% | -61.47% | -78.71% | ALPHA++ |
+| 5 | MVO Momentum Variance | SOLUSDT | 1.72% | -58.82% | -79.06% | ALPHA++ |
+| 6 | Institutional Flow Hybrid | SOLUSDT | 1.62% | -65.28% | -82.6% | ALPHA++ |
+| 7 | OBV + WaveTrend Volume Scalper | SOLUSDT | 1.56% | -63.61% | -89.91% | ALPHA++ |
+| 8 | ML Lorentzian Classification | SOLUSDT | 1.33% | -25.96% | -28.29% | ALPHA |
+| 9 | Reversed BarUpDn Strategy | ETHUSDT | 1.27% | -51.78% | -57.65% | ALPHA |
+| 10 | OPTIMIZED_SOLUSDT (Bollinger) | ETHUSDT | 1.25% | -47.33% | -60.36% | ALPHA |
+| 11 | Mean Reversion Scalper Hybrid | SOLUSDT | 1.22% | -22.23% | -24.16% | ALPHA |
 
-**Liquidation Heatmap Bot:**
-- ✅ Scrapers running (coinglass_visual + OI/FR loop)
-- ✅ Fresh data: Current BTC $68,080-$68,210
-- ✅ 428 liquidation data points loaded
-- ✅ 10 clusters identified
-- ✅ Signals generating (SHORT bias detected)
-- ⚠️ Order execution paused (insufficient margin)
-
-**TradingView Webhook Bot:**
-- ✅ 8 strategies active (systemd services)
-- ✅ Webhook server operational (port 8004)
-- ✅ Real-time signal processing
-- ✅ Virtual balance tracking accurate
-- ✅ Google Sheets dashboard updating
-
-**Infrastructure:**
-- ✅ Xvfb virtual display (Chrome scraping)
-- ✅ File descriptor limits: 65,536
-- ✅ Watchdog scripts monitoring processes
-- ✅ Cron jobs running (every 2 min checks)
+Rankings update daily at 00:15 UTC via `strategy_tournament.py`.
 
 ---
 
-## 📁 Repository Structure
+## Services
 
+| Service | Port | Description | Command |
+|---------|------|-------------|---------|
+| `trading_webhook` | 5000 | Gunicorn webhook receiver (4 workers, gthread) | `sudo systemctl status trading_webhook` |
+| `trading_orchestrator` | - | Signal consumer + trade executor | `sudo systemctl status trading_orchestrator` |
+| `hl_mirror` | - | Hyperliquid lead trader mirror (optional) | `sudo systemctl status hl_mirror` |
+| `telegram_bot` | - | Telegram backtest bot (separate project) | `sudo systemctl status telegram_bot` |
+
+**Cron Jobs:**
+
+| Schedule | Script | Purpose |
+|----------|--------|---------|
+| `0 0 * * *` | `fetch_historical_data.py` | Download 3-year OHLCV for BTC/ETH/SOL |
+| `0 0:15 * * *` | `strategy_tournament.py` | Grid-search optimization, output winners CSV |
+| `0 9 * * *` | `script_vault.py` | Deploy top strategies to Telegram |
+| `0 * * * *` | `auto_injector.py` | Hourly heartbeat health check |
+
+---
+
+## Project Structure
 
 ```
-.
-└── tradingview_webhook_bot
-    ├── README.md
-    ├── RUNBOOK.md
-    ├── archive
-    │   ├── enhanced_trading_bot_remote.py
-    │   ├── legacy_backup
-    │   │   ├── conftest.py
-    │   │   ├── debug_poll.py
-    │   │   ├── generate_report.py
-    │   │   ├── ingest_trades.py
-    │   │   ├── send_fake_signals.py
-    │   │   ├── sync_ledger.py
-    │   │   ├── telegram_listener_secure.py
-    │   │   ├── test_alerts.py
-    │   │   └── test_telegram.py
-    │   ├── main.py
-    │   ├── main_engine.py
-    │   └── simulate_signal.py
-    ├── auto_scan.log
-    ├── aws-configs
-    │   ├── harsh-key-ap-south-1.pem
-    │   └── harsh-server-ap-south-1
-    │       └── HARSH_ACCESS_AP_SOUTH_1.md
-    ├── backtesting
-    │   ├── A_Leaderboard
-    │   │   ├── backtest_imports
-    │   │   │   ├── EMA_9_15_Strategy_with_Webhook_BINANCE_BTCUSDH2026_2026-03-05_15m.csv
-    │   │   │   ├── LuxAlgo_-_SMC_Strategy_BINANCE_ETHUSDH2026_2026-03-05_15m.csv
-    │   │   │   ├── MACD_Strategy_BINANCE_ETHUSDH2026_2026-03-05_4h.csv
-    │   │   │   ├── OBV_Div_BINANCE_BTCUSDH2026_2026-03-05_4h.csv
-    │   │   │   ├── Reverse_Liquidity_Trap_[PyraTime_Logic]_BINANCE_SOLUSDH2026_2026-03-05_4h.csv
-    │   │   │   └── SQZGo-WH_BITSTAMP_BTCUSD_2026-03-05_4h.csv
-    │   │   ├── ingest_csv.py
-    │   │   └── report.py
-    │   ├── __init__.py
-    │   ├── core
-    │   │   ├── add_last_updated.py
-    │   │   ├── init_db.py
-    │   │   └── schemas
-    │   │       └── event_schema_v1.json
-    │   ├── data
-    │   ├── db.sqlite3
-    │   ├── engine.py
-    │   └── pine
-    │       ├── 'SMC Strategy [LuxAlgo] + Webhook', 'LuxAlgo - SMC'
-    │       ├── ATR Supertrend [QuantAlgo]
-    │       ├── EMA 9by15 Strategy
-    │       ├── EMA-SMA Crossover
-    │       ├── Enhanced ATR Supertrend
-    │       ├── Hackathon V3 FIXED - Institutional Matrix
-    │       ├── Hybrid SMC [MarkitTick]
-    │       ├── Hybrid Smart Money Concepts [MarkitTick]
-    │       ├── Institutional Flow Hybrid [SMC + Hull + RSI]
-    │       ├── ML Lorentzian Classification
-    │       ├── MVO Momentum Variance
-    │       ├── Machine Learning Lorentzian Classification
-    │       ├── Madrid Ribbon
-    │       ├── Mean Reversion Scalper Hybrid
-    │       ├── Momentum Variance Oscillator
-    │       ├── OBV + WaveTrend Volume Scalper
-    │       ├── OBV Divergence Strategy
-    │       ├── Oppsite SMA
-    │       ├── Reverse Liquidity Trap
-    │       ├── Reverse MACD Strategy [ETH 1D]
-    │       ├── Reverse Madrid Ribbon Strategy
-    │       ├── Reverse SMA 9 Cross
-    │       ├── Reverse SMA Cross Backtest - ETH 1H
-    │       ├── Reverse SuperTrend - ETH 4h
-    │       ├── Reverse SuperTrend ETH 4h
-    │       ├── Reverse SuperTrend Strategy
-    │       ├── Reversed BarUpDn Strategy
-    │       ├── Smart Money Concept - Uncle Sam
-    │       ├── Smart Money Concepts Strategy [LuxAlgo] + Webhook', 'LuxAlgo - SMC Strategy'
-    │       ├── Smart Money Concepts [LuxAlgo]
-    │       ├── Smart Money Concepts [LuxAlgo] - Webhook'SMC-LuxAlgo-WH'
-    │       ├── Squeeze Go Momentum Pro
-    │       ├── Squeeze Go Pro
-    │       ├── Squeeze Momentum
-    │       ├── Squeeze Momentum Indicator [LazyBear]
-    │       ├── Squeeze Momentum [LazyBear]
-    │       ├── Squeeze vX [DGT]
-    │       ├── Squeeze-Flow Expansion Hybrid
-    │       ├── SuperTrend BTC 4h - Webhook
-    │       ├── SuperTrend Fusion — ATP
-    │       └── Supertrend
-    ├── config
-    │   └── settings.json
-    ├── deploy
-    │   ├── MIGRATION_README.md
-    │   ├── README.md
-    │   ├── deploy.sh
-    │   ├── migrate-server.sh
-    │   ├── nginx
-    │   │   ├── tradingview_webhook.conf
-    │   │   ├── webhook.conf
-    │   │   ├── webhook_rate_limit.conf
-    │   │   └── webhook_ssl_selfsigned.conf
-    │   └── systemd
-    │       ├── tv-engine.service
-    │       └── tv-webhook.service
-    ├── docs
-    │   ├── FINAL_STATUS.md
-    │   ├── LIQUIDATION_HEATMAP_BOT.md
-    │   ├── LIQUIDATION_STRATEGY_DOCUMENTATION.md
-    │   ├── PRD_TRADING_SYSTEMS_COMBINED.md
-    │   ├── RENAME_COMPLETE.md
-    │   ├── REORGANIZATION_PLAN.md
-    │   ├── TRADINGVIEW_BOT_DOCUMENTATION.md
-    │   └── reports
-    │       ├── dlq_analysis_report.txt
-    │       ├── requirements.txt
-    │       └── safety_gate_report.txt
-    ├── logs
-    │   ├── orchestrator.log
-    │   └── webhook.log
-    ├── pytest.ini
-    ├── scripts
-    │   ├── RUNBOOK.md
-    │   ├── analyze_7day.py
-    │   ├── asset_scanner.py
-    │   ├── backup_bot.sh
-    │   ├── clean_dashboard_7tabs.py
-    │   ├── clean_dashboard_tab7.py
-    │   ├── db_setup.py
-    │   ├── dlq_admin.py
-    │   ├── dlq_inspector.py
-    │   ├── dlq_replay.py
-    │   ├── emergency_stop.sh
-    │   ├── enable_trading.sh
-    │   ├── generate_report.py
-    │   ├── ingest_tv_export.py
-    │   ├── kill_switch.py
-    │   ├── ma_cross_checker.py
-    │   ├── smoke_test_signal.py
-    │   ├── strategy_health.py
-    │   └── system_health_check.py
-    ├── strategies
-    │   ├── ema_sma_crossover_webhook.pine
-    │   ├── enhanced_atr_supertrend_config.json
-    │   ├── enhanced_atr_supertrend_webhook.pine
-    │   ├── institutional_matrix_webhook.pine
-    │   ├── lorentzian_classification_webhook.pine
-    │   ├── obv_wavetrend_scalper_webhook.pine
-    │   ├── sma_crossover_9_21_webhook.pine
-    │   ├── squeeze_flow_expansion_webhook.pine
-    │   └── supertrend_btc_4h_webhook.pine
-    ├── tests
-    │   ├── __init__.py
-    │   ├── test_hardened_ledger.py
-    │   ├── test_hardened_logic.py
-    │   └── test_suite.py
-    ├── tradingview_webhook_bot
-    │   ├── README.md
-    │   ├── RUNBOOK.md
-    │   ├── __init__.py
-    │   ├── alerts
-    │   │   ├── __init__.py
-    │   │   ├── email_notifier.py
-    │   │   ├── router.py
-    │   │   ├── telegram_alerts.py
-    │   │   └── test_alerts.py
-    │   ├── clean_dashboard_tab7.py
-    │   ├── core
-    │   │   ├── __init__.py
-    │   │   ├── balance_manager.py
-    │   │   ├── circuit_breaker.py
-    │   │   ├── enhanced_order_manager.py
-    │   │   ├── orchestrator.py
-    │   │   ├── orchestrator.py.bak
-    │   │   ├── order_monitor.py
-    │   │   ├── position_manager.py
-    │   │   ├── position_size_validator.py
-    │   │   ├── reconciler.py
-    │   │   ├── risk_manager.py
-    │   │   ├── schemas.py
-    │   │   ├── signal_processor.py
-    │   │   ├── strategy_engine.py
-    │   │   └── webhook_server.py
-    │   ├── exchange
-    │   │   ├── __init__.py
-    │   │   ├── binance_client.py
-    │   │   ├── enhanced_order_executor.py
-    │   │   ├── execution_engine.py
-    │   │   └── price_provider.py
-    │   ├── ledger
-    │   │   ├── __init__.py
-    │   │   ├── positions.py
-    │   │   └── test_ledger.py
-    │   ├── logs
-    │   │   ├── bot.log
-    │   │   └── enhanced_bot.log
-    │   ├── main_enhanced.py
-    │   ├── recon
-    │   │   ├── __init__.py
-    │   │   ├── reconciler.py
-    │   │   └── test_recon.py
-    │   ├── requirements.txt
-    │   ├── schemas.py
-    │   ├── storage
-    │   │   ├── __init__.py
-    │   │   ├── alerts.jsonl
-    │   │   ├── alerts.jsonl.1
-    │   │   ├── dead_letter.jsonl
-    │   │   ├── dead_letter.jsonl.1
-    │   │   ├── dlq_archive_20260308_175623.jsonl
-    │   │   ├── dlq_archive_20260308_175623.jsonl.1
-    │   │   ├── idempotency.db
-    │   │   ├── idempotency_store.py
-    │   │   ├── jsonl_consumer.py
-    │   │   ├── jsonl_queue.py
-    │   │   ├── ledger_state.json
-    │   │   ├── sheets_logger.py
-    │   │   ├── signals.jsonl
-    │   │   ├── signals.jsonl.1
-    │   │   ├── signals.offset
-    │   │   ├── stress_test_queue.py
-    │   │   ├── test_storage.py
-    │   │   └── trading_system.db
-    │   ├── test_orchestrator.py
-    │   ├── test_webhook_server.py
-    │   ├── tests
-    │   │   └── test_core.py
-    │   ├── tradingview_webhook_server.py
-    │   ├── update_institutional_flow_hybrid_dashboard.py
-    │   ├── update_live_dashboard.py
-    │   └── utils
-    │       ├── __init__.py
-    │       ├── client_order_id_generator.py
-    │       ├── dashboard_updater.py
-    │       ├── event_logger.py
-    │       ├── health_checker.py
-    │       ├── helpers.py
-    │       ├── instance_lock.py
-    │       ├── logger.py
-    │       ├── position_reconciler.py
-    │       ├── signal_archiver.py
-    │       └── telegram_alerter.py
-    └── wsgi.py
-
+tradingview_webhook_bot/
+|-- wsgi.py                          # Gunicorn entry point
+|-- config/
+|   |-- settings.json                # Symbols, risk params, webhook config
+|   |-- strategy_config.json         # Dynamic mode, min tier, emergency stop
+|-- tradingview_webhook_bot/         # Main Python package
+|   |-- core/
+|   |   |-- orchestrator.py          # Signal pipeline + trade execution
+|   |   |-- webhook_server.py        # Flask webhook receiver
+|   |   |-- signal_processor.py      # Signal normalization
+|   |   |-- risk_manager.py          # Position limits, exposure
+|   |   |-- circuit_breaker.py       # Daily loss limit enforcement
+|   |   |-- schemas.py               # Pydantic signal models
+|   |   |-- script_vault.py          # Pine Script generator + Telegram dispatch
+|   |-- exchange/
+|   |   |-- binance_client.py        # Binance Futures order execution
+|   |   |-- price_provider.py        # Live price resolution
+|   |   |-- hl_client.py             # Hyperliquid client (optional)
+|   |   |-- hl_mirror.py             # Lead trader mirror (optional)
+|   |-- ledger/
+|   |   |-- positions.py             # Position state + PnL tracking
+|   |-- storage/
+|   |   |-- jsonl_queue.py           # Append-only signal queue
+|   |   |-- jsonl_consumer.py        # Offset-based queue consumer
+|   |   |-- idempotency_store.py     # SQLite dedup store
+|   |   |-- sheets_logger.py         # Google Sheets trade logger
+|   |-- alerts/
+|   |   |-- telegram_alerts.py       # Telegram notifications
+|   |   |-- email_notifier.py        # Email alerts (optional)
+|   |-- utils/
+|       |-- health_checker.py        # Component health + Prometheus metrics
+|       |-- signal_archiver.py       # Log rotation for signal files
+|-- backtesting/
+|   |-- engine.py                    # Backtest confidence scoring
+|   |-- A_Leaderboard/               # Ingested TV backtest CSVs
+|   |-- pine/                        # 40+ Pine Script strategy folders
+|-- scripts/
+|   |-- strategy_tournament.py       # Daily grid-search optimizer
+|   |-- fetch_historical_data.py     # Binance OHLCV downloader
+|   |-- auto_injector.py             # Hourly heartbeat scanner
+|   |-- kill_switch.py               # Emergency stop all trading
+|   |-- emergency_stop.sh            # Shell-level kill switch
+|-- storage/
+|   |-- backtest_data/               # 3-year 15m candles (BTC/ETH/SOL)
+|   |-- reports/tournament_winners.csv
+|-- strategies/                      # Reference Pine scripts
+|-- deploy/
+|   |-- nginx/                       # Nginx proxy configs
+|   |-- systemd/                     # Service unit files
+|   |-- deploy.sh                    # Automated deployment
 ```
 
 ---
 
-## 🚀 Quick Start
+## Setup
 
 ### Prerequisites
 
-```bash
-# System Requirements
-- Ubuntu 22.04 LTS
-- Python 3.12+
-- Chrome/ChromeDriver (for scraping)
-- Google Service Account (for Sheets API)
-- Binance API keys (Testnet + Mainnet)
-```
+- Ubuntu 22.04 LTS (AWS EC2)
+- Python 3.10+
+- Binance Futures API keys
+- Telegram Bot Token
+- Google Service Account (for Sheets logging)
 
-### Deployment
+### Installation
 
-**1. Clone Repository:**
 ```bash
+# Clone
 cd /home/ubuntu
-git clone <repository_url>
-cd Btc-Layer-Updated-files-main
+git clone <repo_url> tradingview_webhook_bot
+cd tradingview_webhook_bot
+
+# Virtual environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r tradingview_webhook_bot/requirements.txt
+
+# Environment config
+sudo mkdir -p /etc/tradingbot
+sudo cp .env.example /etc/tradingbot/env_vars
+sudo nano /etc/tradingbot/env_vars  # Fill in API keys
 ```
 
-**2. Install Dependencies:**
+### Configuration
+
+**`/etc/tradingbot/env_vars`** (required):
 ```bash
-# Liquidation Bot
-cd liquidation-heatmap-bot
-pip3 install -r requirements.txt
+# Core
+WEBHOOK_SECRET=your_secret_here
+PORT=5000
+RUN_MODE=production
+ALLOW_REAL_TRADES=true
 
-# TradingView Bot
-cd ../tradingview-only-bot
-pip3 install -r requirements.txt
+# Binance
+BINANCE_API_KEY=your_key
+BINANCE_API_SECRET=your_secret
+BINANCE_TESTNET=true
+
+# Telegram
+TELEGRAM_BOT_TOKEN=your_token
+TELEGRAM_CHAT_ID=your_chat_id
+
+# Risk
+MAX_NOTIONAL_PER_TRADE=500.0
+DAILY_LOSS_LIMIT=-50.0
 ```
 
-**3. Configure Environment:**
+### Deploy Services
+
 ```bash
-# Copy example config
-cp .env.example .env
+# Copy service files
+sudo cp deploy/systemd/*.service /etc/systemd/system/
+sudo systemctl daemon-reload
 
-# Edit with your API keys
-nano .env
+# Start services
+sudo systemctl enable --now trading_webhook
+sudo systemctl enable --now trading_orchestrator
+
+# Setup cron
+crontab -e  # Add entries from setup_cron.sh
+
+# Verify
+curl http://127.0.0.1:5000/health
+sudo journalctl -u trading_orchestrator -f
 ```
 
-**4. Start Systems:**
+---
+
+## Signal Flow (Webhook JSON Format)
+
+TradingView sends this JSON on each alert:
+
+```json
+{
+  "secret": "squeeze_tradingview_cluster_2026_secure",
+  "strategy": "Machine_Learning_Lorentzian_Classification",
+  "side": "BUY",
+  "symbol": "SOLUSDT",
+  "timeframe": "1h",
+  "price": 90.28,
+  "quantity": 0.003,
+  "exchange": "binance"
+}
+```
+
+The system also handles TradingView plain-text alerts and auto-extracts fields.
+
+---
+
+## Safety Pipeline
+
+Signals pass through 7 layers before execution:
+
+1. **Idempotency** - SQLite store prevents duplicate signal_id processing
+2. **Leaderboard Tier** - Strategy must be ALPHA or ALPHA++ in daily tournament
+3. **Signal Dedup** - Same strategy+symbol+side blocked within 120s window
+4. **Symbol Cooldown** - 300s minimum between trades on same symbol
+5. **Candle Lock** - First signal per hourly candle wins; opposite direction blocked
+6. **Safety Gate** - Daily PnL limit (-$50), no duplicate positions
+7. **Quantity Cap** - Hard limits: SOL 1.0, ETH 0.05, BTC 0.003
+
+---
+
+## Monitoring
+
+**Telegram Alerts:**
+- Trade executions (BUY/SELL with price and PnL)
+- Safety gate blocks (position conflicts, loss limits)
+- Hourly heartbeat (service health, webhook status)
+
+**Google Sheets:**
+- Live trade log with signal_id, strategy, PnL
+- Blocked trade log with rejection reason
+
+**Logs:**
 ```bash
-# Liquidation Bot
-cd /home/ubuntu/tradingview-webhook-mvp/trading_bot
-python3 -u enhanced_trading_bot.py
+# Webhook server logs
+sudo journalctl -u trading_webhook -f
 
-# TradingView Bots (systemd)
-sudo systemctl start institutional-flow-hybrid.service
-sudo systemctl start squeeze-flow-expansion.service
-# ... (repeat for all strategies)
+# Orchestrator logs
+sudo journalctl -u trading_orchestrator -f
+
+# Heartbeat scan
+tail -f /home/ubuntu/tradingview_webhook_bot/auto_scan.log
 ```
 
-**5. Start Scrapers:**
+**Health Check:**
 ```bash
-# Visual Heatmap Scraper
-cd /home/ubuntu/trading_bot
-nohup xvfb-run python3 coinglass_visual_scraper.py > logs/scraper.log 2>&1 &
-
-# OI/Funding Rate Loop
-cd /home/ubuntu/tradingview-webhook-mvp/trading_bot
-nohup bash run_oi_funding_loop.sh > logs/oi_funding.log 2>&1 &
+curl http://127.0.0.1:5000/health
+# {"service":"trading_webhook","status":"ok","timestamp":"..."}
 ```
 
 ---
 
-## 📖 Documentation
+## Operations
 
-### Core Documentation
-
-📄 **[Product Requirements Document](PRD_TRADING_SYSTEMS_COMBINED.md)**  
-Comprehensive PRD covering both trading systems, architecture, and roadmap.
-
-
-📄 **[TradingView Bot Documentation](docs/TRADINGVIEW_BOT_DOCUMENTATION.md)**  
-Full guide for TradingView webhook integration and multi-strategy setup.
-### Setup Guides
-
-- [HTTPS Setup Guide](HTTPS_SETUP_GUIDE.md)
-- [Indicator Integration Format](INDICATOR_INTEGRATION_FORMAT.md)
-- [Top 6 Indicators Setup](TOP_6_INDICATORS_SETUP_GUIDE.md)
-
-### Strategy Guides
-
-- [ATR Supertrend Setup](ATR_SUPERTREND_ALERT_SETUP_GUIDE.md)
-- [EMA/SMA Crossover Setup](EMA_SMA_ALERT_SETUP_GUIDE.md)
-- [Madrid Ribbon Setup](MADRID_RIBBON_ALERT_SETUP_GUIDE.md)
-- [SMC LuxAlgo Setup](SMC_LUXALGO_SETUP_GUIDE.md)
-
----
-
-## 🛠️ Key Technologies
-
-**Programming:**
-- Python 3.12 (asyncio, multiprocessing)
-- Pine Script (TradingView indicators)
-
-**Data Processing:**
-- Pandas, NumPy (data analysis)
-- Scikit-learn (DBSCAN clustering)
-- gspread (Google Sheets API)
-
-**Web Scraping:**
-- Selenium + Chrome
-- Xvfb (virtual display)
-- undetected-chromedriver
-
-**Trading:**
-- Binance Futures API
-- ccxt (exchange abstraction)
-
-**Monitoring:**
-- Google Sheets (real-time dashboards)
-- systemd (process management)
-- Custom event logging
-
-**Infrastructure:**
-- Ubuntu 22.04 LTS
-- Nginx (webhook proxy)
-- Cron (scheduled tasks)
-
----
-
-## 📊 Performance Metrics
-
-### Liquidation Heatmap Bot
-
-### TradingView Webhook Bot
-
-| Metric | Value |
-|--------|-------|
-| Active Strategies | 8 concurrent bots |
-| Signal Latency | <500ms (webhook reception) |
-| Order Execution | LIMIT orders (maker fees) |
-| Balance Tracking | Virtual per-strategy |
-| Uptime | 99%+ (systemd managed) |
-
----
-
-## 🔐 Security
-
-**API Keys:**
-- ✅ Environment variables (.env)
-- ✅ Testnet keys (no real funds)
-- ✅ Mainnet read-only (price data)
-
-**Webhook Security:**
-- ✅ Secret token validation
-- ✅ HTTPS (optional)
-- ✅ IP restrictions (recommended)
-
-**Risk Management:**
-- ✅ Position size limits
-- ✅ Maximum exposure controls
-- ✅ Kill switch functionality
-- ✅ Virtual balance safeguards
-
----
-
-## 🤝 Support & Contact
-
-**Server Access:**
+### Restart Services
 ```bash
-ssh ubuntu@13.236.143.201
+sudo systemctl restart trading_webhook trading_orchestrator
 ```
 
-**Key Directories:**
-- Liquidation Bot: `/home/ubuntu/tradingview-webhook-mvp/trading_bot/`
-- TradingView Bot: `/home/ubuntu/tradingview-bot/`
-- Logs: `/home/ubuntu/trading_bot/logs/`
+### Emergency Stop
+```bash
+bash scripts/emergency_stop.sh
+# or
+python3 scripts/kill_switch.py
+```
 
-**Monitoring:**
-- Liquidation Bot Logs: `tail -f /home/ubuntu/tradingview-webhook-mvp/trading_bot/bot.log`
-- Scraper Logs: `tail -f /home/ubuntu/trading_bot/logs/coinglass_scraper.log`
-- OI/FR Logs: `tail -f /home/ubuntu/tradingview-webhook-mvp/trading_bot/logs/oi_funding_loop.log`
+### Check Positions
+```bash
+cat tradingview_webhook_bot/storage/ledger_state.json | python3 -m json.tool
+```
 
----
+### View Trade History
+```bash
+# Last 10 trades from ledger
+python3 -c "
+import json
+with open('tradingview_webhook_bot/storage/ledger_state.json') as f:
+    data = json.load(f)
+for t in data.get('trade_history', [])[-10:]:
+    print(f\"{t['timestamp'][:19]}  {t['symbol']:20s}  PnL: \${t['pnl']:>8.2f}\")
+"
+```
 
-## 📝 Recent Updates
-
-### February 18, 2026
-- ✅ Fixed Chrome scraper infrastructure (Xvfb + file descriptors)
-- ✅ Restored liquidation data pipeline (now analyzing current price $66K-$68K)
-- ✅ Started OI/Funding Rate scraper loop (fresh data every 5 minutes)
-- ✅ Resolved signal rejection issue (no longer "no OI/funding/LSR confirmation")
-- ✅ Created comprehensive documentation (3 files, 100+ pages)
-- ✅ Organized docs folder structure
-
----
-
-## 📄 License
-
-This project is proprietary and confidential. All rights reserved.
-
----
-
-## 🎯 Roadmap
-
-See [PRD_TRADING_SYSTEMS_COMBINED.md](PRD_TRADING_SYSTEMS_COMBINED.md) for detailed roadmap and feature planning.
-
-**Upcoming Features:**
-- [ ] Advanced ML-based signal filtering
-- [ ] Multi-exchange support (OKX, Bybit)
-- [ ] Automated backtesting framework
-- [ ] Real-time Telegram notifications
-- [ ] Web-based monitoring dashboard
+### Force Tournament Rerun
+```bash
+cd /home/ubuntu/tradingview_webhook_bot
+venv/bin/python3 scripts/strategy_tournament.py
+```
 
 ---
 
-**Built with ❤️ for algorithmic crypto trading**
+## Recent Changes
+
+### March 23-24, 2026
+- Fixed flip-flop trading (multiple strategies contradicting on same candle)
+- Added candle lock system (first signal wins per hourly candle)
+- Added symbol cooldown (300s between trades per symbol)
+- Capped max quantity per symbol (prevents oversized positions)
+- Fixed strategy name matching (`_normalize()` strips all special chars)
+- Fixed heartbeat alert checking wrong process name
+- Cleaned stale ledger entries and freed disk space (91% -> 80%)
+
+### March 21, 2026
+- Deployed Alpha Engine v10.0 with 11 strategies
+- ADX > 25 filter + 4% trailing stop on all strategies
+- Grid-search tournament with 7-combo parameter optimization
+
+---
+
+## License
+
+Proprietary and confidential. All rights reserved.

@@ -2,7 +2,7 @@
 
 ## Instance Details
 
-- **Instance Name**: `harsh_liquidation_papertrading_ap_south_1`
+- **Instance Name**: `tradingview_webhook_bot_ap_south_1`
 - **Instance ID**: `i-0440274e868b4bae9`
 - **Region**: `ap-south-1` (Mumbai)
 - **Public IP (Elastic IP - Fixed)**: `15.207.152.119`
@@ -79,7 +79,7 @@ Because the instance has the IAM profile `AmazonSSMRoleForInstances`, you (or an
 
 1. AWS Console → **EC2** → **Instances**.
 2. Region selector: choose **`ap-south-1`**.
-3. Find instance **`harsh_liquidation_papertrading_ap_south_1`** (ID `i-0440274e868b4bae9`).
+3. Find instance **`tradingview_webhook_bot_ap_south_1`** (ID `i-0440274e868b4bae9`).
 4. Click **“Connect”** → **“Session Manager”** tab → **“Connect”**.
 
 CLI equivalent:

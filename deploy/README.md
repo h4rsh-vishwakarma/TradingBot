@@ -34,7 +34,7 @@ This project now has automated deployment capabilities to sync code from local d
 1. Add SSH private key to GitHub Secrets:
    - Go to: Repository → Settings → Secrets and variables → Actions
    - Add new secret: `SSH_PRIVATE_KEY`
-   - Paste contents of `~/.ssh/pratik-key-new.pem`
+   - Paste contents of `~/.ssh/harsh-key-ap-south-1.pem`
 
 2. Enable GitHub Actions:
    - Push to `main` branch → Auto-deploys
@@ -44,26 +44,26 @@ This project now has automated deployment capabilities to sync code from local d
 
 | Property | Value |
 |----------|-------|
-| **IP** | 13.236.143.201 |
+| **IP** | 15.207.152.119 |
 | **User** | ubuntu |
 | **Region** | ap-southeast-2 (Sydney) |
 | **Path** | ~/tradingview-bot |
-| **SSH Key** | ~/.ssh/pratik-key-new.pem |
+| **SSH Key** | ~/.ssh/harsh-key-ap-south-1.pem |
 
 ## Quick SSH Commands
 
 ```bash
 # SSH to server
-ssh -i ~/.ssh/pratik-key-new.pem ubuntu@13.236.143.201
+ssh -i ~/.ssh/harsh-key-ap-south-1.pem ubuntu@15.207.152.119
 
 # Check running bots
-ssh -i ~/.ssh/pratik-key-new.pem ubuntu@13.236.143.201 "ps aux | grep main_enhanced"
+ssh -i ~/.ssh/harsh-key-ap-south-1.pem ubuntu@15.207.152.119 "ps aux | grep main_enhanced"
 
 # View logs
-ssh -i ~/.ssh/pratik-key-new.pem ubuntu@13.236.143.201 "tail -f ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log"
+ssh -i ~/.ssh/harsh-key-ap-south-1.pem ubuntu@15.207.152.119 "tail -f ~/tradingview-bot/logs/bot_institutional_flow_hybrid.log"
 
 # Check disk space
-ssh -i ~/.ssh/pratik-key-new.pem ubuntu@13.236.143.201 "df -h"
+ssh -i ~/.ssh/harsh-key-ap-south-1.pem ubuntu@15.207.152.119 "df -h"
 ```
 
 ## Project Structure
@@ -109,7 +109,7 @@ After deploying:
 
 ```bash
 # Check backup and restore
-ssh -i ~/.ssh/pratik-key-new.pem ubuntu@13.236.143.201
+ssh -i ~/.ssh/harsh-key-ap-south-1.pem ubuntu@15.207.152.119
 ls -la ~/tradingview-bot.backup_*
 # Restore if needed
 cp -r ~/tradingview-bot.backup_YYYYMMDD_HHMMSS ~/tradingview-bot
@@ -119,7 +119,7 @@ cp -r ~/tradingview-bot.backup_YYYYMMDD_HHMMSS ~/tradingview-bot
 
 ```bash
 # Check logs
-ssh -i ~/.ssh/pratik-key-new.pem ubuntu@13.236.143.201
+ssh -i ~/.ssh/harsh-key-ap-south-1.pem ubuntu@15.207.152.119
 tail -50 ~/tradingview-bot/logs/bot_*.log
 
 # Restart manually
@@ -132,7 +132,7 @@ python main_enhanced.py --config config/config_institutional_flow_hybrid.json
 
 ```bash
 # Quick health check
-ssh -i ~/.ssh/pratik-key-new.pem ubuntu@13.236.143.201 << 'EOF'
+ssh -i ~/.ssh/harsh-key-ap-south-1.pem ubuntu@15.207.152.119 << 'EOF'
   echo "=== System Uptime ==="
   uptime
   echo ""
@@ -153,7 +153,7 @@ If something goes wrong after deployment:
 
 ```bash
 # SSH to server
-ssh -i ~/.ssh/pratik-key-new.pem ubuntu@13.236.143.201
+ssh -i ~/.ssh/harsh-key-ap-south-1.pem ubuntu@15.207.152.119
 
 # Stop current deployment
 pkill -f main_enhanced.py
