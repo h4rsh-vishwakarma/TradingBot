@@ -33,9 +33,9 @@ def fix_quantity(symbol, quantity, price=None):
     min_qty, step_size = QUANTITY_RULES.get(symbol, (0.001, 0.001))
     precision = max(0, int(round(-math.log10(step_size))))
 
-    # Enforce minimum notional of $5.5 (buffer above $5 minimum)
+    # Enforce minimum notional of $21 (Binance Futures USDT-M minimum is $20)
     if price and price > 0:
-        min_notional_qty = 5.5 / price
+        min_notional_qty = 21.0 / price
         if quantity < min_notional_qty:
             quantity = min_notional_qty
 

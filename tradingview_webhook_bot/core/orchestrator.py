@@ -25,6 +25,7 @@ try:
     from tradingview_webhook_bot.storage.idempotency_store import IdempotencyStore
     from tradingview_webhook_bot.core.schemas import SignalPayload
     from tradingview_webhook_bot.storage.sheets_logger import GoogleSheetsLogger
+    from tradingview_webhook_bot.storage.analytics_writer import AnalyticsWriter
     from tradingview_webhook_bot.storage.jsonl_consumer import JsonlOffsetConsumer
     from tradingview_webhook_bot.ledger.positions import PositionLedger
     from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert, AlertSeverity
@@ -61,6 +62,8 @@ class Orchestrator:
         self.telegram = TelegramAlert()
         self.reconciler = Reconciler(self.ledger)
         self.sheets_logger = GoogleSheetsLogger()
+        self.analytics = AnalyticsWriter()
+        self._analytics_last_update = 0
         self.consumer = JsonlOffsetConsumer(self.queue_path, self.offset_path)
         self.idempotency = IdempotencyStore(self.idempotency_db)
         self.exchange_binance = BinanceClient()
@@ -369,6 +372,14 @@ class Orchestrator:
                     self.sheets_logger.log_trade(signal_id=signal_id, symbol=f"{target_exchange.upper()}:{symbol}",
                         action=side, qty=qty, price=fill_price, strategy=strat_name, indicator=indicator_name, pnl=pos_snapshot.daily_realized_pnl)
                 except: pass
+
+                # Auto-update analytics (rate limited: 1 per 5 min)
+                try:
+                    if time.time() - self._analytics_last_update > 300:
+                        self.analytics.update_today()
+                        self._analytics_last_update = time.time()
+                except Exception as ae:
+                    logger.warning(f"Analytics update skipped: {ae}")
 
                 emoji = "🟢" if side == "BUY" else "🔴"
                 msg = (f"{emoji} <b>Bot Alert: Trade Executed</b>\n\n"
