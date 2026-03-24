@@ -77,11 +77,11 @@ def run_scan():
         issues.append("Webhook server not responding on port 5000")
 
     # 2. Telegram Listener
-    if check_process("telegram_listener"):
-        status_lines.append("Telegram Listener: UP")
+    if check_process("telegram_backtest_bot") or check_process("orchestrator"):
+        status_lines.append("Telegram & Orchestrator: UP")
     else:
-        status_lines.append("Telegram Listener: DOWN")
-        issues.append("Telegram listener process not running")
+        status_lines.append("Telegram & Orchestrator: DOWN")
+        issues.append("Telegram bot or Orchestrator not running")
 
     # 3. Data Freshness
     fresh, detail = check_data_freshness()
