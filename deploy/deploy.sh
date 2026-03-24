@@ -9,8 +9,8 @@ set -e  # Exit on error
 # Configuration
 SERVER_USER="ubuntu"
 SERVER_IP="15.207.152.119"
-SERVER_PATH="~/Multi-Strategy-Crypto-Trading-Systems"
-SSH_KEY="$HOME/.ssh/pratik-key-new.pem"
+SERVER_PATH="~/tradingview_webhook_bot"
+SSH_KEY="$HOME/.ssh/harsh-key-ap-south-1.pem"
 
 # Colors for output
 RED='\033[0;31m'
@@ -93,10 +93,10 @@ log_info "Stopping running bots..."
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
     cd ~/Multi-Strategy-Crypto-Trading-Systems
     # Find all running bot processes and send SIGTERM (using sudo for root processes)
-    sudo pkill -TERM -f 'main_enhanced.py' || true
+    sudo pkill -TERM -f 'tradingview_webhook_bot/core/orchestrator.py' || true
     sleep 3
     # Force kill if still running
-    sudo pkill -KILL -f 'main_enhanced.py' || true
+    sudo pkill -KILL -f 'tradingview_webhook_bot/core/orchestrator.py' || true
     sleep 2
     echo 'Bots stopped'
 "
@@ -140,7 +140,7 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
       if [ -f \"\$config\" ]; then
         strategy_name=\$(basename \"\$config\" .json | sed 's/config_//')
         echo \"  → Starting \$strategy_name\"
-        nohup python tradingview-webhook-bot/main_enhanced.py --config \"\$config\" > \"logs/bot_\${strategy_name}.log\" 2>&1 &
+        nohup python tradingview-webhook-bot/tradingview_webhook_bot/core/orchestrator.py --config \"\$config\" > \"logs/bot_\${strategy_name}.log\" 2>&1 &
         BOT_COUNT=\$((BOT_COUNT + 1))
       fi
     done
@@ -150,7 +150,7 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
 # Verify deployment
 log_info "Verifying deployment..."
 sleep 3
-BOT_COUNT=$(ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "ps aux | grep 'main_enhanced.py' | grep -v grep | wc -l")
+BOT_COUNT=$(ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "ps aux | grep 'tradingview_webhook_bot/core/orchestrator.py' | grep -v grep | wc -l")
 
 log_info "✅ Deployment completed!"
 log_info "📊 Active bots: $BOT_COUNT"

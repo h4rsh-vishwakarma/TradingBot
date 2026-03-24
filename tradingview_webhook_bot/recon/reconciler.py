@@ -28,7 +28,7 @@ class Reconciler:
             try:
                 # Assuming exchange_data[symbol] contains 'side' (LONG/SHORT)
                 side = exchange_data.get(symbol, {}).get('side', 'BOTH')
-                self.ledger.update_position_manually(symbol, incident['exchange_qty'], side)
+                self.ledger.update_position_manually(symbol, incident['exchange_qty'])
                 logger.info(f"🔧 Auto-synced Ledger for {symbol} to {incident['exchange_qty']}")
             except Exception as e:
                 logger.error(f"❌ Failed to auto-fix drift for {symbol}: {e}")

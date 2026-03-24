@@ -31,6 +31,7 @@ try:
     from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert, AlertSeverity
     from tradingview_webhook_bot.recon.reconciler import Reconciler
     from tradingview_webhook_bot.exchange.binance_client import BinanceClient
+    from tradingview_webhook_bot.core.circuit_breaker import CircuitBreaker
     from backtesting.engine import BacktestEngine
     try:
         from tradingview_webhook_bot.exchange.hl_client import HyperliquidClient
@@ -81,6 +82,16 @@ class Orchestrator:
         self.bt_engine = BacktestEngine()
         self.processed_count = 0
         self.last_heartbeat = time.time()
+
+        # --- Circuit Breaker (Daily Loss + Consecutive Loss Protection) ---
+        cb_state = str(PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "circuit_breaker_state.json")
+        cb_config = {"daily_loss_limit_pct": 5.0, "max_consecutive_losses": 8, "cooldown_minutes": 60}
+        try:
+            self.circuit_breaker = CircuitBreaker(cb_state, cb_config)
+            logger.info("Circuit Breaker initialized")
+        except Exception as e:
+            logger.warning(f"Circuit Breaker init failed: {e}")
+            self.circuit_breaker = None
 
         # --- FIX: Anti Flip-Flop Cooldown ---
         # After executing a trade on a symbol, block further trades for COOLDOWN seconds
@@ -373,6 +384,10 @@ class Orchestrator:
                         action=side, qty=qty, price=fill_price, strategy=strat_name, indicator=indicator_name, pnl=pos_snapshot.daily_realized_pnl)
                 except: pass
 
+                # Record win/loss for circuit breaker
+                if self.circuit_breaker:
+                    self.circuit_breaker.record_trade_result(fill_pnl >= 0)
+
                 # Auto-update analytics (rate limited: 1 per 5 min)
                 try:
                     if True:  # Update on every trade
@@ -412,6 +427,16 @@ class Orchestrator:
             if time.time() - self.last_heartbeat > 900:
                 logger.info(f"💓 Heartbeat: Orchestrator is running. Processed: {self.processed_count}")
                 self.last_heartbeat = time.time()
+
+        # --- Circuit Breaker (Daily Loss + Consecutive Loss Protection) ---
+        cb_state = str(PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "circuit_breaker_state.json")
+        cb_config = {"daily_loss_limit_pct": 5.0, "max_consecutive_losses": 8, "cooldown_minutes": 60}
+        try:
+            self.circuit_breaker = CircuitBreaker(cb_state, cb_config)
+            logger.info("Circuit Breaker initialized")
+        except Exception as e:
+            logger.warning(f"Circuit Breaker init failed: {e}")
+            self.circuit_breaker = None
             time.sleep(1)
 
 if __name__ == "__main__":
