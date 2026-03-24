@@ -96,12 +96,13 @@ Rankings update daily at 00:15 UTC via `strategy_tournament.py`.
 
 **Cron Jobs:**
 
-| Schedule | Script | Purpose |
-|----------|--------|---------|
+| Schedule (UTC) | Script | Purpose |
+|:-:|--------|---------|
 | `0 0 * * *` | `fetch_historical_data.py` | Download 3-year OHLCV for BTC/ETH/SOL |
 | `0 0:15 * * *` | `strategy_tournament.py` | Grid-search optimization, output winners CSV |
 | `0 9 * * *` | `script_vault.py` | Deploy top strategies to Telegram |
 | `0 * * * *` | `auto_injector.py` | Hourly heartbeat health check |
+| `55 23 * * *` | `analytics_writer.py` | End-of-day analytics snapshot |
 
 ---
 
@@ -134,6 +135,7 @@ tradingview_webhook_bot/
 |   |   |-- jsonl_consumer.py        # Offset-based queue consumer
 |   |   |-- idempotency_store.py     # SQLite dedup store
 |   |   |-- sheets_logger.py         # Google Sheets trade logger
+|   |   |-- analytics_writer.py     # Auto-updates 3 analytics tabs on every trade
 |   |-- alerts/
 |   |   |-- telegram_alerts.py       # Telegram notifications
 |   |   |-- email_notifier.py        # Email alerts (optional)
@@ -278,9 +280,12 @@ Signals pass through 7 layers before execution:
 - Safety gate blocks (position conflicts, loss limits)
 - Hourly heartbeat (service health, webhook status)
 
-**Google Sheets:**
-- Live trade log with signal_id, strategy, PnL
-- Blocked trade log with rejection reason
+**Google Sheets (6 tabs, auto-updated on every trade):**
+- **Trades** - Live trade log with signal_id, strategy, PnL
+- **Blocked Trades** - Rejected signals with reason
+- **Daily Analytics** - Daily breakdown (trades, wins, losses, PnL, running capital, DD%)
+- **Backtest - With Safety** - Actual bot performance with safety gates
+- **Backtest - Without Safety** - All signals (shows impact of safety gates)
 
 **Logs:**
 ```bash
@@ -343,7 +348,18 @@ venv/bin/python3 scripts/strategy_tournament.py
 
 ## Recent Changes
 
-### March 23-24, 2026
+### March 24, 2026
+- Added real-time Google Sheets analytics (Daily Analytics, Backtest With/Without Safety)
+- All 3 analytics tabs auto-update on every trade (zero delay)
+- Added end-of-day cron (23:55 UTC) as analytics backup
+- Fixed TradingView webhook 400 errors (SOLUSDT_PREMIUM symbol, price=0, unknown formats)
+- Fixed TradingView webhook timeouts (async price fetching)
+- Fixed ETH min notional ($5.5 -> $21 for Binance Futures)
+- Added `/health` endpoint to fix false heartbeat alerts
+- Verified zero flip-flop trades post-fix (candle lock working)
+- Updated RUNBOOK.md with complete architecture and operations guide
+
+### March 23, 2026
 - Fixed flip-flop trading (multiple strategies contradicting on same candle)
 - Added candle lock system (first signal wins per hourly candle)
 - Added symbol cooldown (300s between trades per symbol)

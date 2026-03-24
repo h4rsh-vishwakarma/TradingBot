@@ -1,96 +1,56 @@
-# 🛡️ Trading Bot Production Runbook (2026 Edition)
+# Trading Bot Core Module
 
-This document contains all operational procedures, maintenance commands, and troubleshooting steps for the Trading Bot Orchestrator.
+> **Full runbook and architecture docs are at the project root: [`/RUNBOOK.md`](../RUNBOOK.md)**
 
----
+## Quick Reference
 
-## 🚀 1. Quick Service Management
-Use these commands to manage the background services.
-
-| Action | Webhook Server (Port 80) | Orchestrator (Engine) |
-| :--- | :--- | :--- |
-| **Start** | `sudo systemctl start trading_webhook` | `sudo systemctl start trading_orchestrator` |
-| **Stop** | `sudo systemctl stop trading_webhook` | `sudo systemctl stop trading_orchestrator` |
-| **Restart** | `sudo systemctl restart trading_webhook` | `sudo systemctl restart trading_orchestrator` |
-| **Status** | `systemctl status trading_webhook` | `systemctl status trading_orchestrator` |
-
----
-
-## 📊 2. Monitoring & Auditing
-
-### **A. Check Real-time Logs**
-Follow the logs to see trades happening live:
 ```bash
-# Orchestrator Logs (Trades & Logic)
-journalctl -u trading_orchestrator -f -n 50
+# Service status
+sudo systemctl status trading_webhook trading_orchestrator
 
-# Webhook Logs (Incoming Signals)
-journalctl -u trading_webhook -f -n 50
-B. Inspect Local Ledger (PnL)
-To see the bot's internal view of your positions:
+# Live logs
+journalctl -u trading_orchestrator -f
+journalctl -u trading_webhook -f
 
-```Bash
-cat storage/ledger_state.json | jq
-# C. Check Idempotency (Duplicate Prevention)
-Verify which signals have already been processed:
+# Health check
+curl http://127.0.0.1:5000/health
 
-```Bash
-sqlite3 storage/idempotency.db "SELECT * FROM processed_signals ORDER BY processed_at DESC LIMIT 10;"
-#🛠️ 3. Common Troubleshooting
-Error: 502 Bad Gateway (Nginx)
-If the webhook returns 502, Gunicorn is likely down.
+# Emergency stop
+python3 scripts/kill_switch.py
 
-Check if the socket/port is active: sudo netstat -tulpn | grep 80
+# Check positions
+cat tradingview_webhook_bot/storage/ledger_state.json | python3 -m json.tool
 
-Restart the webhook: sudo systemctl restart trading_webhook
+# Force analytics update
+python3 -c 'from tradingview_webhook_bot.storage.analytics_writer import AnalyticsWriter; AnalyticsWriter().update_today()'
 
-Error: Trade Failed (Binance Notional)
-If logs show Order's notional must be no smaller than 100:
+# Force tournament rerun
+python3 scripts/strategy_tournament.py
+```
 
-Cause: Quantity is too small.
+## Module Layout
 
-Fix: Increase quantity in TradingView alert so that Price x Qty > $100.
+```
+tradingview_webhook_bot/
+  core/
+    webhook_server.py     - Flask HTTP receiver (JSON + plain text)
+    orchestrator.py       - Signal pipeline with 7 safety gates
+  exchange/
+    binance_client.py     - Binance Futures execution
+    hl_client.py          - Hyperliquid client (optional)
+  ledger/
+    positions.py          - Position state + PnL tracking
+  storage/
+    jsonl_queue.py        - Crash-safe append-only signal queue
+    sheets_logger.py      - Google Sheets trade logging
+    analytics_writer.py   - Auto-updates 3 analytics tabs per trade
+    idempotency_store.py  - SQLite duplicate prevention
+  alerts/
+    telegram_alerts.py    - Trade alerts + heartbeat
+  recon/
+    reconciler.py         - Binance vs ledger audit
+```
 
-Error: High Queue Lag
-If you see 🐢 HIGH QUEUE LAG in logs:
-
-Cause: Orchestrator is processing slower than signals are arriving.
-
-Fix: Check CPU usage with top. Restart the orchestrator to clear memory.
-
-#🔄 4. Maintenance & Manual Sync
-Force Reconcile (Binance vs Ledger)
-If the bot's position doesn't match your Binance app:
-
-```Bash
-# Run the manual reconciliation script
-/home/ubuntu/tradingview_webhook_bot/venv/bin/python3 scripts/reconcile_now.py
-Clear Signal Queue
-If you want to wipe the history and start fresh:
-
-```Bash
-sudo systemctl stop trading_orchestrator
-rm storage/signals.jsonl storage/signals.offset
-touch storage/signals.jsonl
-sudo systemctl start trading_orchestrator
-#🔒 5. Security Checklist
-Rotate Secret: If WEBHOOK_SECRET is leaked, change it in .env and restart both services.
-
-API Keys: Never commit .env to GitHub. It is already in .gitignore.
-
-GitHub Actions: Ensure all CI runs stay "Green". If a test fails, do not deploy that version.
-
-Maintained by: AnythingAi 
-Developed by : Harsh Vishwakarma
+Maintained by: AnythingAi Labs
+Developed by: Harsh Vishwakarma
 Last Updated: March 2026
-
-
-###Folder Structure
-
-
-### **Final Words of Advice:**
-1.  **Retention:** Maine GitHub history delete karne ka tarika bata diya hai, use periodic karte rahein.
-2.  **Backup:** Har hafte `storage/` folder ka ek copy apne local machine par le liya karein (Safety first!).
-3.  **Telegram:** Bot ko humesha "Pinned" rakhein taaki koi bhi critical failure alert miss na ho.
-
-**Bhai, aapka bot ab ready hai market fadhne ke liye! 🚀 Koi bhi naya feature ya change c
