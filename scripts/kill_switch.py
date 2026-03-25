@@ -1,153 +1,115 @@
 #!/usr/bin/env python3
 """
-Emergency Kill Switch System
-Creates immediate stop mechanism for trading bot
+Emergency Kill Switch — Close ALL positions and cancel ALL orders.
+Usage:
+  python3 scripts/kill_switch.py --emergency-stop   # Close everything
+  python3 scripts/kill_switch.py --status            # Show current status
 """
-
 import sys
-sys.path.insert(0, '/home/ubuntu/tradingview-bot')
 import os
-from binance.client import Client
-from binance.enums import *
-from dotenv import load_dotenv
-from datetime import datetime
 import json
+import logging
+import argparse
+from datetime import datetime
 
-load_dotenv('/home/ubuntu/tradingview-bot/.env')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-KILL_SWITCH_FILE = '/home/ubuntu/tradingview-bot/KILL_SWITCH'
-STATUS_FILE = '/home/ubuntu/tradingview-bot/kill_switch_status.json'
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+from dotenv import load_dotenv
+env_path = "/etc/tradingbot/env_vars"
+if os.path.exists(env_path):
+    load_dotenv(dotenv_path=env_path)
+else:
+    load_dotenv()
+
+KILL_SWITCH_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                 "tradingview_webhook_bot", "storage", "KILL_SWITCH")
+STATUS_FILE = os.path.join(os.path.dirname(KILL_SWITCH_FILE), "kill_switch_status.json")
+
 
 def activate_kill_switch():
-    """Create kill switch file"""
     with open(KILL_SWITCH_FILE, 'w') as f:
         f.write(f"ACTIVATED: {datetime.now().isoformat()}\n")
-    print("✅ Kill switch ACTIVATED")
+    print("Kill switch ACTIVATED — bot will not execute new trades")
+
 
 def deactivate_kill_switch():
-    """Remove kill switch file"""
     if os.path.exists(KILL_SWITCH_FILE):
         os.remove(KILL_SWITCH_FILE)
-        print("✅ Kill switch DEACTIVATED")
+        print("Kill switch DEACTIVATED — trading can resume")
     else:
-        print("ℹ️  Kill switch was not active")
+        print("Kill switch was not active")
 
-def is_kill_switch_active():
-    """Check if kill switch is active"""
-    return os.path.exists(KILL_SWITCH_FILE)
 
 def emergency_stop():
-    """Emergency stop all trading"""
+    print("=" * 60)
+    print("  EMERGENCY KILL SWITCH")
+    print("  Closes ALL positions and cancels ALL orders.")
+    print("=" * 60)
+
+    confirm = input("\nType 'KILL' to confirm: ").strip()
+    if confirm != "KILL":
+        print("Aborted.")
+        return
+
+    from tradingview_webhook_bot.exchange.binance_client import BinanceClient
+    client = BinanceClient()
+    closed = client.close_all_positions()
+
+    print(f"\nClosed {len(closed)} positions:")
+    for c in closed:
+        print(f"  {c['side']} {c['qty']} {c['symbol']}")
+
+    # Activate kill switch file
+    activate_kill_switch()
+
+    # Save status
+    status = {
+        "activated_at": datetime.now().isoformat(),
+        "reason": "Manual emergency stop",
+        "positions_closed": len(closed),
+    }
+    with open(STATUS_FILE, 'w') as f:
+        json.dump(status, f, indent=2)
+
+    # Notify via Telegram
     try:
-        client = Client(
-            os.getenv('BINANCE_API_KEY'),
-            os.getenv('BINANCE_API_SECRET'),
-            testnet=True
-        )
-        
-        print("\n" + "="*60)
-        print("🚨 EMERGENCY STOP INITIATED")
-        print("="*60)
-        
-        # 1. Close all positions
-        print("\n1. Closing all open positions...")
-        positions = client.futures_position_information()
-        active_positions = [p for p in positions if float(p["positionAmt"]) != 0]
-        
-        if active_positions:
-            for pos in active_positions:
-                symbol = pos['symbol']
-                amt = float(pos['positionAmt'])
-                side = "LONG" if amt > 0 else "SHORT"
-                
-                try:
-                    # Close position
-                    close_side = SIDE_SELL if amt > 0 else SIDE_BUY
-                    order = client.futures_create_order(
-                        symbol=symbol,
-                        side=close_side,
-                        type=FUTURE_ORDER_TYPE_MARKET,
-                        quantity=abs(amt),
-                        reduceOnly='true'
-                    )
-                    print(f"   ✅ Closed {symbol} {side} position")
-                except Exception as e:
-                    print(f"   ❌ Failed to close {symbol}: {e}")
-        else:
-            print("   ℹ️  No open positions to close")
-        
-        # 2. Cancel all open orders
-        print("\n2. Canceling all open orders...")
-        symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
-        for symbol in symbols:
-            try:
-                client.futures_cancel_all_open_orders(symbol=symbol)
-                print(f"   ✅ Canceled all orders for {symbol}")
-            except Exception as e:
-                if "No need to cancel" not in str(e):
-                    print(f"   ⚠️  {symbol}: {e}")
-        
-        # 3. Activate kill switch
-        print("\n3. Activating kill switch...")
-        activate_kill_switch()
-        
-        # 4. Save status
-        status = {
-            'activated_at': datetime.now().isoformat(),
-            'reason': 'Manual emergency stop',
-            'positions_closed': len(active_positions),
-            'balance': float(client.futures_account()['totalWalletBalance'])
-        }
-        
-        with open(STATUS_FILE, 'w') as f:
-            json.dump(status, f, indent=2)
-        
-        print("\n" + "="*60)
-        print("✅ EMERGENCY STOP COMPLETE")
-        print("="*60)
-        print(f"Positions closed: {len(active_positions)}")
-        print(f"Current balance: ${status['balance']:.2f}")
-        print("\nTo resume trading:")
-        print("  python3 kill_switch.py --deactivate")
-        print("  sudo systemctl restart tradingbot")
-        print("="*60)
-        
-    except Exception as e:
-        print(f"\n❌ EMERGENCY STOP FAILED: {e}")
-        print("Please manually close positions and stop the bot!")
-        import traceback
-        traceback.print_exc()
+        from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert, AlertSeverity
+        telegram = TelegramAlert()
+        msg = f"🚨 KILL SWITCH (CLI)\nClosed {len(closed)} positions"
+        telegram.send(severity=AlertSeverity.WARNING, title="KILL SWITCH", message=msg)
+    except Exception:
+        pass
+
+    print("\n" + "=" * 60)
+    print("EMERGENCY STOP COMPLETE")
+    print("=" * 60)
+    print("To resume: python3 scripts/kill_switch.py --deactivate")
+    print("Then:      sudo systemctl restart trading_orchestrator trading_webhook")
+
 
 def show_status():
-    """Show kill switch status"""
-    is_active = is_kill_switch_active()
-    
-    print("\n" + "="*60)
-    print("KILL SWITCH STATUS")
-    print("="*60)
-    print(f"Status: {'🔴 ACTIVE' if is_active else '🟢 INACTIVE'}")
-    
+    is_active = os.path.exists(KILL_SWITCH_FILE)
+    print("=" * 60)
+    print(f"Kill Switch: {'ACTIVE' if is_active else 'INACTIVE'}")
     if is_active and os.path.exists(STATUS_FILE):
-        with open(STATUS_FILE, 'r') as f:
+        with open(STATUS_FILE) as f:
             status = json.load(f)
-        print(f"\nActivated: {status['activated_at']}")
-        print(f"Reason: {status['reason']}")
+        print(f"Activated: {status['activated_at']}")
         print(f"Positions closed: {status['positions_closed']}")
-        print(f"Balance at stop: ${status['balance']:.2f}")
-    
-    print("="*60)
+    print("=" * 60)
+
 
 if __name__ == "__main__":
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Emergency Kill Switch for Trading Bot')
-    parser.add_argument('--activate', action='store_true', help='Activate kill switch (emergency stop)')
-    parser.add_argument('--deactivate', action='store_true', help='Deactivate kill switch (resume trading)')
-    parser.add_argument('--status', action='store_true', help='Show kill switch status')
-    parser.add_argument('--emergency-stop', action='store_true', help='Emergency stop: close all positions and activate kill switch')
-    
+    parser = argparse.ArgumentParser(description='Emergency Kill Switch')
+    parser.add_argument('--emergency-stop', action='store_true', help='Close all positions')
+    parser.add_argument('--activate', action='store_true', help='Activate kill switch (block trades)')
+    parser.add_argument('--deactivate', action='store_true', help='Deactivate kill switch')
+    parser.add_argument('--status', action='store_true', help='Show status')
     args = parser.parse_args()
-    
+
     if args.emergency_stop:
         emergency_stop()
     elif args.activate:
@@ -157,8 +119,4 @@ if __name__ == "__main__":
     elif args.status:
         show_status()
     else:
-        print("Usage:")
-        print("  Emergency stop: python3 kill_switch.py --emergency-stop")
-        print("  Activate:       python3 kill_switch.py --activate")
-        print("  Deactivate:     python3 kill_switch.py --deactivate")
-        print("  Status:         python3 kill_switch.py --status")
+        parser.print_help()

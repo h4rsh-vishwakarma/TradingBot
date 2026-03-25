@@ -7,9 +7,16 @@ Persists state to local storage for crash recovery and Hybrid Scoring.
 import logging
 import json
 import os
+import tempfile
 from datetime import datetime
 from typing import Dict, List
 from pydantic import BaseModel
+
+try:
+    import fcntl
+    HAS_FCNTL = True
+except ImportError:
+    HAS_FCNTL = False  # Windows
 
 logger = logging.getLogger(__name__)
 
@@ -46,15 +53,26 @@ class PositionLedger:
                 logger.error(f"❌ Failed to load ledger state: {e}")
 
     def _save_state(self):
-        """Persists the current ledger state and trade history to disk."""
+        """Persists the current ledger state atomically with file locking."""
         try:
             os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
-            with open(self.storage_path, 'w') as f:
-                data = {
-                    "positions": {s: p.model_dump() for s, p in self.positions.items()},
-                    "trade_history": self.trade_history[-50:] # Keep last 50 trades for scoring
-                }
-                json.dump(data, f, indent=4)
+            data = {
+                "positions": {s: p.model_dump() for s, p in self.positions.items()},
+                "trade_history": self.trade_history[-50:]
+            }
+            # Atomic write: write to temp file, then rename
+            dir_name = os.path.dirname(self.storage_path)
+            fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix='.tmp')
+            try:
+                with os.fdopen(fd, 'w') as f:
+                    if HAS_FCNTL:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                    json.dump(data, f, indent=4)
+                os.replace(tmp_path, self.storage_path)
+            except Exception:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                raise
         except Exception as e:
             logger.error(f"❌ Failed to save ledger state: {e}")
 

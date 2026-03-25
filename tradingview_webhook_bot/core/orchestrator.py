@@ -45,7 +45,10 @@ class Orchestrator:
     def __init__(self):
         self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
         self.run_mode = os.getenv("RUN_MODE", "production")
-        self.webhook_secret = os.getenv("WEBHOOK_SECRET", "squeeze_tradingview_cluster_2026_secure").strip()
+        self.webhook_secret = os.getenv("WEBHOOK_SECRET", "").strip()
+        if not self.webhook_secret:
+            logger.critical("WEBHOOK_SECRET not set in env_vars! Set it in /etc/tradingbot/env_vars")
+            sys.exit(1)
         self.max_notional = float(os.getenv("MAX_NOTIONAL_PER_TRADE", "500.0"))
         self.daily_loss_limit = float(os.getenv("DAILY_LOSS_LIMIT", "-50.0"))
 
@@ -312,6 +315,14 @@ class Orchestrator:
 
             # --- 🔄 4.5. EXIT/CLOSE HANDLING (strategy.close() sends position=0) ---
             is_exit = payload_raw.get("is_exit", False)
+            # Detect exit from JSON position_size=0 or plain text "position is 0"
+            if not is_exit:
+                pos_size = str(payload_raw.get("position_size", event.get("position_size", ""))).strip()
+                if pos_size in ("0", "0.0", "flat"):
+                    is_exit = True
+                raw_body = str(event.get("raw_body", ""))
+                if "position is 0" in raw_body.lower() or "position is -" in raw_body.lower():
+                    is_exit = True
             if is_exit:
                 current_pos = self.ledger.get_position(f"{target_exchange}:{symbol}")
                 if current_pos.quantity == 0:
@@ -378,6 +389,15 @@ class Orchestrator:
                 pos_snapshot = self.ledger.apply_fill(f"{target_exchange}:{symbol}", side, qty, fill_price)
                 self._mark_symbol_traded(symbol)  # Start cooldown for this symbol
                 self._set_candle_lock(symbol, side, strat_name)  # Lock direction for candle
+
+                # --- Place exchange-side stop-loss (3% default) ---
+                if not is_exit and target_exchange == "binance":
+                    sl_pct = float(os.getenv("STOP_LOSS_PCT", "3.0"))
+                    sl_res = self.exchange_binance.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
+                    if sl_res.get("status") == "SUCCESS":
+                        logger.info(f"🛡️ SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
+                    else:
+                        logger.warning(f"⚠️ SL placement failed for {symbol}: {sl_res.get('msg')}")
                 self.processed_count += 1
                 try:
                     self.sheets_logger.log_trade(signal_id=signal_id, symbol=f"{target_exchange.upper()}:{symbol}",
@@ -386,7 +406,7 @@ class Orchestrator:
 
                 # Record win/loss for circuit breaker
                 if self.circuit_breaker:
-                    self.circuit_breaker.record_trade_result(fill_pnl >= 0)
+                    self.circuit_breaker.record_trade_result(pos_snapshot.daily_realized_pnl >= 0)
 
                 # Auto-update analytics (rate limited: 1 per 5 min)
                 try:
@@ -415,10 +435,22 @@ class Orchestrator:
                         reason=f"Execution Failed: {exec_reason}", signal_id=signal_id)
                 except Exception:
                     pass
-                return True
+                # Permanent failures: mark seen so we don't retry forever
+                if exec_reason == "permanent":
+                    self.idempotency.mark_seen(signal_id)
+                    return True
+                # Transient failures: return False so consumer retries
+                return False
 
         except Exception as e:
-            logger.error(f"❌ Critical Error in handle_signal: {e}"); return True
+            logger.error(f"❌ Critical Error in handle_signal: {e}")
+            # Log to DLQ for manual recovery
+            try:
+                with open(self.dlq_path, 'a') as dlq:
+                    dlq.write(json.dumps({"ts": datetime.utcnow().isoformat(), "err": str(e), "event": event}) + "\n")
+            except Exception:
+                pass
+            return True
 
     def run(self):
         logger.info(f"🚀 Execution Engine Live | Dynamic Brain Mode ACTIVE")
@@ -428,15 +460,6 @@ class Orchestrator:
                 logger.info(f"💓 Heartbeat: Orchestrator is running. Processed: {self.processed_count}")
                 self.last_heartbeat = time.time()
 
-        # --- Circuit Breaker (Daily Loss + Consecutive Loss Protection) ---
-        cb_state = str(PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "circuit_breaker_state.json")
-        cb_config = {"daily_loss_limit_pct": 5.0, "max_consecutive_losses": 8, "cooldown_minutes": 60}
-        try:
-            self.circuit_breaker = CircuitBreaker(cb_state, cb_config)
-            logger.info("Circuit Breaker initialized")
-        except Exception as e:
-            logger.warning(f"Circuit Breaker init failed: {e}")
-            self.circuit_breaker = None
             time.sleep(1)
 
 if __name__ == "__main__":

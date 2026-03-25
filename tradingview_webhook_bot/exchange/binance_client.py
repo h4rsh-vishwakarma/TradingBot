@@ -171,6 +171,74 @@ class BinanceClient:
             logger.error(f"❌ Unexpected Execution Error: {e}")
             return {"status": "FAILED", "reason": "exception", "msg": str(e)}
 
+    def place_stop_loss(self, symbol, side, quantity, entry_price, sl_pct=3.0, signal_id=None):
+        """Place a stop-loss order after entry. sl_pct = stop distance in %."""
+        if not self.allow_real:
+            return {"status": "SKIPPED", "msg": "Dry-run mode"}
+        try:
+            # Stop side is opposite of entry
+            stop_side = "SELL" if side == "BUY" else "BUY"
+            if side == "BUY":
+                stop_price = round(entry_price * (1 - sl_pct / 100), 2)
+            else:
+                stop_price = round(entry_price * (1 + sl_pct / 100), 2)
+
+            quantity = fix_quantity(symbol, quantity, price=stop_price)
+            params = {
+                "symbol": symbol,
+                "side": stop_side,
+                "type": "STOP_MARKET",
+                "stopPrice": str(stop_price),
+                "quantity": quantity,
+                "closePosition": "false",
+                "newClientOrderId": f"SL_{signal_id}" if signal_id else f"SL_{int(time.time())}",
+                "workingType": "MARK_PRICE"
+            }
+            logger.info(f"🛡️ Placing SL: {stop_side} {quantity} {symbol} @ ${stop_price} ({sl_pct}% from ${entry_price})")
+            response = self.client.futures_create_order(**params)
+            logger.info(f"✅ Stop-Loss placed: {response.get('orderId')}")
+            return {"status": "SUCCESS", "orderId": response.get("orderId"), "stopPrice": stop_price}
+        except BinanceAPIException as e:
+            logger.error(f"❌ Stop-Loss Error: {e.message}")
+            return {"status": "FAILED", "msg": e.message}
+        except Exception as e:
+            logger.error(f"❌ Stop-Loss Error: {e}")
+            return {"status": "FAILED", "msg": str(e)}
+
+    def close_all_positions(self):
+        """Emergency kill switch: close ALL open futures positions."""
+        closed = []
+        try:
+            positions = self.client.futures_position_information()
+            for pos in positions:
+                amt = float(pos.get('positionAmt', 0))
+                if amt == 0:
+                    continue
+                symbol = pos['symbol']
+                side = "SELL" if amt > 0 else "BUY"
+                qty = abs(amt)
+                try:
+                    qty = fix_quantity(symbol, qty)
+                    self.client.futures_create_order(
+                        symbol=symbol, side=side, type="MARKET", quantity=qty,
+                        newClientOrderId=f"KILL_{int(time.time())}_{symbol}"
+                    )
+                    logger.critical(f"🚨 KILLED: {side} {qty} {symbol}")
+                    closed.append({"symbol": symbol, "side": side, "qty": qty})
+                except Exception as e:
+                    logger.error(f"❌ Failed to close {symbol}: {e}")
+            # Cancel all open orders
+            try:
+                symbols_with_orders = set(o['symbol'] for o in self.client.futures_get_open_orders())
+                for sym in symbols_with_orders:
+                    self.client.futures_cancel_all_open_orders(symbol=sym)
+                    logger.critical(f"🚨 Cancelled all orders for {sym}")
+            except Exception as e:
+                logger.error(f"❌ Failed to cancel orders: {e}")
+        except Exception as e:
+            logger.error(f"❌ Kill switch error: {e}")
+        return closed
+
     def get_account_health(self):
         try:
             acc = self.client.futures_account()

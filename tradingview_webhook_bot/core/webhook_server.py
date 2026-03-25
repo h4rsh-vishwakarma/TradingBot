@@ -129,6 +129,7 @@ class WebhookServer:
         self.ingestor = BacktestIngestor(project_root, self.telegram)
 
         self.setup_health_route()
+        self.setup_kill_switch()
         self.setup_routes()
 
     def _fetch_live_price(self, symbol):
@@ -158,6 +159,32 @@ class WebhookServer:
         @self.app.route("/health", methods=["GET"])
         def health_check():
             return {"status": "ok", "service": "webhook", "uptime": "running"}, 200
+
+    def setup_kill_switch(self):
+        @self.app.route("/kill", methods=["POST"])
+        def kill_switch():
+            """Emergency: close all positions and cancel all orders."""
+            try:
+                data = request.get_json(silent=True) or {}
+                secret = data.get("secret", "")
+                if secret != self.webhook_secret:
+                    return jsonify({"error": "Unauthorized"}), 401
+
+                from tradingview_webhook_bot.exchange.binance_client import BinanceClient
+                client = BinanceClient()
+                closed = client.close_all_positions()
+
+                msg = f"🚨 KILL SWITCH ACTIVATED\nClosed {len(closed)} positions"
+                try:
+                    self.telegram.send(severity=AlertSeverity.WARNING, title="KILL SWITCH", message=msg)
+                except Exception:
+                    pass
+
+                logger.critical(f"🚨 KILL SWITCH: Closed {len(closed)} positions")
+                return jsonify({"status": "killed", "closed": closed}), 200
+            except Exception as e:
+                logger.error(f"Kill switch error: {e}")
+                return jsonify({"error": str(e)}), 500
 
     def setup_routes(self):
         @self.app.route('/webhook/tradingview', methods=['POST'])
@@ -332,7 +359,7 @@ class WebhookServer:
 
 if __name__ == "__main__":
     # Mock config if run standalone
-    conf = {"webhook": {"secret": "squeeze_tradingview_cluster_2026_secure", "host": "0.0.0.0", "port": 5000}}
+    conf = {"webhook": {"secret": os.getenv("WEBHOOK_SECRET", ""), "host": "0.0.0.0", "port": 5000}}
     queue_file = "/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/storage/signals.jsonl"
     server = WebhookServer(conf, queue_file)
     server.run()
