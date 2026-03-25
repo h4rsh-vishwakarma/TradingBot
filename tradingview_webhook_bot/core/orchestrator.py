@@ -35,6 +35,7 @@ try:
     from tradingview_webhook_bot.recon.reconciler import Reconciler
     from tradingview_webhook_bot.exchange.binance_client import BinanceClient
     from tradingview_webhook_bot.core.circuit_breaker import CircuitBreaker
+    from tradingview_webhook_bot.core.metrics import metrics
     from backtesting.engine import BacktestEngine
     from tradingview_webhook_bot.exchange.hl_client import HyperliquidClient
 except ImportError as e:
@@ -206,6 +207,7 @@ class Orchestrator:
 
     def handle_signal(self, event: dict) -> bool:
         try:
+            metrics.inc("bot_signals_received_total")
             correlation_id = str(uuid.uuid4())[:8]
             signal_id = event.get("signal_id")
             logger.info(f"[{correlation_id}] Processing signal {signal_id}")
@@ -240,6 +242,7 @@ class Orchestrator:
                         reason=f"Tier Block: {reason}", signal_id=signal_id)
                 except Exception as e:
                     logger.debug(f"Sheets log failed: {e}")
+                metrics.inc("bot_signals_blocked_total", labels={"reason": "tier_block"})
                 return True
 
             # --- 1.5. SIGNAL DEDUP CHECK ---
@@ -249,6 +252,7 @@ class Orchestrator:
 
             # --- 1.6. SYMBOL COOLDOWN CHECK ---
             if self._is_symbol_in_cooldown(symbol):
+                metrics.inc("bot_signals_blocked_total", labels={"reason": "cooldown"})
                 logger.info(f"Cooldown block: {symbol} (strategy: {strat_name})")
                 return True
 
@@ -461,6 +465,8 @@ class Orchestrator:
                         logger.warning(f"TP placement failed for {symbol}: {tp_res.get('msg')}")
 
                 self.processed_count += 1
+                metrics.inc("bot_trades_executed_total", labels={"symbol": symbol, "side": side})
+                metrics.set_gauge("bot_last_trade_price", fill_price, labels={"symbol": symbol})
                 # Async: non-blocking Sheets write
                 def _log_trade():
                     try:
@@ -472,6 +478,7 @@ class Orchestrator:
                 self._thread_pool.submit(_log_trade)
 
                 # Record win/loss for circuit breaker
+                metrics.set_gauge("bot_daily_pnl_usd", pos_snapshot.daily_realized_pnl)
                 if self.circuit_breaker:
                     self.circuit_breaker.record_trade_result(pos_snapshot.daily_realized_pnl >= 0)
 
@@ -507,6 +514,7 @@ class Orchestrator:
             else:
                 exec_reason = execution_res.get('reason', 'Unknown API Error')
                 exec_msg = execution_res.get('msg', '')
+                metrics.inc("bot_execution_failures_total")
                 logger.error(f"[{correlation_id}] Execution Failure: {exec_reason} | Detail: {exec_msg}")
                 try:
                     self.sheets_logger.log_blocked_trade(

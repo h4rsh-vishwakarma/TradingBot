@@ -35,6 +35,9 @@ class DurableSignalQueue:
                     error TEXT
                 )
             """)
+            conn.execute("PRAGMA journal_mode=WAL")  # Write-Ahead Logging: concurrent reads + crash safety
+            conn.execute("PRAGMA synchronous=NORMAL")  # Faster writes, still crash-safe with WAL
+            conn.execute("PRAGMA cache_size=-8000")  # 8MB cache for faster reads
             conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON signals(status)")
             # Reset any stuck 'processing' signals from a crash
             stuck = conn.execute(

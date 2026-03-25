@@ -1,6 +1,8 @@
 import sys, os, json, time, re, csv, threading
 from pathlib import Path
-from flask import Flask, request, jsonify
+from flask import Flask
+from flask import request, jsonify
+from tradingview_webhook_bot.core.metrics import metrics
 from datetime import datetime
 
 # --- 1. DYNAMIC PATH RESOLUTION (Fixes ModuleNotFoundError) ---
@@ -245,6 +247,7 @@ class WebhookServer:
                     return jsonify({'status': 'error', 'message': 'Rate limit exceeded'}), 429
 
                 raw_body = request.get_data(as_text=True).strip()
+                metrics.inc("bot_webhook_requests_total")
                 logger.info(f"📨 Webhook received: {raw_body[:200]}")
 
                 # --- DETECT FORMAT: JSON or Plain Text ---

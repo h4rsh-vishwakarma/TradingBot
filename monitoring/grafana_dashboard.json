@@ -1,0 +1,129 @@
+{
+  "dashboard": {
+    "title": "TradingView Webhook Bot",
+    "uid": "tradingbot-main",
+    "panels": [
+      {
+        "title": "Signals Received (total)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "bot_signals_received_total"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "title": "Trades Executed (total)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "bot_trades_executed_total"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        }
+      },
+      {
+        "title": "Signals Blocked (total)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "bot_signals_blocked_total"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "title": "Execution Failures",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "bot_execution_failures_total"
+          }
+        ],
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        }
+      },
+      {
+        "title": "Daily PnL ($)",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "bot_daily_pnl_usd"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 0,
+          "y": 4
+        }
+      },
+      {
+        "title": "Bot Uptime (seconds)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "bot_uptime_seconds"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 12,
+          "y": 4
+        }
+      },
+      {
+        "title": "Trades by Symbol",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "bot_trades_executed_total"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 10
+        }
+      },
+      {
+        "title": "Block Reasons",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "bot_signals_blocked_total"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 10
+        }
+      }
+    ]
+  },
+  "overwrite": true
+}
