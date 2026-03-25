@@ -363,11 +363,12 @@ class WebhookServer:
                 _sym, _side, _price, _sig, _strat = symbol, side, price_val, signal_id, strategy
                 def _notify_telegram():
                     try:
+                        price_display = f"${_price:,.2f}" if _price and _price > 0 else "Resolving..."
                         self.telegram.send(
                             severity=AlertSeverity.INFO,
                             title=f"📥 Signal Received: {_sym}",
                             message=(f"🏹 <b>Action:</b> <code>{str(_side).upper()}</code>\n"
-                                     f"💰 <b>Price:</b> <code>${_price:,.2f}</code>\n"
+                                     f"💰 <b>Price:</b> <code>{price_display}</code>\n"
                                      f"📋 <b>Strategy:</b> <code>{_strat}</code>\n"
                                      f"🆔 <b>ID:</b> <code>{_sig}</code>\n\n"
                                      f"⏳ <i>Processing via Orchestrator...</i>")

@@ -449,10 +449,22 @@ class Orchestrator:
                 except Exception as ae:
                     logger.warning(f"Analytics update skipped: {ae}")
 
-                emoji = "BUY" if side == "BUY" else "SELL"
+                emoji = "🟢" if side == "BUY" else "🔴"
+                sl_info = ""
+                if not is_exit and target_exchange == "binance":
+                    sl_pct_val = float(os.getenv("STOP_LOSS_PCT", "3.0"))
+                    sl_price_est = fill_price * (1 - sl_pct_val / 100) if side == "BUY" else fill_price * (1 + sl_pct_val / 100)
+                    sl_info = f"\n🛡️ <b>Stop-Loss:</b> <code>${sl_price_est:,.2f}</code> ({sl_pct_val}%)"
                 try:
                     self.telegram.send(severity=AlertSeverity.INFO, title="Trade Success",
-                        message=f"Executed: {side} {symbol} @ {fill_price} | PnL: ${pos_snapshot.daily_realized_pnl:.2f}")
+                        message=(f"{emoji} <b>Bot Alert: Trade Executed</b>\n\n"
+                                 f"✅ <b>Executed:</b> {side} {symbol}\n"
+                                 f"💰 <b>Price:</b> <code>${fill_price:,.2f}</code>\n"
+                                 f"📊 <b>Quantity:</b> <code>{qty}</code>\n"
+                                 f"📋 <b>Strategy:</b> <code>{strat_name}</code>\n"
+                                 f"📈 <b>BT Status:</b> Verified {tier}{sl_info}\n"
+                                 f"💵 <b>Today PnL:</b> <code>${pos_snapshot.daily_realized_pnl:.2f}</code>\n"
+                                 f"🆔 <b>ID:</b> <code>{signal_id}</code>"))
                 except Exception as e:
                     logger.debug(f"Telegram failed: {e}")
                 return True
