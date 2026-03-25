@@ -57,6 +57,14 @@ class GoogleSheetsLogger:
             self.sheet = None
             self.blocked_sheet = None
 
+    def _reconnect(self):
+        """Reconnect to Google Sheets if token expired."""
+        try:
+            logger.info("Reconnecting to Google Sheets...")
+            self._connect()
+        except Exception as e:
+            logger.error(f"Sheets reconnect failed: {e}")
+
     def log_trade(self, signal_id, symbol, action, qty, price, strategy="N/A", indicator="N/A", pnl=0.0):
         """
         Logs detailed trade data including PnL for Analytics formulas.

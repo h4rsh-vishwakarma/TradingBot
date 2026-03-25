@@ -215,6 +215,40 @@ class BinanceClient:
             logger.error(f"❌ Stop-Loss Error: {e}")
             return {"status": "FAILED", "msg": str(e)}
 
+
+    def place_take_profit(self, symbol, side, quantity, entry_price, tp_pct=5.0, signal_id=None):
+        """Place a take-profit order after entry. tp_pct = profit distance in %."""
+        if not self.allow_real:
+            return {"status": "SKIPPED", "msg": "Dry-run mode"}
+        try:
+            tp_side = "SELL" if side == "BUY" else "BUY"
+            if side == "BUY":
+                tp_price = round(entry_price * (1 + tp_pct / 100), 2)
+            else:
+                tp_price = round(entry_price * (1 - tp_pct / 100), 2)
+
+            quantity = fix_quantity(symbol, quantity, price=tp_price)
+            params = {
+                "symbol": symbol,
+                "side": tp_side,
+                "type": "TAKE_PROFIT_MARKET",
+                "stopPrice": str(tp_price),
+                "quantity": quantity,
+                "closePosition": "false",
+                "newClientOrderId": f"TP_{signal_id}" if signal_id else f"TP_{int(time.time())}",
+                "workingType": "MARK_PRICE"
+            }
+            logger.info(f"🎯 Placing TP: {tp_side} {quantity} {symbol} @ ${tp_price} ({tp_pct}% from ${entry_price})")
+            response = self.client.futures_create_order(**params)
+            logger.info(f"✅ Take-Profit placed: {response.get('orderId')}")
+            return {"status": "SUCCESS", "orderId": response.get("orderId"), "tpPrice": tp_price}
+        except BinanceAPIException as e:
+            logger.error(f"❌ Take-Profit Error: {e.message}")
+            return {"status": "FAILED", "msg": e.message}
+        except Exception as e:
+            logger.error(f"❌ Take-Profit Error: {e}")
+            return {"status": "FAILED", "msg": str(e)}
+
     def close_all_positions(self):
         """Emergency kill switch: close ALL open futures positions."""
         closed = []

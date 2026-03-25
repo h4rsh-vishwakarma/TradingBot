@@ -66,6 +66,24 @@ class IdempotencyStore:
         except sqlite3.Error as e:
             logger.error(f"❌ Database Write Error (mark_seen): {e}")
 
+
+    def cleanup_old(self, days: int = 7):
+        """Remove signals older than N days to prevent unbounded growth."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    "DELETE FROM processed_signals WHERE processed_at < datetime('now', ?)",
+                    (f'-{days} days',)
+                )
+                conn.commit()
+                deleted = cursor.rowcount
+                if deleted > 0:
+                    logger.info(f"🧹 Idempotency cleanup: removed {deleted} signals older than {days} days")
+                return deleted
+        except sqlite3.Error as e:
+            logger.error(f"Cleanup error: {e}")
+            return 0
+
     def get_recent_signals(self, limit: int = 10):
         """Helper for debugging/admin tools to see recent activity."""
         with sqlite3.connect(self.db_path) as conn:

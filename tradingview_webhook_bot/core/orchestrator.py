@@ -1,5 +1,6 @@
 import time, logging, os, json, sys, signal as _signal, pandas as pd
 from concurrent.futures import ThreadPoolExecutor
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -134,7 +135,7 @@ class Orchestrator:
 
     def _set_candle_lock(self, symbol: str, side: str, strategy: str):
         self._candle_lock[symbol] = {"side": side, "time": time.time(), "strategy": strategy}
-        logger.info(f"Candle locked: {symbol} -> {side} by {strategy} for {self.CANDLE_LOCK_SECONDS}s")
+        logger.info(f"[{correlation_id}] Candle locked: {symbol} -> {side} by {strategy} for {self.CANDLE_LOCK_SECONDS}s")
 
     def _is_symbol_in_cooldown(self, symbol: str) -> bool:
         last_trade = self._symbol_cooldown.get(symbol, 0)
@@ -205,7 +206,9 @@ class Orchestrator:
 
     def handle_signal(self, event: dict) -> bool:
         try:
+            correlation_id = str(uuid.uuid4())[:8]
             signal_id = event.get("signal_id")
+            logger.info(f"[{correlation_id}] Processing signal {signal_id}")
             if self.idempotency.is_seen(signal_id):
                 logger.info(f"Skipping duplicate: {signal_id}")
                 return True
@@ -366,7 +369,7 @@ class Orchestrator:
             else:
                 is_safe, risk_reason = self.check_safety_gate(symbol, qty, price_signal, side, exchange=target_exchange)
             if not is_safe:
-                logger.warning(f"Safety Gate Block: {risk_reason}")
+                logger.warning(f"[{correlation_id}] Safety Gate Block: {risk_reason}")
                 try:
                     self.telegram.send(severity=AlertSeverity.WARNING, title="Risk Block",
                         message=f"Safety Gate: {symbol} - {risk_reason}")
@@ -445,11 +448,17 @@ class Orchestrator:
                 # Place exchange-side stop-loss
                 if not is_exit and target_exchange == "binance":
                     sl_pct = float(os.getenv("STOP_LOSS_PCT", "3.0"))
+                    tp_pct = float(os.getenv("TAKE_PROFIT_PCT", "5.0"))
                     sl_res = self.exchange_binance.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
                     if sl_res.get("status") == "SUCCESS":
                         logger.info(f"SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
                     else:
                         logger.warning(f"SL placement failed for {symbol}: {sl_res.get('msg')}")
+                    tp_res = self.exchange_binance.place_take_profit(symbol, side, qty, fill_price, tp_pct=tp_pct, signal_id=signal_id)
+                    if tp_res.get("status") == "SUCCESS":
+                        logger.info(f"TP placed for {symbol} @ ${tp_res.get('tpPrice')}")
+                    else:
+                        logger.warning(f"TP placement failed for {symbol}: {tp_res.get('msg')}")
 
                 self.processed_count += 1
                 # Async: non-blocking Sheets write
@@ -477,6 +486,7 @@ class Orchestrator:
 
                 emoji = "🟢" if side == "BUY" else "🔴"
                 sl_info = ""
+                tp_info = ""
                 if not is_exit and target_exchange == "binance":
                     sl_pct_val = float(os.getenv("STOP_LOSS_PCT", "3.0"))
                     sl_price_est = fill_price * (1 - sl_pct_val / 100) if side == "BUY" else fill_price * (1 + sl_pct_val / 100)
@@ -497,7 +507,7 @@ class Orchestrator:
             else:
                 exec_reason = execution_res.get('reason', 'Unknown API Error')
                 exec_msg = execution_res.get('msg', '')
-                logger.error(f"Execution Failure: {exec_reason} | Detail: {exec_msg}")
+                logger.error(f"[{correlation_id}] Execution Failure: {exec_reason} | Detail: {exec_msg}")
                 try:
                     self.sheets_logger.log_blocked_trade(
                         symbol=symbol, side=side, strategy=strat_name,
