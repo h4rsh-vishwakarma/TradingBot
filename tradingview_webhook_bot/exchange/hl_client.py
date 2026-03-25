@@ -19,7 +19,7 @@ class HyperliquidClient:
         self.exchange = None
         
         if not self.address or not self.key:
-            logger.error("❌ HL Credentials missing in /etc/tradingbot/env_vars!")
+            logger.info("HL Credentials not configured — Hyperliquid disabled")
             return
 
         # Network Setup
@@ -32,7 +32,9 @@ class HyperliquidClient:
             self.exchange = Exchange(self.account, self.base_url, account_address=self.address)
             logger.info(f"✅ HL Client Initialized | Wallet: {self.address} | Network: {'Testnet' if self.is_testnet else 'Mainnet'}")
         except Exception as e:
-            logger.error(f"❌ HL Initialization Error: {e}")
+            logger.warning(f"HL init skipped (non-critical): {e}")
+            self.info = None
+            self.exchange = None
 
     def get_balance(self):
         """Safe USDC Balance check"""

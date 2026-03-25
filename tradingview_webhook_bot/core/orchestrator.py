@@ -27,6 +27,7 @@ try:
     from tradingview_webhook_bot.storage.sheets_logger import GoogleSheetsLogger
     from tradingview_webhook_bot.storage.analytics_writer import AnalyticsWriter
     from tradingview_webhook_bot.storage.jsonl_consumer import JsonlOffsetConsumer
+    from tradingview_webhook_bot.storage.signal_queue import DurableSignalQueue
     from tradingview_webhook_bot.ledger.positions import PositionLedger
     from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert, AlertSeverity
     from tradingview_webhook_bot.recon.reconciler import Reconciler
@@ -65,7 +66,11 @@ class Orchestrator:
         self.sheets_logger = GoogleSheetsLogger()
         self.analytics = AnalyticsWriter()
         self._analytics_last_update = 0
+        # Dual queue: SQLite (primary, durable) + JSONL (legacy fallback)
+        self.queue_db_path = f"{base_storage}/signal_queue.db"
+        self.durable_queue = DurableSignalQueue(self.queue_db_path, max_retries=3)
         self.consumer = JsonlOffsetConsumer(self.queue_path, self.offset_path)
+        self.use_durable_queue = os.getenv("USE_DURABLE_QUEUE", "true").lower() == "true"
         self.idempotency = IdempotencyStore(self.idempotency_db)
         self.exchange_binance = BinanceClient()
 
@@ -479,9 +484,13 @@ class Orchestrator:
         _signal.signal(_signal.SIGTERM, _shutdown)
         _signal.signal(_signal.SIGINT, _shutdown)
 
-        logger.info(f"🚀 Execution Engine Live | Dynamic Brain Mode ACTIVE")
+        queue_type = "SQLite Durable" if self.use_durable_queue else "JSONL Legacy"
+        logger.info(f"🚀 Execution Engine Live | Queue: {queue_type}")
         while self._running:
-            self.consumer.poll(handler=self.handle_signal, batch_size=1)
+            if self.use_durable_queue:
+                self.durable_queue.poll(handler=self.handle_signal, batch_size=1)
+            else:
+                self.consumer.poll(handler=self.handle_signal, batch_size=1)
             if time.time() - self.last_heartbeat > 900:
                 logger.info(f"💓 Heartbeat: Orchestrator is running. Processed: {self.processed_count}")
                 self.last_heartbeat = time.time()

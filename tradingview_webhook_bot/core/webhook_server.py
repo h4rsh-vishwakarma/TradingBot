@@ -17,6 +17,10 @@ if str(PACKAGE_ROOT) not in sys.path:
 from utils.logger import setup_logger
 from storage.jsonl_queue import AtomicJsonlQueue
 try:
+    from storage.signal_queue import DurableSignalQueue
+except ImportError:
+    from tradingview_webhook_bot.storage.signal_queue import DurableSignalQueue
+try:
     from alerts.telegram_alerts import TelegramAlert, AlertSeverity
 except ImportError:
     from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert, AlertSeverity
@@ -126,6 +130,11 @@ class WebhookServer:
         self.config = config
         self.webhook_secret = config['webhook']['secret'].strip()
         self.queue = AtomicJsonlQueue(signals_queue_file)
+        # Durable SQLite queue (primary)
+        db_path = signals_queue_file.replace('.jsonl', '_queue.db').replace('signals_queue', 'signal_queue')
+        if 'signal_queue' not in db_path:
+            db_path = os.path.join(os.path.dirname(signals_queue_file), 'signal_queue.db')
+        self.durable_queue = DurableSignalQueue(db_path)
         self.telegram = TelegramAlert()
 
         # Rate limiting state
@@ -138,6 +147,7 @@ class WebhookServer:
         self.app.config['MAX_CONTENT_LENGTH'] = self.MAX_PAYLOAD_BYTES
 
         self.setup_health_route()
+        self.setup_metrics_route()
         self.setup_kill_switch()
         self.setup_routes()
 
@@ -178,6 +188,26 @@ class WebhookServer:
         @self.app.route("/health", methods=["GET"])
         def health_check():
             return {"status": "ok", "service": "webhook", "uptime": "running"}, 200
+
+    def setup_metrics_route(self):
+        @self.app.route("/metrics", methods=["GET"])
+        def metrics():
+            """Prometheus-compatible metrics endpoint."""
+            try:
+                queue_stats = self.durable_queue.get_stats()
+                lines = [
+                    "# HELP trading_bot_signals_total Total signals by status",
+                    "# TYPE trading_bot_signals_total gauge",
+                    f'trading_bot_signals_total{{status="pending"}} {queue_stats.get("pending", 0)}',
+                    f'trading_bot_signals_total{{status="completed"}} {queue_stats.get("completed", 0)}',
+                    f'trading_bot_signals_total{{status="dlq"}} {queue_stats.get("dlq", 0)}',
+                    "# HELP trading_bot_webhook_up Webhook server health",
+                    "# TYPE trading_bot_webhook_up gauge",
+                    "trading_bot_webhook_up 1",
+                ]
+                return "\n".join(lines) + "\n", 200, {"Content-Type": "text/plain"}
+            except Exception as e:
+                return f"# error: {e}\ntrading_bot_webhook_up 0\n", 200, {"Content-Type": "text/plain"}
 
     def setup_kill_switch(self):
         @self.app.route("/kill", methods=["POST"])
@@ -321,8 +351,9 @@ class WebhookServer:
                     }
                 }
 
-                # Queue signal (fast file write, ~1ms)
+                # Queue signal to both JSONL (legacy) and SQLite (durable)
                 self.queue.enqueue(clean_payload)
+                self.durable_queue.enqueue(clean_payload)
                 logger.info(f"✅ Signal Queued: {symbol} {side} @ ${price_val} | Strategy: {strategy} (ID: {signal_id})")
 
                 # Return 200 IMMEDIATELY
