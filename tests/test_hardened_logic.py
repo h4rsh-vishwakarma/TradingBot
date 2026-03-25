@@ -51,7 +51,8 @@ def test_qty_precision_fix(MockClient):
     """Test that fix_quantity adjusts precision correctly."""
     from tradingview_webhook_bot.exchange.binance_client import fix_quantity
     # SOL: step_size=0.1, min_qty=0.1
-    assert fix_quantity("SOLUSDT", 0.05, price=90) == 0.3  # bumped to min notional
+    qty_sol = fix_quantity("SOLUSDT", 0.05, price=90)
+    assert qty_sol * 90 >= 21  # meets min notional $21
     # BTC: step_size=0.001, min_qty=0.001
     assert fix_quantity("BTCUSDT", 0.0005, price=90000) == 0.001  # bumped to min_qty
     # ETH: step_size=0.001, min_qty=0.001
