@@ -345,6 +345,22 @@ class Orchestrator:
                     qty = abs(current_pos.quantity)
                 logger.info(f"🔄 Exit signal: closing {symbol} position ({current_pos.quantity}) with {side} {qty}")
 
+            # --- 🚨 4.9. KILL SWITCH CHECK ---
+            kill_file = os.path.join(os.path.dirname(self.ledger_path), "KILL_SWITCH")
+            if os.path.exists(kill_file):
+                logger.critical(f"🚨 KILL SWITCH ACTIVE — blocking all trades")
+                return True
+
+            # --- 🛡️ 4.95. CIRCUIT BREAKER CHECK ---
+            if self.circuit_breaker and not self.circuit_breaker.should_allow_trade():
+                cb_reason = self.circuit_breaker.get_status().get('trip_reason', 'Circuit breaker tripped')
+                logger.warning(f"🚨 Circuit Breaker: {cb_reason}")
+                try:
+                    self.sheets_logger.log_blocked_trade(symbol=symbol, side=side, strategy=strat_name,
+                        reason=f"Circuit Breaker: {cb_reason}", signal_id=signal_id)
+                except Exception: pass
+                return True
+
             # --- 🛡️ 5. RISK GATES (skip position conflict check for exit signals) ---
             if is_exit:
                 # Exit signals bypass position conflict check (closing IS the intended action)
@@ -377,8 +393,8 @@ class Orchestrator:
                 try:
                     health = self.exchange_binance.get_account_health()
                     avail = health.get("available_balance", 0)
-                    if avail > 0 and price_val > 0:
-                        qty = (avail * equity_pct) / price_val
+                    if avail > 0 and price_signal > 0:
+                        qty = (avail * equity_pct) / price_signal
                         logger.info(f"📐 Equity sizing: {equity_pct*100}% of ${avail:.2f} = {qty:.6f} {symbol}")
                 except Exception as e:
                     logger.warning(f"⚠️ Equity sizing failed, using signal qty: {e}")
