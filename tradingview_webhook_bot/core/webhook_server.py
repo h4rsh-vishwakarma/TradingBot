@@ -117,6 +117,10 @@ class BacktestIngestor:
         return str(filepath)
 
 class WebhookServer:
+    MAX_PAYLOAD_BYTES = 65536  # 64KB max payload
+    RATE_LIMIT_PER_SECOND = 10
+    RATE_LIMIT_WINDOW = 1.0  # seconds
+
     def __init__(self, config, signals_queue_file):
         self.app = Flask(__name__)
         self.config = config
@@ -124,13 +128,28 @@ class WebhookServer:
         self.queue = AtomicJsonlQueue(signals_queue_file)
         self.telegram = TelegramAlert()
 
+        # Rate limiting state
+        self._request_times = []
+
         current_file = Path(__file__).resolve()
         project_root = current_file.parents[1]
         self.ingestor = BacktestIngestor(project_root, self.telegram)
 
+        self.app.config['MAX_CONTENT_LENGTH'] = self.MAX_PAYLOAD_BYTES
+
         self.setup_health_route()
         self.setup_kill_switch()
         self.setup_routes()
+
+    def _check_rate_limit(self):
+        """Returns True if request should be rejected (rate limited)."""
+        now = time.time()
+        cutoff = now - self.RATE_LIMIT_WINDOW
+        self._request_times = [t for t in self._request_times if t > cutoff]
+        if len(self._request_times) >= self.RATE_LIMIT_PER_SECOND:
+            return True
+        self._request_times.append(now)
+        return False
 
     def _fetch_live_price(self, symbol):
         """Fetch live price from Binance mainnet (fast, cached)."""
@@ -190,6 +209,11 @@ class WebhookServer:
         @self.app.route('/webhook/tradingview', methods=['POST'])
         def receive_signal():
             try:
+                # Rate limiting
+                if self._check_rate_limit():
+                    logger.warning("🚫 Rate limit exceeded")
+                    return jsonify({'status': 'error', 'message': 'Rate limit exceeded'}), 429
+
                 raw_body = request.get_data(as_text=True).strip()
                 logger.info(f"📨 Webhook received: {raw_body[:200]}")
 

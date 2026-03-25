@@ -84,6 +84,7 @@ class BinanceClient:
             self.client.futures_account_balance()
             mode = "TESTNET" if self.testnet else "LIVE"
             logger.info(f"✅ Connected to Binance Futures [{mode}] | Real Trades: {self.allow_real}")
+            self._load_exchange_info()
         except Exception as e:
             logger.error(f"❌ Connection Failed: Check /etc/tradingbot/env_vars content. Error: {e}")
             raise
@@ -238,6 +239,22 @@ class BinanceClient:
         except Exception as e:
             logger.error(f"❌ Kill switch error: {e}")
         return closed
+
+    def _load_exchange_info(self):
+        """Fetch quantity rules dynamically from Binance exchangeInfo."""
+        global QUANTITY_RULES
+        try:
+            info = self.client.futures_exchange_info()
+            for s in info.get('symbols', []):
+                sym = s['symbol']
+                for f in s.get('filters', []):
+                    if f['filterType'] == 'LOT_SIZE':
+                        min_qty = float(f['minQty'])
+                        step = float(f['stepSize'])
+                        QUANTITY_RULES[sym] = (min_qty, step)
+            logger.info(f"📐 Loaded {len(QUANTITY_RULES)} symbol precision rules from exchangeInfo")
+        except Exception as e:
+            logger.warning(f"⚠️ exchangeInfo fetch failed, using hardcoded rules: {e}")
 
     def get_account_health(self):
         try:

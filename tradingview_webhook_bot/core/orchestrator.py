@@ -1,4 +1,4 @@
-import time, logging, os, json, sys, pandas as pd
+import time, logging, os, json, sys, signal as _signal, pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -459,14 +459,24 @@ class Orchestrator:
             return True
 
     def run(self):
+        self._running = True
+
+        def _shutdown(signum, frame):
+            logger.info(f"🛑 Received signal {signum}, shutting down gracefully...")
+            self._running = False
+
+        _signal.signal(_signal.SIGTERM, _shutdown)
+        _signal.signal(_signal.SIGINT, _shutdown)
+
         logger.info(f"🚀 Execution Engine Live | Dynamic Brain Mode ACTIVE")
-        while True:
+        while self._running:
             self.consumer.poll(handler=self.handle_signal, batch_size=1)
             if time.time() - self.last_heartbeat > 900:
                 logger.info(f"💓 Heartbeat: Orchestrator is running. Processed: {self.processed_count}")
                 self.last_heartbeat = time.time()
-
             time.sleep(1)
+
+        logger.info(f"🛑 Orchestrator stopped gracefully. Total processed: {self.processed_count}")
 
 if __name__ == "__main__":
     Orchestrator().run()
