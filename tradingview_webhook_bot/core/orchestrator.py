@@ -33,10 +33,7 @@ try:
     from tradingview_webhook_bot.exchange.binance_client import BinanceClient
     from tradingview_webhook_bot.core.circuit_breaker import CircuitBreaker
     from backtesting.engine import BacktestEngine
-    try:
-        from tradingview_webhook_bot.exchange.hl_client import HyperliquidClient
-    except ImportError:
-        from tradingview_webhook_bot.exchanges.hl_client import HyperliquidClient
+    from tradingview_webhook_bot.exchange.hl_client import HyperliquidClient
 except ImportError as e:
     logger.error(f"❌ Import failed: {e}")
     sys.exit(1)

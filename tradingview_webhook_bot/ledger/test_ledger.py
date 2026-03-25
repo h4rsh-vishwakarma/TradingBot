@@ -1,5 +1,5 @@
 import pytest
-from positions import PositionLedger
+from tradingview_webhook_bot.ledger.positions import PositionLedger
 
 def test_weighted_average_and_pnl():
     ledger = PositionLedger()

@@ -17,7 +17,7 @@ else:
     load_dotenv(dotenv_path=PROJECT_ROOT / ".env", override=True)
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "squeeze_tradingview_cluster_2026_secure")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 DB_PATH = os.path.join(PROJECT_ROOT, "tradingview_webhook_bot/storage/idempotency.db")
 REPORT_PATH = os.path.join(PROJECT_ROOT, "storage/reports/tournament_winners.csv")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://127.0.0.1:5000/webhook/tradingview")

@@ -1,62 +1,39 @@
-# Environments
-venv/
-.env
+# Python
 __pycache__/
 *.pyc
+*.pyo
+venv/
 
-# Credentials & Keys
-credentials.json
+# Environment & Secrets
+.env
 *.pem
 *.key
+service_account.json
+/etc/tradingbot/env_vars
 
-# Sensitive Configs (Keep the template, ignore the real one)
+# Credentials & Config
 config/*.json
 !config/config_template.json
+credentials.json
+
+# Storage (runtime data)
+storage/*.json
+storage/*.db
+storage/*.jsonl
+storage/*.offset
+storage/*.csv
+storage/*.gz
+storage/*.bak
+storage/reports/*.csv
 
 # Logs
 *.log
 logs/
 
-# Storage & Trading Data
-storage/*.jsonl
-storage/*.json
-storage/*.db
-storage/*.offset
-service_account.json
-.env
-service_account.json
-.env
-service_account.json
-.env
-storage/ledger_state.json
-storage/ledger_state.json.bak
-storage/*.db
-storage/*.csv
-storage/test_performance.csv
+# Backup files
+*.bak
 
-# Security & Secrets
-.env
-service_account.json
-
-
-# Databases & Data
-storage/*.db
-storage/*.csv
-storage/*.jsonl
-*.db
-*.jsonl
-
-# Python artifacts
-__pycache__/
-*.pyc
-venv/
-storage/*.json
-storage/*.db
-storage/*.offset
-
-
-
-/etc/tradingbot/env_vars
-storage/*.json
-storage/*.jsonl
-storage/reports/*.csv
+# IDE
+.vscode/
+.idea/
+.claude/

@@ -3,7 +3,10 @@ import json
 import uuid
 
 URL = "http://127.0.0.1:5000/webhook/tradingview" 
-SECRET = "squeeze_tradingview_cluster_2026_secure"
+import os
+from dotenv import load_dotenv
+load_dotenv("/etc/tradingbot/env_vars") if os.path.exists("/etc/tradingbot/env_vars") else load_dotenv()
+SECRET = os.getenv("WEBHOOK_SECRET", "")
 
 payload = {
     "signal_id": f"FINAL_SUCCESS_{uuid.uuid4().hex[:6]}",
