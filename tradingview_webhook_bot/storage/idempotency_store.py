@@ -39,7 +39,16 @@ class IdempotencyStore:
 
     def is_seen(self, signal_id: str) -> bool:
         """Quick check to see if a signal has already been touched."""
-        return self.get_order_mapping(signal_id) is not None
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT 1 FROM processed_signals WHERE signal_id = ?",
+                    (signal_id,)
+                )
+                return cursor.fetchone() is not None
+        except sqlite3.Error as e:
+            logger.error(f"Database Read Error (is_seen): {e}")
+            return False
 
     def mark_seen(self, signal_id: str, client_order_id: str = None):
         """
