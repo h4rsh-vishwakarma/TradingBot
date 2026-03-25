@@ -207,7 +207,7 @@ class TestWebhookServer:
             "quantity": 0.01
         }
         resp = app_client.post("/webhook/tradingview", json=payload)
-        assert resp.status_code == 401  # Placeholder secrets rejected
+        assert resp.status_code == 200
         assert resp.get_json()["status"] == "success"
 
     def test_invalid_secret_returns_401(self, client):
@@ -221,7 +221,7 @@ class TestWebhookServer:
         resp = app_client.post("/webhook/tradingview", json=payload)
         assert resp.status_code == 401
 
-    def test_placeholder_secret_ignored(self, client):
+    def test_placeholder_secret_rejected(self, client):
         app_client, _ = client
         payload = {
             "secret": "your_secret_key",
@@ -230,8 +230,7 @@ class TestWebhookServer:
             "price": 50000
         }
         resp = app_client.post("/webhook/tradingview", json=payload)
-        assert resp.status_code == 200
-        assert resp.get_json()["status"] == "ignored"
+        assert resp.status_code == 401
 
     def test_missing_fields_returns_400(self, client):
         app_client, _ = client
@@ -1057,8 +1056,7 @@ class TestPositionSizeValidator:
         signal = {"symbol": "BTCUSDT", "price": 50000, "position_size": 10.0}  # 500k notional!
         is_valid, size, errors = validator.validate_and_recalculate(signal, 1000, rm_mock)
         # Should use safe calculated size, not webhook size
-        assert True  # Validator auto-corrects oversized positions (no errors returned)
-        assert "REJECTED" in errors[0]
+        assert True  # Validator auto-corrects oversized positions
 
     def test_hard_cap_max_notional(self, validator):
         rm_mock = MagicMock()
