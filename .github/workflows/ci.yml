@@ -15,7 +15,7 @@ jobs:
           python-version: '3.10'
       - name: Install dependencies
         run: |
-          pip install pytest pydantic python-binance gspread google-auth requests python-dotenv pandas flask gunicorn
+          pip install pytest pydantic python-binance gspread google-auth requests python-dotenv pandas flask gunicorn tenacity
       - name: Run tests
         run: |
           cd tests && python -m pytest -v --tb=short
