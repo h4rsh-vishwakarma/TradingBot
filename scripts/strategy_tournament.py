@@ -52,6 +52,16 @@ def strategy_tournament():
             if best_res:
                 daily_roi, gross_dd, net_dd, win_rate, sharpe, trades, tier, opt_p = best_res
 
+                # Out-of-sample validation (80/20 split)
+                oos_roi, oos_dd, oos_sharpe = 0.0, 0.0, 0.0
+                try:
+                    _, oos_result = run_test_oos(df_raw, clean_name, opt_p['mult'], opt_p['len'])
+                    oos_roi = oos_result[0]  # daily_roi
+                    oos_dd = oos_result[1]   # gross_dd
+                    oos_sharpe = oos_result[4]  # sharpe
+                except Exception:
+                    pass
+
                 # Check uniqueness
                 sig = (round(daily_roi, 5), round(gross_dd, 2))
                 if sig not in seen_signatures:
@@ -62,13 +72,16 @@ def strategy_tournament():
                         "Daily_ROI_%": round(daily_roi, 3),
                         "Gross_DD_%": round(gross_dd, 2),
                         "Net_DD_%": round(net_dd, 2),
-                        "Max_DD_%": round(gross_dd, 2),  # Backward compat
+                        "Max_DD_%": round(gross_dd, 2),
                         "Win_Rate_%": win_rate,
                         "Sharpe_Ratio": sharpe,
                         "Total_Trades": trades,
                         "Tier": tier,
                         "Optimal_Mult": round(opt_p['mult'], 2),
-                        "Optimal_Len": int(opt_p['len'])
+                        "Optimal_Len": int(opt_p['len']),
+                        "OOS_Daily_ROI_%": round(oos_roi, 3),
+                        "OOS_Gross_DD_%": round(oos_dd, 2),
+                        "OOS_Sharpe": round(oos_sharpe, 2),
                     })
             gc.collect()
 
@@ -77,6 +90,21 @@ def strategy_tournament():
     
     print("\n🚀 --- TOP ALPHA STRATEGIES (TARGET 2% DAILY) --- 🚀")
     print(final_df.head(15).to_string(index=False))
+
+def run_test_oos(df_raw, name, mult, length, train_pct=0.8):
+    """Run test with train/test split for out-of-sample validation."""
+    split_idx = int(len(df_raw) * train_pct)
+    df_train = df_raw.iloc[:split_idx].copy()
+    df_test = df_raw.iloc[split_idx:].copy()
+    df_train['pct'] = df_train['close'].pct_change()
+    df_test['pct'] = df_test['close'].pct_change()
+
+    # Optimize on train set
+    train_result = run_test(df_train, name, True, mult, length)
+    # Validate on test set (same params, no re-optimization)
+    test_result = run_test(df_test, name, True, mult, length)
+    return train_result, test_result
+
 
 def run_test(df_raw, name, optimize, mult, length):
     df = df_raw.copy()

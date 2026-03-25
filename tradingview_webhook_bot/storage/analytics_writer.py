@@ -364,7 +364,14 @@ class AnalyticsWriter:
 
     def update_today(self):
         result = self.rebuild_all_daily_analytics()
-        self.rebuild_backtest_sheets()
+        # Backtest sheets are heavier — throttle to every 5 min
+        import time as _time
+        now = _time.time()
+        if not hasattr(self, '_last_backtest_update'):
+            self._last_backtest_update = 0
+        if now - self._last_backtest_update > 300:
+            self.rebuild_backtest_sheets()
+            self._last_backtest_update = now
         return result
 
 

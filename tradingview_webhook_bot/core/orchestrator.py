@@ -367,7 +367,21 @@ class Orchestrator:
                     pass
                 return True
 
-            # --- 🛡️ 5.5. MAX QUANTITY CAP (Prevent oversized positions) ---
+            # --- 🛡️ 5.5. POSITION SIZING ---
+            size_mode = os.getenv("POSITION_SIZE_MODE", "fixed")  # "fixed" or "equity_pct"
+            if size_mode == "equity_pct":
+                # Use % of available equity for position sizing
+                equity_pct = float(os.getenv("EQUITY_PCT_PER_TRADE", "5.0")) / 100
+                try:
+                    health = self.exchange_binance.get_account_health()
+                    avail = health.get("available_balance", 0)
+                    if avail > 0 and price_val > 0:
+                        qty = (avail * equity_pct) / price_val
+                        logger.info(f"📐 Equity sizing: {equity_pct*100}% of ${avail:.2f} = {qty:.6f} {symbol}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Equity sizing failed, using signal qty: {e}")
+
+            # Max qty cap (safety net regardless of sizing mode)
             MAX_QTY = {"SOLUSDT": 1.0, "ETHUSDT": 0.05, "BTCUSDT": 0.003}
             max_allowed = MAX_QTY.get(symbol, 1.0)
             if qty > max_allowed:

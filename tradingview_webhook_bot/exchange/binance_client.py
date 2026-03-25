@@ -125,15 +125,24 @@ class BinanceClient:
         """
         Execute order with MAINNET PRICE SUBSTITUTION.
         """
-        if not self.allow_real:
-            logger.warning(f"🚫 SAFETY GATE: Blocked {side} {quantity} {symbol} (Mode: Dry-Run)")
-            return {"status": "SKIPPED", "msg": "SAFETY GATE: Real trades disabled"}
-
-        # --- SUB-TASK 1.1: PRICE SUBSTITUTION ---
+        # --- SUB-TASK 1.1: PRICE SUBSTITUTION (always, even paper mode) ---
         mainnet_price = self.get_mainnet_mark_price(symbol)
         if mainnet_price:
             logger.info(f"⚖️ Substituting Signal Price {price} with Mainnet Price {mainnet_price}")
             price = mainnet_price
+
+        if not self.allow_real:
+            # Paper trading: simulate fill at current mainnet price
+            quantity = fix_quantity(symbol, quantity, price=price)
+            sim_id = f"PAPER_{signal_id}" if signal_id else f"PAPER_{int(time.time())}"
+            logger.info(f"📝 PAPER TRADE: {side} {quantity} {symbol} @ ${price} (ID: {sim_id})")
+            return {
+                "status": "SUCCESS",
+                "orderId": sim_id,
+                "avg_price": price,
+                "paper": True,
+                "msg": "Simulated fill"
+            }
 
         try:
             # Fix quantity precision and minimum notional for this symbol
