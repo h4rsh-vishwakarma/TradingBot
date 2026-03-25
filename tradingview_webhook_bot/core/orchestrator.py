@@ -1,4 +1,5 @@
 import time, logging, os, json, sys, signal as _signal, pandas as pd
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -89,6 +90,7 @@ class Orchestrator:
 
         self.bt_engine = BacktestEngine()
         self.processed_count = 0
+        self._thread_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix='sheets')
         self.last_heartbeat = time.time()
 
         # Circuit Breaker
@@ -160,7 +162,13 @@ class Orchestrator:
 
     def check_tournament_alpha(self, symbol, strategy_name) -> tuple[bool, str, str]:
         if not os.path.exists(self.report_path):
-            return True, "No report found, allowing", "ALPHA"
+            fallback = self.report_path + ".bak"
+            if os.path.exists(fallback):
+                logger.warning(f"Tournament CSV missing, using backup: {fallback}")
+                self.report_path = fallback
+            else:
+                logger.warning("No tournament CSV found. Allowing signal.")
+                return True, "No report found, allowing", "ALPHA"
         try:
             df = pd.read_csv(self.report_path)
             import re as _re
@@ -336,6 +344,12 @@ class Orchestrator:
             if self.circuit_breaker and not self.circuit_breaker.should_allow_trade():
                 cb_reason = self.circuit_breaker.get_status().get('trip_reason', 'Circuit breaker tripped')
                 logger.warning(f"Circuit Breaker: {cb_reason}")
+                def _cb_alert():
+                    try:
+                        self.telegram.send(severity=AlertSeverity.CRITICAL, title="CIRCUIT BREAKER TRIPPED",
+                            message=f"Trading HALTED: {cb_reason}\nAll signals blocked until cooldown.", force=True)
+                    except: pass
+                self._thread_pool.submit(_cb_alert)
                 try:
                     self.sheets_logger.log_blocked_trade(symbol=symbol, side=side, strategy=strat_name,
                         reason=f"Circuit Breaker: {cb_reason}", signal_id=signal_id)
@@ -416,7 +430,13 @@ class Orchestrator:
                 try:
                     pos_snapshot = self.ledger.apply_fill(f"{target_exchange}:{symbol}", side, qty, fill_price)
                 except Exception as e:
-                    logger.error(f"Ledger apply_fill failed: {e}")
+                    logger.critical(f"LEDGER WRITE FAILED: {e}. Trade OK but ledger desynced!")
+                    def _alert_desync():
+                        try:
+                            self.telegram.send(severity=AlertSeverity.CRITICAL, title="LEDGER DESYNC",
+                                message=f"Ledger write failed for {side} {qty} {symbol} @ {fill_price}. MANUAL FIX NEEDED.", force=True)
+                        except: pass
+                    self._thread_pool.submit(_alert_desync)
                     pos_snapshot = self.ledger.get_position(f"{target_exchange}:{symbol}")
 
                 self._mark_symbol_traded(symbol)
@@ -432,22 +452,28 @@ class Orchestrator:
                         logger.warning(f"SL placement failed for {symbol}: {sl_res.get('msg')}")
 
                 self.processed_count += 1
-                try:
-                    self.sheets_logger.log_trade(signal_id=signal_id, symbol=f"{target_exchange.upper()}:{symbol}",
-                        action=side, qty=qty, price=fill_price, strategy=strat_name, indicator=indicator_name,
-                        pnl=pos_snapshot.daily_realized_pnl)
-                except Exception as e:
-                    logger.warning(f"Sheets trade log failed: {e}")
+                # Async: non-blocking Sheets write
+                def _log_trade():
+                    try:
+                        self.sheets_logger.log_trade(signal_id=signal_id, symbol=f"{target_exchange.upper()}:{symbol}",
+                            action=side, qty=qty, price=fill_price, strategy=strat_name, indicator=indicator_name,
+                            pnl=pos_snapshot.daily_realized_pnl)
+                    except Exception as e:
+                        logger.warning(f"Sheets trade log failed (async): {e}")
+                self._thread_pool.submit(_log_trade)
 
                 # Record win/loss for circuit breaker
                 if self.circuit_breaker:
                     self.circuit_breaker.record_trade_result(pos_snapshot.daily_realized_pnl >= 0)
 
                 # Auto-update analytics on every trade
-                try:
-                    self.analytics.update_today()
-                except Exception as ae:
-                    logger.warning(f"Analytics update skipped: {ae}")
+                # Async: non-blocking analytics update
+                def _update_analytics():
+                    try:
+                        self.analytics.update_today()
+                    except Exception as ae:
+                        logger.warning(f"Analytics update skipped (async): {ae}")
+                self._thread_pool.submit(_update_analytics)
 
                 emoji = "🟢" if side == "BUY" else "🔴"
                 sl_info = ""
@@ -526,6 +552,8 @@ class Orchestrator:
                 self.last_heartbeat = time.time()
             time.sleep(1)
 
+        logger.info("Shutting down thread pool...")
+        self._thread_pool.shutdown(wait=True, cancel_futures=False)
         logger.info(f"Orchestrator stopped gracefully. Total processed: {self.processed_count}")
 
 

@@ -264,8 +264,9 @@ class WebhookServer:
                     payload = data.get('payload', data)
                     received_secret = str(data.get('secret', payload.get('secret', ''))).strip()
 
-                    if received_secret == "your_secret_key":
-                        return jsonify({'status': 'ignored', 'message': 'Placeholder secret detected'}), 200
+                    if received_secret in ("your_secret_key", "test", "secret", ""):
+                        logger.warning(f'Rejected placeholder secret from {request.remote_addr}')
+                        return jsonify({'status': 'error', 'message': 'Placeholder secret rejected'}), 401
                     if received_secret != self.webhook_secret:
                         logger.warning(f"❌ Unauthorized JSON attempt")
                         return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
