@@ -327,7 +327,7 @@ class WebhookServer:
                         logger.info(f"⚠️ No price in plain text for {symbol}, orchestrator will resolve")
 
                 # --- COMMON: Build payload, queue, respond ---
-                signal_id = f"TV-{int(time.time())}"
+                signal_id = f"TV-{int(time.time() * 1000)}"
                 if is_json:
                     signal_id = data.get('signal_id') or signal_id
 

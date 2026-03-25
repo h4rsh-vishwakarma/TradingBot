@@ -125,8 +125,8 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
 log_info "Fixing permissions..."
 ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
     cd ~/tradingview_webhook_bot
-    sudo chown -R ubuntu:ubuntu logs/ storage/ tradingview-webhook-bot/storage/ 2>/dev/null || true
-    sudo chmod -R 755 logs/ storage/ tradingview-webhook-bot/storage/ 2>/dev/null || true
+    sudo chown -R ubuntu:ubuntu logs/ storage/ tradingview_webhook_bot/storage/ 2>/dev/null || true
+    sudo chmod -R 755 logs/ storage/ tradingview_webhook_bot/storage/ 2>/dev/null || true
 "
 
 # Restart bots
@@ -135,16 +135,8 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
     cd ~/tradingview_webhook_bot
     source venv/bin/activate
 
-    BOT_COUNT=0
-    for config in config/config_*.json; do
-      if [ -f \"\$config\" ]; then
-        strategy_name=\$(basename \"\$config\" .json | sed 's/config_//')
-        echo \"  → Starting \$strategy_name\"
-        nohup python tradingview-webhook-bot/tradingview_webhook_bot/core/orchestrator.py --config \"\$config\" > \"logs/bot_\${strategy_name}.log\" 2>&1 &
-        BOT_COUNT=\$((BOT_COUNT + 1))
-      fi
-    done
-    echo \"Started \$BOT_COUNT bots\"
+    sudo systemctl restart trading_orchestrator trading_webhook
+    echo 'Services restarted via systemd'
 "
 
 # Verify deployment
@@ -161,4 +153,4 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "echo 'Directory structure:' && ls -
 
 # Show recent logs
 log_info "📋 Recent logs:"
-ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "tail -10 ~/tradingview_webhook_bot/logs/bot_institutional_flow_hybrid.log"
+ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "journalctl -u trading_orchestrator --since '1 min ago' --no-pager 2>/dev/null | tail -10"
