@@ -236,12 +236,7 @@ class WebhookServer:
                         return jsonify({'status': 'error', 'message': f'Invalid price: {price}'}), 400
 
                     if price_val <= 0:
-                        logger.warning(f"⚠️ Negative/zero price {price_val} for {symbol}, fetching live price...")
-                        price_val = self._fetch_live_price(symbol)
-                        if price_val <= 0:
-                            logger.error(f"❌ Could not fetch live price for {symbol}, rejecting")
-                            return jsonify({"status": "rejected", "message": f"Could not resolve price for {symbol}"}), 400
-                        logger.info(f"📊 Live price resolved for {symbol}: ${price_val}")
+                        logger.info(f"⚠️ Price={price_val} for {symbol}, orchestrator will resolve via mainnet")
 
                     strategy = payload.get("strategy", "SMC")
                     indicator = payload.get("indicator", "SMC_LuxAlgo")
@@ -268,13 +263,14 @@ class WebhookServer:
                     quantity = parsed['quantity']
                     exchange = "binance"
 
-                    # Fetch live price from Binance (plain text alerts don't include price)
-                    price_val = self._fetch_live_price(symbol)
+                    # Plain text alerts may not include price — orchestrator resolves via mainnet
+                    price_val = parsed.get('price', 0)
+                    try:
+                        price_val = float(price_val) if price_val else 0.0
+                    except (ValueError, TypeError):
+                        price_val = 0.0
                     if price_val <= 0:
-                        logger.error(f"❌ Could not fetch live price for {symbol}")
-                        return jsonify({'status': 'error', 'message': f'Could not fetch price for {symbol}'}), 500
-
-                    logger.info(f"📊 Live price fetched for {symbol}: ${price_val}")
+                        logger.info(f"⚠️ No price in plain text for {symbol}, orchestrator will resolve")
 
                 # --- COMMON: Build payload, queue, respond ---
                 signal_id = f"TV-{int(time.time())}"

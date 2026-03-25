@@ -299,8 +299,14 @@ class Orchestrator:
                 
                 raw_price = float(payload_raw.get("price") or event.get("price") or 0.0)
                 if raw_price <= 0:
-                    logger.warning(f"🚫 Invalid price {raw_price} for {symbol}. Skipping.")
-                    return True
+                    # Fetch live price from mainnet (orchestrator-side, not webhook-side)
+                    live_price = self.exchange_binance.get_mainnet_mark_price(symbol)
+                    if live_price and live_price > 0:
+                        raw_price = live_price
+                        logger.info(f"📊 Resolved price for {symbol}: ${raw_price}")
+                    else:
+                        logger.warning(f"🚫 Cannot resolve price for {symbol}. Skipping.")
+                        return True
                 signal_data["price"] = raw_price
                 signal_data["action"] = str(payload_raw.get("action") or event.get("action") or "BUY").upper()
 
