@@ -1,0 +1,3 @@
+Trade #,Type,Date and time,Signal,Price USDT,SL Price,TP Price,Position size (qty),Position size (value),Net P&L USDT,Net P&L %,Favorable excursion USDT,Favorable excursion %,Adverse excursion USDT,Adverse excursion %,Cumulative P&L USDT,Cumulative P&L %
+1,Open Short,2024-07-28 00:00:00,Short,3236.8,3259.7568,3102.2929,2.934998,9500.0,-86.51,-0.71,0,0,86.51,0.71,-86.51,-0.87
+1,Close Short,2024-07-28 08:00:00,Stop-Loss,3259.7568,3259.7568,3102.2929,2.934998,9500.0,-86.51,-0.71,0,0,86.51,0.71,-86.51,-0.87

@@ -69,12 +69,20 @@ def run_scan():
     issues = []
     status_lines = []
 
-    # 1. Webhook Server
+    # 1. Webhook Server (auto-restart if down)
     if check_webhook_server():
         status_lines.append("Webhook Server: UP")
     else:
-        status_lines.append("Webhook Server: DOWN")
-        issues.append("Webhook server not responding on port 5000")
+        # Auto-restart webhook before alerting
+        import subprocess
+        subprocess.run(["sudo", "systemctl", "restart", "trading_webhook"], timeout=15)
+        import time
+        time.sleep(5)
+        if check_webhook_server():
+            status_lines.append("Webhook Server: AUTO-RESTARTED (was down, now UP)")
+        else:
+            status_lines.append("Webhook Server: DOWN (restart failed)")
+            issues.append("Webhook server not responding on port 5000 (auto-restart failed)")
 
     # 2. Telegram Listener
     if check_process("telegram_backtest_bot") or check_process("orchestrator"):

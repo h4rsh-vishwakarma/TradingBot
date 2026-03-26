@@ -22,7 +22,7 @@ def dispatch_top_strategies(force=False):
 
     try:
         df = pd.read_csv(report_path)
-        targets = df[df['Daily_ROI_%'] >= 1.2].sort_values(by='Daily_ROI_%', ascending=False)
+        targets = df[df['Tier'].str.contains('ALPHA', na=False)].sort_values(by='Daily_ROI_%', ascending=False)
     except Exception as e:
         print(f"❌ Error: {e}")
         return
@@ -103,13 +103,17 @@ if (time >= start_time)
         safe_code = html.escape(pine_code)
         
         # Telegram Dispatch
+        tier_display = str(winner.get('Tier', 'ALPHA'))
+        tier_emoji = "🚀" if "ALPHA++" in tier_display else "🎯" if "ALPHA" in tier_display else "⚖️"
         msg = (f"🏆 <b>RANK #{i+1} WINNER</b> 🏆\n"
+               f"{tier_emoji} <b>Tier: {tier_display}</b>\n"
                f"📊 Symbol: {symbol}\n"
                f"📈 Daily ROI: {roi}%\n"
                f"📉 Gross DD: {gross_dd}% (Compounding)\n"
                f"📉 Net DD: {net_dd}% (Fixed Size)\n"
                f"🎯 Win Rate: {win_rate}% | Sharpe: {sharpe}\n"
                f"🔄 Total Trades: {total_trades}\n"
+               f"⚙️ Params: Len={length}, Mult={mult}\n"
                f"🛡️ ADX &gt; 25 Filter: ON | Trailing Stop: 4%")
 
         telegram.send(severity=AlertSeverity.INFO, title=f"Rank #{i+1} Stats", message=msg)
@@ -119,5 +123,82 @@ if (time >= start_time)
         print(f"Dispatched {symbol} Rank #{i+1} in God Mode.")
         time.sleep(4)  # 4s between strategies (Telegram allows ~20 msg/min to same chat)
 
+def dispatch_average_strategies():
+    """Send AVERAGE tier strategies with Pine scripts."""
+    telegram = TelegramAlert()
+    report_path = os.path.join(PROJECT_ROOT, "storage/reports/tournament_winners.csv")
+
+    try:
+        df = pd.read_csv(report_path)
+        targets = df[df['Tier'].str.contains('AVERAGE', na=False)].sort_values(by='Daily_ROI_%', ascending=False).head(15)
+    except Exception as e:
+        print(f"Error: {e}")
+        return
+
+    telegram.send(severity=AlertSeverity.INFO, title="Average Tier Deployment",
+                  message=f"⚖️ <b>Deploying {len(targets)} AVERAGE strategies</b>\nThese require manual approval before live trading.")
+    time.sleep(3)
+
+    for i, (_, winner) in enumerate(targets.iterrows()):
+        symbol = str(winner['Symbol']).upper()
+        strat = str(winner['Strategy'])
+        mult = winner.get('Optimal_Mult', 3.0)
+        length = int(winner.get('Optimal_Len', 14))
+        roi = round(float(winner.get('Daily_ROI_%', 0.0)), 3)
+        gross_dd = round(float(winner.get('Gross_DD_%', winner.get('Max_DD_%', 0.0))), 2)
+        net_dd = round(float(winner.get('Net_DD_%', gross_dd)), 2)
+        win_rate = round(float(winner.get('Win_Rate_%', 0.0)), 1)
+        sharpe = round(float(winner.get('Sharpe_Ratio', 0.0)), 2)
+        total_trades = int(winner.get('Total_Trades', 0))
+
+        if any(k in strat.upper() for k in ["SMC", "LIQUIDITY", "FLOW", "BARUPDN"]):
+            core_logic = f"lookback = {length}\nlong = close > close[lookback]\nshort = close < close[lookback]"
+        elif any(k in strat.upper() for k in ["SUPERTREND"]):
+            core_logic = f"[st, dir] = ta.supertrend({mult}, {length})\nlong = ta.crossover(close, st)\nshort = ta.crossunder(close, st)"
+        else:
+            core_logic = f"basis = ta.sma(close, {length})\ndev = {mult} * ta.stdev(close, {length})\nlong = close < basis - dev\nshort = close > basis + dev"
+
+        strat_clean = strat.replace("'", "").replace('"', '').replace(" ", "_").replace("[", "").replace("]", "").replace("+", "").replace("\u2014", "-")
+        strat_display = strat.replace("'", "").replace('"', '').strip()
+        pine_name = f"{strat_display} | {symbol} - Webhook"
+
+        pine_code = f"""//@version=5
+strategy("{pine_name}", overlay=true, initial_capital=100000000, currency=currency.USD, margin_long=0, margin_short=0)
+grp_wh = "Webhook Settings"
+enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_wh)
+webhook_secret = input.string("squeeze_tradingview_cluster_2026_secure", "Webhook Secret", group=grp_wh)
+{core_logic}
+[diPlus, diMinus, adxValue] = ta.dmi(14, 14)
+adx_filter = adxValue > 25
+fixed_qty = 10
+start_time = timestamp(2024, 01, 01, 00, 00)
+trail_pct = 4.0
+if (time >= start_time)
+    if long and adx_filter
+        strategy.entry("Long", strategy.long, qty=fixed_qty)
+        strategy.exit("Trail Long", "Long", trail_points=close * trail_pct / 100 / syminfo.mintick, trail_offset=close * trail_pct / 100 / syminfo.mintick)
+    if short and adx_filter
+        strategy.entry("Short", strategy.short, qty=fixed_qty)
+        strategy.exit("Trail Short", "Short", trail_points=close * trail_pct / 100 / syminfo.mintick, trail_offset=close * trail_pct / 100 / syminfo.mintick)
+"""
+        safe_code = html.escape(pine_code)
+        msg = (f"⚖️ <b>AVERAGE #{i+1}</b>\n"
+               f"📊 {symbol} | {strat_display[:40]}\n"
+               f"📈 ROI: {roi}% | WR: {win_rate}% | Sharpe: {sharpe}\n"
+               f"📉 DD: {gross_dd}% | Trades: {total_trades}\n"
+               f"⚙️ Params: Len={length}, Mult={mult}")
+
+        telegram.send(severity=AlertSeverity.INFO, title=f"Average #{i+1}", message=msg)
+        time.sleep(2)
+        telegram.send(severity=AlertSeverity.INFO, title=f"Average #{i+1} Code", message=f"<code>{safe_code}</code>")
+        time.sleep(3)
+
+    print(f"Dispatched {len(targets)} AVERAGE strategies.")
+
+
 if __name__ == "__main__":
-    dispatch_top_strategies(force=True)
+    import sys as _sys
+    if len(_sys.argv) > 1 and _sys.argv[1] == "--average":
+        dispatch_average_strategies()
+    else:
+        dispatch_top_strategies(force=True)

@@ -1,0 +1,7 @@
+Trade #,Type,Date and time,Signal,Price USDT,SL Price,TP Price,Position size (qty),Position size (value),Net P&L USDT,Net P&L %,Favorable excursion USDT,Favorable excursion %,Adverse excursion USDT,Adverse excursion %,Cumulative P&L USDT,Cumulative P&L %
+1,Open Short,2024-02-26 04:00:00,Short,103.392,102.6334,99.2091,91.883318,9500.0,50.84,0.73,50.84,0.73,0.0,0.0,50.84,0.51
+1,Close Short,2024-02-26 08:00:00,Trailing-SL (Profit),102.6334,102.6334,99.2091,91.883318,9500.0,50.84,0.73,50.84,0.73,0.0,0.0,50.84,0.51
+2,Open Short,2024-08-07 12:00:00,Short,148.391,145.1052,126.4915,64.345535,9548.3,192.75,2.21,192.75,2.21,0.0,0.0,243.59,2.44
+2,Close Short,2024-08-07 16:00:00,Trailing-SL (Profit),145.1052,145.1052,126.4915,64.345535,9548.3,192.75,2.21,192.75,2.21,0.0,0.0,243.59,2.44
+3,Open Short,2025-11-02 00:00:00,Short,185.18,185.5482,177.5157,52.551104,9731.41,-38.85,-0.2,0.0,0.0,38.85,0.2,204.74,2.05
+3,Close Short,2025-11-02 20:00:00,Stop-Loss,185.5482,185.5482,177.5157,52.551104,9731.41,-38.85,-0.2,0.0,0.0,38.85,0.2,204.74,2.05

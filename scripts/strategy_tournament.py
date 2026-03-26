@@ -153,11 +153,40 @@ def run_test(df_raw, name, optimize, mult, length):
         # 15m bars, ~96 bars/day, ~35040 bars/year
         sharpe = round((mean_ret / std_ret) * np.sqrt(35040), 2) if std_ret > 0 else 0.0
 
-        # Tiering based on 2% Goal
-        if daily_roi >= 1.5: status = "🚀 ALPHA++"
-        elif daily_roi >= 0.5: status = "🎯 ALPHA"
-        elif daily_roi > 0.1: status = "⚖️ AVERAGE"
-        else: status = "💀 REJECT"
+        # --- QUALITY-BASED TIERING ---
+        # Not just ROI — also checks Sharpe, Win Rate, DD, and trade count
+
+        # Disqualify: DD > 80% is too risky regardless of ROI
+        if abs(gross_dd) > 80:
+            if daily_roi >= 1.0:
+                status = "🎯 ALPHA"  # High ROI but dangerous DD → downgrade from ALPHA++
+            elif daily_roi >= 0.3:
+                status = "⚖️ AVERAGE"
+            else:
+                status = "💀 REJECT"
+        # ALPHA++ — Elite tier: high ROI + quality metrics
+        elif daily_roi >= 1.8 and sharpe >= 4.0 and win_rate >= 45:
+            status = "🚀 ALPHA++"
+        elif daily_roi >= 1.5 and sharpe >= 3.5 and win_rate >= 45:
+            status = "🚀 ALPHA++"
+        # ALPHA — Solid performers
+        elif daily_roi >= 1.0 and sharpe >= 3.0 and win_rate >= 45:
+            status = "🎯 ALPHA"
+        elif daily_roi >= 0.8 and sharpe >= 2.5 and win_rate >= 48:
+            status = "🎯 ALPHA"
+        # AVERAGE — Marginal, needs manual review
+        elif daily_roi >= 0.3 and sharpe >= 1.5:
+            status = "⚖️ AVERAGE"
+        elif daily_roi >= 0.1:
+            status = "⚖️ AVERAGE"
+        else:
+            status = "💀 REJECT"
+
+        # Bonus: Extremely high Sharpe (>6) with decent ROI → upgrade
+        if sharpe >= 6.0 and daily_roi >= 1.0 and "ALPHA++" not in status:
+            status = "🚀 ALPHA++"
+        elif sharpe >= 5.0 and daily_roi >= 0.8 and "ALPHA" not in status:
+            status = "🎯 ALPHA"
 
         return daily_roi, gross_dd, net_dd, win_rate, sharpe, total_trades, status
     except:

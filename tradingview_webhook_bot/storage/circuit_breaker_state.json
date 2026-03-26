@@ -1,0 +1,10 @@
+{
+  "is_tripped": false,
+  "trip_reason": null,
+  "trip_time": null,
+  "manual_pause": false,
+  "daily_start_balance": null,
+  "daily_start_time": null,
+  "consecutive_losses": 7,
+  "last_updated": 1774436415.3045824
+}

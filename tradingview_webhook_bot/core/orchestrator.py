@@ -111,14 +111,14 @@ class Orchestrator:
 
         # Anti Flip-Flop controls — all configurable via env
         self._symbol_cooldown = {}
-        self.COOLDOWN_SECONDS = int(os.getenv("SYMBOL_COOLDOWN_SECONDS", "300"))
+        self.COOLDOWN_SECONDS = int(os.getenv("SYMBOL_COOLDOWN_SECONDS", "60"))
         self._recent_signals = {}
         self.DEDUP_WINDOW_SECONDS = int(os.getenv("DEDUP_WINDOW_SECONDS", "120"))
         self._candle_lock = {}
-        self.CANDLE_LOCK_SECONDS = int(os.getenv("CANDLE_LOCK_SECONDS", "3600"))
+        self.CANDLE_LOCK_SECONDS = int(os.getenv("CANDLE_LOCK_SECONDS", "60"))
 
         # Max qty caps — configurable via env (JSON format)
-        default_max_qty = '{"SOLUSDT": 1.0, "ETHUSDT": 0.05, "BTCUSDT": 0.003}'
+        default_max_qty = '{"SOLUSDT": 1.0, "ETHUSDT": 0.05, "BTCUSDT": 0.003, "BNBUSDT": 0.1, "ADAUSDT": 30.0, "LINKUSDT": 1.0, "DOTUSDT": 2.0}'
         self.MAX_QTY = json.loads(os.getenv("MAX_QTY_CAPS", default_max_qty))
 
     def _is_candle_locked(self, symbol: str, side: str) -> bool:
@@ -138,16 +138,18 @@ class Orchestrator:
         self._candle_lock[symbol] = {"side": side, "time": time.time(), "strategy": strategy}
         logger.info(f"[{correlation_id}] Candle locked: {symbol} -> {side} by {strategy} for {self.CANDLE_LOCK_SECONDS}s")
 
-    def _is_symbol_in_cooldown(self, symbol: str) -> bool:
-        last_trade = self._symbol_cooldown.get(symbol, 0)
+    def _is_symbol_in_cooldown(self, symbol: str, strategy: str = "") -> bool:
+        cooldown_key = f"{symbol}:{strategy}" if strategy else symbol
+        last_trade = self._symbol_cooldown.get(cooldown_key, 0)
         elapsed = time.time() - last_trade
         if elapsed < self.COOLDOWN_SECONDS:
             logger.info(f"Cooldown active for {symbol}: {self.COOLDOWN_SECONDS - elapsed:.0f}s remaining")
             return True
         return False
 
-    def _mark_symbol_traded(self, symbol: str):
-        self._symbol_cooldown[symbol] = time.time()
+    def _mark_symbol_traded(self, symbol: str, strategy: str = ""):
+        cooldown_key = f"{symbol}:{strategy}" if strategy else symbol
+        self._symbol_cooldown[cooldown_key] = time.time()
 
     def _is_duplicate_signal(self, strategy: str, symbol: str, side: str) -> bool:
         key = f"{strategy}:{symbol}:{side}".lower()
@@ -195,14 +197,16 @@ class Orchestrator:
             logger.error(f"Leaderboard Check Error: {e}")
             return False, f"Leaderboard check failed: {e}", "ERROR"
 
-    def check_safety_gate(self, symbol, qty, price, side, exchange="binance") -> tuple[bool, str]:
+    def check_safety_gate(self, symbol, qty, price, side, exchange="binance", strategy="") -> tuple[bool, str]:
         if not self.allow_real: return False, "ALLOW_REAL_TRADES is disabled"
         current_pnl = self.ledger.get_daily_pnl()
         if current_pnl <= self.daily_loss_limit:
             return False, f"Daily loss limit hit: ${current_pnl:.2f}"
-        current_pos = self.ledger.get_position(f"{exchange}:{symbol}")
+        # Per-strategy position check (Option C)
+        pos_key = f"{exchange}:{symbol}:{strategy}" if strategy else f"{exchange}:{symbol}"
+        current_pos = self.ledger.get_position(pos_key)
         if (side == "BUY" and current_pos.quantity > 0) or (side == "SELL" and current_pos.quantity < 0):
-            return False, f"Already in {side} position for {symbol} on {exchange}."
+            return False, f"Already in {side} position for {symbol} ({strategy}) on {exchange}."
         return True, "Safe"
 
     def handle_signal(self, event: dict) -> bool:
@@ -329,7 +333,7 @@ class Orchestrator:
                 if "position is 0" in raw_body.lower() or "position is -" in raw_body.lower():
                     is_exit = True
             if is_exit:
-                current_pos = self.ledger.get_position(f"{target_exchange}:{symbol}")
+                current_pos = self.ledger.get_position(f"{target_exchange}:{symbol}:{strat_name}")
                 if current_pos.quantity == 0:
                     logger.info(f"Exit signal for {symbol} but no position open. Skipping.")
                     return True
@@ -371,7 +375,7 @@ class Orchestrator:
                 else:
                     is_safe, risk_reason = True, "Exit signal - closing position"
             else:
-                is_safe, risk_reason = self.check_safety_gate(symbol, qty, price_signal, side, exchange=target_exchange)
+                is_safe, risk_reason = self.check_safety_gate(symbol, qty, price_signal, side, exchange=target_exchange, strategy=strat_name)
             if not is_safe:
                 logger.warning(f"[{correlation_id}] Safety Gate Block: {risk_reason}")
                 try:
@@ -435,7 +439,8 @@ class Orchestrator:
             if execution_res.get("status") == "SUCCESS":
                 self.idempotency.mark_seen(signal_id)
                 try:
-                    pos_snapshot = self.ledger.apply_fill(f"{target_exchange}:{symbol}", side, qty, fill_price)
+                    pos_key = f"{target_exchange}:{symbol}:{strat_name}"
+                    pos_snapshot = self.ledger.apply_fill(pos_key, side, qty, fill_price)
                 except Exception as e:
                     logger.critical(f"LEDGER WRITE FAILED: {e}. Trade OK but ledger desynced!")
                     def _alert_desync():
@@ -444,9 +449,9 @@ class Orchestrator:
                                 message=f"Ledger write failed for {side} {qty} {symbol} @ {fill_price}. MANUAL FIX NEEDED.", force=True)
                         except: pass
                     self._thread_pool.submit(_alert_desync)
-                    pos_snapshot = self.ledger.get_position(f"{target_exchange}:{symbol}")
+                    pos_snapshot = self.ledger.get_position(f"{target_exchange}:{symbol}:{strat_name}")
 
-                self._mark_symbol_traded(symbol)
+                self._mark_symbol_traded(symbol, strat_name)
                 self._set_candle_lock(symbol, side, strat_name)
 
                 # Place exchange-side stop-loss
@@ -491,21 +496,45 @@ class Orchestrator:
                         logger.warning(f"Analytics update skipped (async): {ae}")
                 self._thread_pool.submit(_update_analytics)
 
-                emoji = "🟢" if side == "BUY" else "🔴"
+                # Determine trade type: Open/Close Long/Short
+                current_pos_qty = pos_snapshot.quantity if pos_snapshot else 0
+                if is_exit:
+                    if side == "SELL":
+                        trade_type = "Close Long"
+                        emoji = "🔴"
+                    else:
+                        trade_type = "Close Short"
+                        emoji = "🟢"
+                else:
+                    if side == "BUY":
+                        trade_type = "Open Long"
+                        emoji = "🟢"
+                    else:
+                        trade_type = "Open Short"
+                        emoji = "🔴"
+
+                # Calculate SL/TP prices
                 sl_info = ""
                 tp_info = ""
                 if not is_exit and target_exchange == "binance":
                     sl_pct_val = float(os.getenv("STOP_LOSS_PCT", "3.0"))
-                    sl_price_est = fill_price * (1 - sl_pct_val / 100) if side == "BUY" else fill_price * (1 + sl_pct_val / 100)
+                    tp_pct_val = float(os.getenv("TAKE_PROFIT_PCT", "5.0"))
+                    if side == "BUY":
+                        sl_price_est = fill_price * (1 - sl_pct_val / 100)
+                        tp_price_est = fill_price * (1 + tp_pct_val / 100)
+                    else:
+                        sl_price_est = fill_price * (1 + sl_pct_val / 100)
+                        tp_price_est = fill_price * (1 - tp_pct_val / 100)
                     sl_info = f"\n🛡️ <b>Stop-Loss:</b> <code>${sl_price_est:,.2f}</code> ({sl_pct_val}%)"
+                    tp_info = f"\n🎯 <b>Take-Profit:</b> <code>${tp_price_est:,.2f}</code> ({tp_pct_val}%)"
                 try:
                     self.telegram.send(severity=AlertSeverity.INFO, title="Trade Success",
                         message=(f"{emoji} <b>Bot Alert: Trade Executed</b>\n\n"
-                                 f"✅ <b>Executed:</b> {side} {symbol}\n"
+                                 f"✅ <b>Action:</b> {trade_type} {symbol}\n"
                                  f"💰 <b>Price:</b> <code>${fill_price:,.2f}</code>\n"
                                  f"📊 <b>Quantity:</b> <code>{qty}</code>\n"
                                  f"📋 <b>Strategy:</b> <code>{strat_name}</code>\n"
-                                 f"📈 <b>BT Status:</b> Verified {tier}{sl_info}\n"
+                                 f"📈 <b>BT Status:</b> Verified {tier}{sl_info}{tp_info}\n"
                                  f"💵 <b>Today PnL:</b> <code>${pos_snapshot.daily_realized_pnl:.2f}</code>\n"
                                  f"🆔 <b>ID:</b> <code>{signal_id}</code>"))
                 except Exception as e:

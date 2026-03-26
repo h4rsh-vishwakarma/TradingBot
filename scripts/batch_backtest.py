@@ -77,28 +77,56 @@ STRATEGIES = {
         "logic": "bollinger_reversion",
         "params": {"period": 8, "mult": 1.63}
     },
+    "RSI_Divergence": {
+        "description": "RSI oversold/overbought reversal with trend filter",
+        "logic": "rsi_divergence",
+        "params": {"rsi_period": 14, "rsi_oversold": 30, "rsi_overbought": 70, "ema_period": 50}
+    },
+    "MACD_Histogram_Reversal": {
+        "description": "MACD histogram flip with volume confirmation",
+        "logic": "macd_histogram",
+        "params": {"fast": 12, "slow": 26, "signal": 9, "vol_mult": 1.3}
+    },
+    "Stochastic_RSI_Cross": {
+        "description": "Stochastic RSI crossover in extreme zones",
+        "logic": "stoch_rsi_cross",
+        "params": {"rsi_period": 14, "stoch_period": 14, "k_smooth": 3, "d_smooth": 3}
+    },
+    "EMA_Ribbon": {
+        "description": "4-EMA ribbon trend direction with momentum",
+        "logic": "ema_ribbon",
+        "params": {"ema1": 5, "ema2": 13, "ema3": 34, "ema4": 55}
+    },
+    "Supertrend_ADX": {
+        "description": "Supertrend crossover with ADX trend strength",
+        "logic": "supertrend_adx",
+        "params": {"atr_period": 10, "atr_mult": 3.0, "adx_period": 14, "adx_threshold": 25}
+    },
+    "Keltner_Channel_Breakout": {
+        "description": "Keltner channel breakout with volume spike",
+        "logic": "keltner_breakout",
+        "params": {"ema_period": 20, "atr_period": 14, "atr_mult": 2.0, "vol_mult": 1.5}
+    },
 }
 
 # === SYMBOL + TIMEFRAME CONFIG ===
 SYMBOL_TIMEFRAMES = {
-    "BNBUSDT":  ["4h"],
+    "BNBUSDT":  ["4h", "1h"],
     "SOLUSDT":  ["4h", "1h"],
-    "ADAUSDT":  ["4h"],
-    "BTCUSDT":  ["4h"],
-    "LINKUSDT": ["4h"],
-    "ETHUSDT":  ["4h"],
+    "ADAUSDT":  ["4h", "1h"],
+    "BTCUSDT":  ["4h", "1h"],
+    "LINKUSDT": ["4h", "1h"],
+    "ETHUSDT":  ["4h", "1h"],
+    "DOTUSDT":  ["4h", "1h"],
 }
 
 # === STRATEGY ASSIGNMENT (from the priority table) ===
-STRATEGY_ASSIGNMENTS = {
-    "BNBUSDT_4h":  ["Golden_Cross_Pro", "EMA_Break_Momentum", "Breakout_Volume_ADX"],
-    "SOLUSDT_4h":  ["EMA_Cloud_Strength", "Reversed_BarUpDn"],
-    "SOLUSDT_1h":  ["Machine_Learning_Lorentzian", "Mean_Reversion_Scalper"],
-    "ADAUSDT_4h":  ["Volume_Stochastic_MACD"],
-    "BTCUSDT_4h":  ["Ultimate_Entry", "EMA_Break_Momentum"],
-    "LINKUSDT_4h": ["Breakout_Volume_ADX"],
-    "ETHUSDT_4h":  ["EMA_Cloud_Strength"],
-}
+# ALL strategies run on ALL symbol-timeframe combos
+ALL_STRATEGIES = list(STRATEGIES.keys())
+STRATEGY_ASSIGNMENTS = {}
+for sym, tfs in SYMBOL_TIMEFRAMES.items():
+    for tf in tfs:
+        STRATEGY_ASSIGNMENTS[f"{sym}_{tf}"] = ALL_STRATEGIES
 
 
 # ================= INDICATOR CALCULATIONS =================
@@ -154,6 +182,34 @@ def calc_bollinger(close, period=20, mult=2.0):
     upper = sma + mult * std
     lower = sma - mult * std
     return sma, upper, lower
+
+def calc_vwap(high, low, close, volume):
+    """Volume Weighted Average Price — rolling session VWAP."""
+    typical_price = (high + low + close) / 3
+    cumulative_tp_vol = (typical_price * volume).cumsum()
+    cumulative_vol = volume.cumsum()
+    vwap = cumulative_tp_vol / cumulative_vol.replace(0, float('nan'))
+    return vwap
+
+def calc_obv(close, volume):
+    """On Balance Volume — volume direction indicator."""
+    direction = close.diff().apply(lambda x: 1 if x > 0 else (-1 if x < 0 else 0))
+    obv = (volume * direction).cumsum()
+    return obv
+
+def calc_obv_trend(close, volume, period=20):
+    """OBV trend: True if OBV is rising (bullish volume), False if falling."""
+    obv = calc_obv(close, volume)
+    obv_ma = obv.rolling(period).mean()
+    return obv > obv_ma  # True = bullish volume, False = bearish volume
+
+def calc_atr(high, low, close, period=14):
+    """Average True Range — measures volatility."""
+    tr1 = high - low
+    tr2 = abs(high - close.shift(1))
+    tr3 = abs(low - close.shift(1))
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    return tr.rolling(period).mean()
 
 
 # ================= STRATEGY LOGIC =================
@@ -239,6 +295,79 @@ def strategy_bollinger_reversion(df, params):
     return signals
 
 
+def strategy_rsi_divergence(df, params):
+    rsi = calc_rsi(df['close'], params['rsi_period'])
+    ema = calc_ema(df['close'], params['ema_period'])
+    signals = pd.Series(0, index=df.index)
+    # RSI oversold + price above EMA = buy dip in uptrend
+    signals[(rsi < params['rsi_oversold']) & (df['close'] > ema)] = 1
+    # RSI overbought + price below EMA = sell rally in downtrend
+    signals[(rsi > params['rsi_overbought']) & (df['close'] < ema)] = -1
+    return signals
+
+def strategy_macd_histogram(df, params):
+    macd_line, signal_line = calc_macd(df['close'], params['fast'], params['slow'], params['signal'])
+    histogram = macd_line - signal_line
+    vol_ma = df['volume'].rolling(20).mean()
+    vol_spike = df['volume'] > vol_ma * params['vol_mult']
+    signals = pd.Series(0, index=df.index)
+    # Histogram flips positive + volume = buy
+    signals[(histogram > 0) & (histogram.shift(1) <= 0) & vol_spike] = 1
+    # Histogram flips negative + volume = sell
+    signals[(histogram < 0) & (histogram.shift(1) >= 0) & vol_spike] = -1
+    return signals
+
+def strategy_stoch_rsi_cross(df, params):
+    rsi = calc_rsi(df['close'], params['rsi_period'])
+    # Stochastic of RSI
+    rsi_low = rsi.rolling(params['stoch_period']).min()
+    rsi_high = rsi.rolling(params['stoch_period']).max()
+    stoch_rsi = (rsi - rsi_low) / (rsi_high - rsi_low).replace(0, float('nan')) * 100
+    k = stoch_rsi.rolling(params['k_smooth']).mean()
+    d = k.rolling(params['d_smooth']).mean()
+    signals = pd.Series(0, index=df.index)
+    # K crosses above D in oversold zone (<20)
+    signals[(k > d) & (k.shift(1) <= d.shift(1)) & (k < 30)] = 1
+    # K crosses below D in overbought zone (>80)
+    signals[(k < d) & (k.shift(1) >= d.shift(1)) & (k > 70)] = -1
+    return signals
+
+def strategy_ema_ribbon(df, params):
+    e1 = calc_ema(df['close'], params['ema1'])
+    e2 = calc_ema(df['close'], params['ema2'])
+    e3 = calc_ema(df['close'], params['ema3'])
+    e4 = calc_ema(df['close'], params['ema4'])
+    signals = pd.Series(0, index=df.index)
+    # All EMAs aligned bullish: e1 > e2 > e3 > e4
+    signals[(e1 > e2) & (e2 > e3) & (e3 > e4)] = 1
+    # All EMAs aligned bearish: e1 < e2 < e3 < e4
+    signals[(e1 < e2) & (e2 < e3) & (e3 < e4)] = -1
+    return signals
+
+def strategy_supertrend_adx(df, params):
+    atr = calc_atr(df['high'], df['low'], df['close'], params['atr_period'])
+    adx = calc_adx(df['high'], df['low'], df['close'], params['adx_period'])
+    mid = (df['high'] + df['low']) / 2
+    upper = mid + params['atr_mult'] * atr
+    lower = mid - params['atr_mult'] * atr
+    # Simple supertrend: price above lower band = uptrend
+    signals = pd.Series(0, index=df.index)
+    signals[(df['close'] > upper.shift(1)) & (adx > params['adx_threshold'])] = 1
+    signals[(df['close'] < lower.shift(1)) & (adx > params['adx_threshold'])] = -1
+    return signals
+
+def strategy_keltner_breakout(df, params):
+    ema = calc_ema(df['close'], params['ema_period'])
+    atr = calc_atr(df['high'], df['low'], df['close'], params['atr_period'])
+    upper = ema + params['atr_mult'] * atr
+    lower = ema - params['atr_mult'] * atr
+    vol_ma = df['volume'].rolling(20).mean()
+    vol_spike = df['volume'] > vol_ma * params['vol_mult']
+    signals = pd.Series(0, index=df.index)
+    signals[(df['close'] > upper) & vol_spike] = 1
+    signals[(df['close'] < lower) & vol_spike] = -1
+    return signals
+
 STRATEGY_FUNCTIONS = {
     "golden_cross": strategy_golden_cross,
     "ultimate_entry": strategy_ultimate_entry,
@@ -248,6 +377,12 @@ STRATEGY_FUNCTIONS = {
     "ema_cloud": strategy_ema_cloud,
     "lookback_momentum": strategy_lookback_momentum,
     "bollinger_reversion": strategy_bollinger_reversion,
+    "rsi_divergence": strategy_rsi_divergence,
+    "macd_histogram": strategy_macd_histogram,
+    "stoch_rsi_cross": strategy_stoch_rsi_cross,
+    "ema_ribbon": strategy_ema_ribbon,
+    "supertrend_adx": strategy_supertrend_adx,
+    "keltner_breakout": strategy_keltner_breakout,
 }
 
 
@@ -322,8 +457,18 @@ def fetch_binance_data(symbol, timeframe="4h", days=365*3):
 # ================= BACKTESTER =================
 
 def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
-                 capital=10000, commission_pct=0.1, sl_pct=3.0, tp_pct=5.0):
-    """Run backtest and return trade list."""
+                 capital=10000, commission_pct=0.1, sl_pct=3.0, tp_pct=5.0,
+                 use_atr=True, atr_sl_mult=1.5, atr_tp_mult=2.5, trailing_pct=2.0,
+                 max_bars_held=48, use_vwap=True, use_obv=True):
+    """
+    Run backtest with ATR-based SL/TP and trailing stop.
+
+    Args:
+        use_atr: If True, SL/TP based on ATR. If False, use fixed sl_pct/tp_pct.
+        atr_sl_mult: SL = entry +/- (ATR * atr_sl_mult)
+        atr_tp_mult: TP = entry +/- (ATR * atr_tp_mult)
+        trailing_pct: Trail SL at this % behind highest profit point
+    """
     logic_name = strategy_config['logic']
     params = strategy_config['params']
     func = STRATEGY_FUNCTIONS.get(logic_name)
@@ -334,12 +479,22 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
 
     signals = func(df, params)
 
+    # Pre-compute ATR for dynamic SL/TP
+    atr_series = calc_atr(df['high'], df['low'], df['close'], period=14)
+
+    # Pre-compute VWAP and OBV for entry filters
+    vwap_series = calc_vwap(df['high'], df['low'], df['close'], df['volume']) if use_vwap else None
+    obv_bullish = calc_obv_trend(df['close'], df['volume'], period=20) if use_obv else None
+
     trades = []
     position = 0  # 0=flat, 1=long, -1=short
     entry_price = 0
     entry_time = None
     entry_idx = 0
     equity = capital
+    current_sl = 0      # Dynamic SL (moves with trailing)
+    current_tp = 0      # Dynamic TP
+    peak_price = 0      # Highest/lowest price since entry (for trailing)
 
     for i in range(1, len(df)):
         sig = signals.iloc[i]
@@ -347,28 +502,71 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
         ts = df['timestamp'].iloc[i]
         high = df['high'].iloc[i]
         low = df['low'].iloc[i]
+        atr_val = atr_series.iloc[i] if not pd.isna(atr_series.iloc[i]) else price * 0.02
 
-        # Check SL/TP if in position
+        # Check TIME-BASED EXIT first (max holding period)
+        if position != 0 and max_bars_held > 0:
+            bars_in_trade = i - entry_idx
+            if bars_in_trade >= max_bars_held:
+                qty = equity * 0.95 / entry_price
+                pnl_pct_time = ((price - entry_price) / entry_price * 100) * position
+                pnl_usd_time = qty * (price - entry_price) * position
+                commission_time = qty * price * commission_pct / 100 * 2
+                net_pnl_time = pnl_usd_time - commission_time
+                equity += net_pnl_time
+                trades.append({
+                    'strategy': strategy_name, 'symbol': symbol, 'timeframe': timeframe,
+                    'entry_time': entry_time, 'exit_time': ts,
+                    'side': 'LONG' if position == 1 else 'SHORT',
+                    'entry_price': round(entry_price, 4), 'exit_price': round(price, 4),
+                    'sl_price': round(current_sl, 4), 'tp_price': round(current_tp, 4),
+                    'qty': round(qty, 6), 'pnl_pct': round(pnl_pct_time, 2),
+                    'pnl_usd': round(net_pnl_time, 2), 'equity': round(equity, 2),
+                    'exit_reason': 'Time Exit', 'bars_held': bars_in_trade
+                })
+                position = 0
+                continue
+
+        # Check SL/TP/Trailing if in position
         if position != 0:
+            # Update trailing stop
             if position == 1:  # Long
-                sl_hit = low <= entry_price * (1 - sl_pct / 100)
-                tp_hit = high >= entry_price * (1 + tp_pct / 100)
+                if high > peak_price:
+                    peak_price = high
+                    # Trail SL: move up when price makes new high
+                    trail_sl = peak_price * (1 - trailing_pct / 100)
+                    if trail_sl > current_sl:
+                        current_sl = trail_sl
+                sl_hit = low <= current_sl
+                tp_hit = high >= current_tp
             else:  # Short
-                sl_hit = high >= entry_price * (1 + sl_pct / 100)
-                tp_hit = low <= entry_price * (1 - tp_pct / 100)
+                if low < peak_price:
+                    peak_price = low
+                    # Trail SL: move down when price makes new low
+                    trail_sl = peak_price * (1 + trailing_pct / 100)
+                    if trail_sl < current_sl:
+                        current_sl = trail_sl
+                sl_hit = high >= current_sl
+                tp_hit = low <= current_tp
 
             if sl_hit or tp_hit:
                 if sl_hit:
-                    exit_price = entry_price * (1 - sl_pct / 100) if position == 1 else entry_price * (1 + sl_pct / 100)
-                    exit_reason = "Stop-Loss"
+                    exit_price = current_sl
+                    # Check if trailing SL is better than initial SL
+                    if position == 1 and current_sl > entry_price:
+                        exit_reason = "Trailing-SL (Profit)"
+                    elif position == -1 and current_sl < entry_price:
+                        exit_reason = "Trailing-SL (Profit)"
+                    else:
+                        exit_reason = "Stop-Loss"
                 else:
-                    exit_price = entry_price * (1 + tp_pct / 100) if position == 1 else entry_price * (1 - tp_pct / 100)
+                    exit_price = current_tp
                     exit_reason = "Take-Profit"
 
                 pnl_pct = ((exit_price - entry_price) / entry_price * 100) * position
                 qty = equity * 0.95 / entry_price
                 pnl_usd = qty * (exit_price - entry_price) * position
-                commission = qty * exit_price * commission_pct / 100 * 2  # entry + exit
+                commission = qty * exit_price * commission_pct / 100 * 2
                 net_pnl = pnl_usd - commission
                 equity += net_pnl
 
@@ -381,6 +579,8 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                     'side': 'LONG' if position == 1 else 'SHORT',
                     'entry_price': round(entry_price, 4),
                     'exit_price': round(exit_price, 4),
+                    'sl_price': round(current_sl, 4),
+                    'tp_price': round(current_tp, 4),
                     'qty': round(qty, 6),
                     'pnl_pct': round(pnl_pct, 2),
                     'pnl_usd': round(net_pnl, 2),
@@ -391,9 +591,24 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                 position = 0
                 continue
 
-        # New signal
+        # New signal — apply VWAP and OBV filters
         if sig != 0 and sig != position:
-            # Close existing position first
+            # VWAP Filter: only buy below VWAP, sell above VWAP (better entries)
+            if use_vwap and vwap_series is not None and not pd.isna(vwap_series.iloc[i]):
+                vwap_val = vwap_series.iloc[i]
+                if sig == 1 and price > vwap_val * 1.005:  # BUY but price 0.5% above VWAP — skip
+                    continue
+                if sig == -1 and price < vwap_val * 0.995:  # SELL but price 0.5% below VWAP — skip
+                    continue
+
+            # OBV Filter: volume must confirm direction
+            if use_obv and obv_bullish is not None and not pd.isna(obv_bullish.iloc[i]):
+                if sig == 1 and not obv_bullish.iloc[i]:  # BUY but OBV bearish — skip
+                    continue
+                if sig == -1 and obv_bullish.iloc[i]:  # SELL but OBV bullish — skip
+                    continue
+
+            # Close existing position first (with current SL/TP levels)
             if position != 0:
                 pnl_pct = ((price - entry_price) / entry_price * 100) * position
                 qty = equity * 0.95 / entry_price
@@ -411,6 +626,8 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                     'side': 'LONG' if position == 1 else 'SHORT',
                     'entry_price': round(entry_price, 4),
                     'exit_price': round(price, 4),
+                    'sl_price': round(current_sl, 4),
+                    'tp_price': round(current_tp, 4),
                     'qty': round(qty, 6),
                     'pnl_pct': round(pnl_pct, 2),
                     'pnl_usd': round(net_pnl, 2),
@@ -419,11 +636,27 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                     'bars_held': i - entry_idx
                 })
 
-            # Open new position
+            # Open new position with ATR-based SL/TP + trailing
             position = int(sig)
             entry_price = price
             entry_time = ts
             entry_idx = i
+            peak_price = price  # Reset trailing tracker
+
+            if use_atr and atr_val > 0:
+                if position == 1:  # Long
+                    current_sl = entry_price - (atr_val * atr_sl_mult)
+                    current_tp = entry_price + (atr_val * atr_tp_mult)
+                else:  # Short
+                    current_sl = entry_price + (atr_val * atr_sl_mult)
+                    current_tp = entry_price - (atr_val * atr_tp_mult)
+            else:
+                if position == 1:
+                    current_sl = entry_price * (1 - sl_pct / 100)
+                    current_tp = entry_price * (1 + tp_pct / 100)
+                else:
+                    current_sl = entry_price * (1 + sl_pct / 100)
+                    current_tp = entry_price * (1 - tp_pct / 100)
 
     return trades
 
@@ -437,7 +670,15 @@ def main():
     parser.add_argument("--timeframe", type=str, default="", help="Override timeframe (e.g., 4h)")
     parser.add_argument("--capital", type=float, default=10000, help="Starting capital (default: $10,000)")
     parser.add_argument("--sl", type=float, default=3.0, help="Stop-loss % (default: 3.0)")
-    parser.add_argument("--tp", type=float, default=5.0, help="Take-profit % (default: 5.0)")
+    parser.add_argument("--tp", type=float, default=5.0, help="Take-profit % fallback (default: 5.0)")
+    parser.add_argument("--use-atr", action="store_true", default=True, help="Use ATR-based SL/TP")
+    parser.add_argument("--no-atr", action="store_true", help="Disable ATR, use fixed SL/TP")
+    parser.add_argument("--atr-sl-mult", type=float, default=1.5, help="ATR multiplier for SL (default: 1.5)")
+    parser.add_argument("--atr-tp-mult", type=float, default=2.5, help="ATR multiplier for TP (default: 2.5)")
+    parser.add_argument("--trail", type=float, default=2.0, help="Trailing stop %% (default: 2.0)")
+    parser.add_argument("--max-bars", type=int, default=48, help="Max bars to hold (0=disabled, default: 48)")
+    parser.add_argument("--no-vwap", action="store_true", help="Disable VWAP entry filter")
+    parser.add_argument("--no-obv", action="store_true", help="Disable OBV entry filter")
     parser.add_argument("--output", type=str, default="storage/backtest_results", help="Output directory")
     args = parser.parse_args()
 
@@ -456,7 +697,12 @@ def main():
 
     print("=" * 80)
     print("  BATCH BACKTEST ENGINE")
-    print(f"  Capital: ${args.capital:,.0f} | SL: {args.sl}% | TP: {args.tp}%")
+    atr_mode = "ATR" if not getattr(args, 'no_atr', False) else "Fixed"
+    vwap_on = "ON" if not getattr(args, 'no_vwap', False) else "OFF"
+    obv_on = "ON" if not getattr(args, 'no_obv', False) else "OFF"
+    max_b = getattr(args, 'max_bars', 48)
+    print(f"  Capital: ${args.capital:,.0f} | SL: {atr_mode} ({getattr(args, 'atr_sl_mult', 1.5)}x ATR) | Trail: {getattr(args, 'trail', 2.0)}%")
+    print(f"  VWAP Filter: {vwap_on} | OBV Filter: {obv_on} | Max Hold: {max_b} bars")
     print("=" * 80)
 
     for assignment_key, strategy_list in STRATEGY_ASSIGNMENTS.items():
@@ -485,16 +731,73 @@ def main():
             config = STRATEGIES[strat_name]
             logger.info(f"Running: {strat_name} on {symbol} {tf}...")
 
+            use_atr = not getattr(args, "no_atr", False)
             trades = run_backtest(df, strat_name, config, symbol, tf,
-                                  capital=args.capital, sl_pct=args.sl, tp_pct=args.tp)
+                                  capital=args.capital, sl_pct=args.sl, tp_pct=args.tp, use_atr=use_atr, atr_sl_mult=getattr(args, "atr_sl_mult", 1.5), atr_tp_mult=getattr(args, "atr_tp_mult", 2.5), trailing_pct=getattr(args, "trail", 2.0), max_bars_held=getattr(args, "max_bars", 48), use_vwap=not getattr(args, "no_vwap", False), use_obv=not getattr(args, "no_obv", False))
 
             if not trades:
                 logger.warning(f"  No trades generated for {strat_name} {symbol} {tf}")
                 continue
 
-            # Save individual CSV
-            trades_df = pd.DataFrame(trades)
-            csv_name = f"{strat_name}_{symbol}_{tf}_trades.csv"
+            # Save individual CSV in TradingView format
+            tv_rows = []
+            cumulative_pnl = 0
+            for idx, t in enumerate(trades, 1):
+                cumulative_pnl += t['pnl_usd']
+                cum_pct = (cumulative_pnl / args.capital) * 100
+                pos_value = t['qty'] * t['entry_price']
+
+                # Entry row (Open Long / Open Short)
+                entry_type = f"Open {'Long' if t['side'] == 'LONG' else 'Short'}"
+                signal = "Long" if t['side'] == 'LONG' else "Short"
+                sl_price = t.get('sl_price', 0)
+                tp_price = t.get('tp_price', 0)
+                tv_rows.append({
+                    'Trade #': idx,
+                    'Type': entry_type,
+                    'Date and time': t['entry_time'],
+                    'Signal': signal,
+                    'Price USDT': t['entry_price'],
+                    'SL Price': sl_price,
+                    'TP Price': tp_price,
+                    'Position size (qty)': round(t['qty'], 6),
+                    'Position size (value)': round(pos_value, 2),
+                    'Net P&L USDT': round(t['pnl_usd'], 2),
+                    'Net P&L %': round(t['pnl_pct'], 2),
+                    'Favorable excursion USDT': round(abs(t['pnl_usd']) if t['pnl_usd'] > 0 else 0, 2),
+                    'Favorable excursion %': round(abs(t['pnl_pct']) if t['pnl_pct'] > 0 else 0, 2),
+                    'Adverse excursion USDT': round(abs(t['pnl_usd']) if t['pnl_usd'] < 0 else 0, 2),
+                    'Adverse excursion %': round(abs(t['pnl_pct']) if t['pnl_pct'] < 0 else 0, 2),
+                    'Cumulative P&L USDT': round(cumulative_pnl, 2),
+                    'Cumulative P&L %': round(cum_pct, 2),
+                })
+
+                # Exit row (Close Long / Close Short)
+                exit_type = f"Close {'Long' if t['side'] == 'LONG' else 'Short'}"
+                tv_rows.append({
+                    'Trade #': idx,
+                    'Type': exit_type,
+                    'Date and time': t['exit_time'],
+                    'Signal': t['exit_reason'],
+                    'Price USDT': t['exit_price'],
+                    'SL Price': sl_price,
+                    'TP Price': tp_price,
+                    'Position size (qty)': round(t['qty'], 6),
+                    'Position size (value)': round(pos_value, 2),
+                    'Net P&L USDT': round(t['pnl_usd'], 2),
+                    'Net P&L %': round(t['pnl_pct'], 2),
+                    'Favorable excursion USDT': round(abs(t['pnl_usd']) if t['pnl_usd'] > 0 else 0, 2),
+                    'Favorable excursion %': round(abs(t['pnl_pct']) if t['pnl_pct'] > 0 else 0, 2),
+                    'Adverse excursion USDT': round(abs(t['pnl_usd']) if t['pnl_usd'] < 0 else 0, 2),
+                    'Adverse excursion %': round(abs(t['pnl_pct']) if t['pnl_pct'] < 0 else 0, 2),
+                    'Cumulative P&L USDT': round(cumulative_pnl, 2),
+                    'Cumulative P&L %': round(cum_pct, 2),
+                })
+
+            trades_df = pd.DataFrame(tv_rows)
+            from datetime import datetime as dt
+            date_str = dt.now().strftime("%Y-%m-%d")
+            csv_name = f"{strat_name}_{tf}_BINANCE_{symbol}_{date_str}.csv"
             csv_path = output_dir / csv_name
             trades_df.to_csv(csv_path, index=False)
 
@@ -548,6 +851,16 @@ def main():
         print(f"  Output: {output_dir}/")
         print(f"  Summary: {summary_path}")
         print("=" * 80)
+
+    # Auto-merge results into tournament_winners.csv
+    try:
+        from merge_to_tournament import merge_results
+        summary_file = str(output_dir / "SUMMARY.csv")
+        winners_file = str(Path("storage/reports/tournament_winners.csv"))
+        merge_results(summary_file, winners_file)
+        print("\n  📊 Tournament leaderboard auto-updated!")
+    except Exception as e:
+        print(f"\n  ⚠️ Tournament merge skipped: {e}")
         print(f"\n  Individual CSVs:")
         for row in summary_rows:
             print(f"    {row['CSV File']}")
