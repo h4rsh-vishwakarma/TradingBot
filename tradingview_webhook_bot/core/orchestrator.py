@@ -136,7 +136,7 @@ class Orchestrator:
 
     def _set_candle_lock(self, symbol: str, side: str, strategy: str):
         self._candle_lock[symbol] = {"side": side, "time": time.time(), "strategy": strategy}
-        logger.info(f"[{correlation_id}] Candle locked: {symbol} -> {side} by {strategy} for {self.CANDLE_LOCK_SECONDS}s")
+        logger.info(f"Candle locked: {symbol} -> {side} by {strategy} for {self.CANDLE_LOCK_SECONDS}s")
 
     def _is_symbol_in_cooldown(self, symbol: str, strategy: str = "") -> bool:
         cooldown_key = f"{symbol}:{strategy}" if strategy else symbol

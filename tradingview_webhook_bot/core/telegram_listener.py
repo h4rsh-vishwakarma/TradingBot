@@ -38,8 +38,8 @@ def cmd_help(message):
         "🏆 <b>/top5</b> — Top 5 strategies with full details\n"
         "⚖️ <b>/average</b> — AVERAGE tier strategies\n"
         "🔍 <b>/strategy</b> &lt;name&gt; — Search strategy by name\n"
-        "💵 <b>/pnl
-📊 /categories — Strategy risk categories (High vs Safe)</b> — Today\'s P&amp;L and open positions\n"
+        "💵 <b>/pnl</b> — Today's P&amp;L and open positions\n"
+        "📊 <b>/categories</b> — Strategy risk categories (High vs Safe)\n"
         "   Deploy top Alpha++ strategies to Telegram.\n"
         "   Pine Script + Stats (ROI, Gross DD, Net DD).\n"
         "   Auto-runs daily 9 AM UTC via cron.\n\n"
@@ -249,8 +249,8 @@ def cmd_strategy_search(message):
         bot.reply_to(message, f"❌ Error: {e}")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# /pnl — Today's P&L and performance
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        "💵 <b>/pnl</b> — Today's P&amp;L and open positions\n"
+        "📊 <b>/categories</b> — Strategy risk categories (High vs Safe)\n"
 @bot.message_handler(commands=['pnl'])
 def cmd_pnl(message):
     try:
@@ -281,8 +281,38 @@ def cmd_pnl(message):
         bot.reply_to(message, f"❌ Error: {e}")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# /audit — Tournament Leaderboard
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@bot.message_handler(commands=["categories"])
+# /categories — Strategy risk categories
+def cmd_categories(message):
+    try:
+        import pandas as pd
+        df = pd.read_csv('storage/reports/tournament_winners.csv')
+        cat1 = df[(df['Daily_ROI_%'] >= 1.5) & (df['Net_DD_%'].abs() >= 75)].sort_values('Daily_ROI_%', ascending=False)
+        cat2 = df[df['Daily_ROI_%'] > 0].sort_values('Net_DD_%', ascending=False).head(10)
+        lines = ["STRATEGY CATEGORIES", "=" * 20, ""]
+        lines.append("CAT 1: HIGH RETURN + HIGH RISK")
+        lines.append("(ROI >1.5%/day, DD >75%)")
+        lines.append("")
+        for _, r in cat1.head(5).iterrows():
+            nd = abs(r['Net_DD_%'])
+            cap = int(10000 * (1 - nd/100))
+            lines.append("  %s | %s" % (r['Symbol'], str(r['Strategy'])[:28]))
+            lines.append("  ROI: %.2f%% | DD: %.1f%% | Worst: $%d" % (r['Daily_ROI_%'], nd, cap))
+            lines.append("")
+        lines.append("CAT 2: SAFE + STEADY")
+        lines.append("(Lowest DD, capital >$8,000)")
+        lines.append("")
+        for _, r in cat2.head(5).iterrows():
+            nd = abs(r['Net_DD_%'])
+            cap = int(10000 * (1 - nd/100))
+            lines.append("  %s | %s" % (r['Symbol'], str(r['Strategy'])[:28]))
+            lines.append("  ROI: %.2f%% | DD: %.1f%% | Worst: $%d" % (r['Daily_ROI_%'], nd, cap))
+            lines.append("")
+        lines.append("Cat 1: %d | Cat 2: %d strategies" % (len(cat1), len(cat2)))
+        bot.send_message(message.chat.id, chr(10).join(lines))
+    except Exception as e:
+        bot.send_message(message.chat.id, "Error: %s" % str(e))
+
 @bot.message_handler(commands=['audit'])
 def cmd_audit(message):
     if not os.path.exists(REPORT_PATH):
@@ -369,5 +399,5 @@ def cmd_trade(message):
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if __name__ == "__main__":
-    print("🛰️ Telegram Listener Active — Commands: /help /alpha /winners /top5 /average /strategy /pnl /status /audit /buy /sell /override")
-    bot.infinity_polling()
+    print('Telegram Listener starting...')
+    bot.infinity_polling(timeout=60, long_polling_timeout=60)

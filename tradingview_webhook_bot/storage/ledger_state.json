@@ -1,45 +1,4 @@
 {
-    "positions": {
-        "binance:SOLUSDT:Mean Reversion Scalper Hybrid": {
-            "symbol": "binance:SOLUSDT:Mean Reversion Scalper Hybrid",
-            "quantity": 0.0,
-            "avg_price": 0.0,
-            "realized_pnl": 0.0,
-            "daily_realized_pnl": 0.0,
-            "last_update_date": "2026-03-26"
-        },
-        "binance:SOLUSDT:Mean_Reversion_Scalper_Hybrid": {
-            "symbol": "binance:SOLUSDT:Mean_Reversion_Scalper_Hybrid",
-            "quantity": 0.0,
-            "avg_price": 0.0,
-            "realized_pnl": 0.0,
-            "daily_realized_pnl": 0.0,
-            "last_update_date": "2026-03-26"
-        },
-        "SOLUSDT": {
-            "symbol": "SOLUSDT",
-            "quantity": -1.28,
-            "avg_price": 0.0,
-            "realized_pnl": 0.0,
-            "daily_realized_pnl": 0.0,
-            "last_update_date": ""
-        },
-        "ETHUSDT": {
-            "symbol": "ETHUSDT",
-            "quantity": -0.04,
-            "avg_price": 0.0,
-            "realized_pnl": 0.0,
-            "daily_realized_pnl": 0.0,
-            "last_update_date": ""
-        },
-        "BTCUSDT": {
-            "symbol": "BTCUSDT",
-            "quantity": -0.018,
-            "avg_price": 0.0,
-            "realized_pnl": 0.0,
-            "daily_realized_pnl": 0.0,
-            "last_update_date": ""
-        }
-    },
-    "trade_history": []
+  "positions": {},
+  "trade_history": []
 }
