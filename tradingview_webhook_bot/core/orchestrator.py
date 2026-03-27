@@ -1,6 +1,6 @@
 import time, logging, os, json, sys, signal as _signal, pandas as pd
 from concurrent.futures import ThreadPoolExecutor
-import uuid
+import re, uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -138,6 +138,13 @@ class Orchestrator:
         self._candle_lock[symbol] = {"side": side, "time": time.time(), "strategy": strategy}
         logger.info(f"Candle locked: {symbol} -> {side} by {strategy} for {self.CANDLE_LOCK_SECONDS}s")
 
+    @staticmethod
+    def _normalize_strategy(name):
+        s = str(name)
+        for ch in ['_', chr(39), chr(34), '[', ']', '+', ',', '-', '|', '.']:
+            s = s.replace(ch, ' ')
+        return re.sub(r'\s+', ' ', s).strip().lower()
+
     def _is_symbol_in_cooldown(self, symbol: str, strategy: str = "") -> bool:
         cooldown_key = f"{symbol}:{strategy}" if strategy else symbol
         last_trade = self._symbol_cooldown.get(cooldown_key, 0)
@@ -225,7 +232,8 @@ class Orchestrator:
                 signal_data["secret"] = self.webhook_secret
 
             target_exchange = str(payload_raw.get("exchange") or event.get("exchange") or "binance").lower()
-            strat_name = payload_raw.get("strategy") or event.get("strategy") or "SMC"
+            strat_name_raw = payload_raw.get("strategy") or event.get("strategy") or "SMC"
+            strat_name = self._normalize_strategy(strat_name_raw)
             symbol_raw = str(payload_raw.get("symbol") or event.get("symbol") or "BTCUSDT").upper()
 
             # --- SYMBOL CLEANING ---

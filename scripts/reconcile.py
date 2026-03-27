@@ -100,7 +100,7 @@ def main():
         has_sl_tp = sym in open_orders and len(open_orders[sym]) >= 1
         age = now - pos['update_time'] if pos['update_time'] > 0 else 0
 
-        if not has_sl_tp and age > 300:  # No SL/TP and older than 5 min
+        if not has_sl_tp and age > 900:  # 15 min without SL/TP = orphan  # No SL/TP and older than 5 min
             logger.warning(f"ORPHAN DETECTED: {sym} qty={pos['qty']} no SL/TP, age={age:.0f}s")
             if close_position(client, sym, pos['qty']):
                 fixes.append(f"Auto-closed orphan {sym}: qty={pos['qty']}, PnL=${pos['unrealized_pnl']:.2f}")
