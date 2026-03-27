@@ -38,6 +38,7 @@ try:
     from tradingview_webhook_bot.core.metrics import metrics
     from backtesting.engine import BacktestEngine
     from tradingview_webhook_bot.exchange.hl_client import HyperliquidClient
+    from tradingview_webhook_bot.exchange.lighter_client import LighterClient
 except ImportError as e:
     logger.error(f"Import failed: {e}")
     sys.exit(1)
@@ -89,6 +90,15 @@ class Orchestrator:
         except Exception as e:
             logger.warning(f"HL Client initialization failed: {e}")
             self.exchange_hl = None
+
+        # Lighter.xyz DEX
+        try:
+            self.exchange_lighter = LighterClient()
+            if not self.exchange_lighter.client:
+                self.exchange_lighter = None
+        except Exception as e:
+            logger.warning("Lighter init skipped: %s" % e)
+            self.exchange_lighter = None
 
         self.bt_engine = BacktestEngine()
         self.processed_count = 0
@@ -238,7 +248,24 @@ class Orchestrator:
 
             # --- SYMBOL CLEANING ---
             symbol = symbol_raw.split('_')[0]
-            if target_exchange == "hyperliquid":
+            if target_exchange == "lighter":
+                if not self.exchange_lighter:
+                    logger.warning("Lighter client not available")
+                    return True
+                try:
+                    is_buy = (side == "BUY")
+                    res = self.exchange_lighter.market_order(symbol, is_buy, qty, price_signal, signal_id)
+                    if res.get("status") == "ok":
+                        execution_res = {"status": "SUCCESS"}
+                        try:
+                            fill_price = float(res["response"]["data"]["statuses"][0]["filled"]["avgPx"])
+                        except (KeyError, IndexError, TypeError):
+                            fill_price = price_signal
+                    else:
+                        execution_res = {"status": "FAILED", "reason": str(res.get("msg",""))}
+                except Exception as e:
+                    execution_res = {"status": "FAILED", "reason": str(e)}
+            elif target_exchange == "hyperliquid":
                 symbol = symbol.replace("USDT", "").replace("USD", "")
             else:
                 if "USDT" not in symbol:
@@ -421,7 +448,24 @@ class Orchestrator:
 
             # --- 6. ACTUAL EXECUTION ---
             execution_res, fill_price = {}, price_signal
-            if target_exchange == "hyperliquid":
+            if target_exchange == "lighter":
+                if not self.exchange_lighter:
+                    logger.warning("Lighter client not available")
+                    return True
+                try:
+                    is_buy = (side == "BUY")
+                    res = self.exchange_lighter.market_order(symbol, is_buy, qty, price_signal, signal_id)
+                    if res.get("status") == "ok":
+                        execution_res = {"status": "SUCCESS"}
+                        try:
+                            fill_price = float(res["response"]["data"]["statuses"][0]["filled"]["avgPx"])
+                        except (KeyError, IndexError, TypeError):
+                            fill_price = price_signal
+                    else:
+                        execution_res = {"status": "FAILED", "reason": str(res.get("msg",""))}
+                except Exception as e:
+                    execution_res = {"status": "FAILED", "reason": str(e)}
+            elif target_exchange == "hyperliquid":
                 if not self.exchange_hl:
                     logger.warning(f"HL client not available, skipping {symbol}")
                     return True
