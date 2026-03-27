@@ -40,6 +40,10 @@ def dispatch_top_strategies(force=False):
         roi = round(float(winner.get('Daily_ROI_%', 0.0)), 3)
         gross_dd = round(float(winner.get('Gross_DD_%', winner.get('Max_DD_%', 0.0))), 2)
         net_dd = round(float(winner.get('Net_DD_%', gross_dd)), 2)
+        gdd_date = str(winner.get('GDD_Date', 'N/A'))
+        gdd_capital = int(float(winner.get('GDD_Capital_Left', 0)))
+        ndd_date = str(winner.get('NDD_Date', 'N/A'))
+        ndd_capital = int(float(winner.get('NDD_Capital_Left', 0)))
         win_rate = round(float(winner.get('Win_Rate_%', 0.0)), 1)
         sharpe = round(float(winner.get('Sharpe_Ratio', 0.0)), 2)
         total_trades = int(winner.get('Total_Trades', 0))
@@ -109,8 +113,8 @@ if (time >= start_time)
                f"{tier_emoji} <b>Tier: {tier_display}</b>\n"
                f"📊 Symbol: {symbol}\n"
                f"📈 Daily ROI: {roi}%\n"
-               f"📉 Gross DD: {gross_dd}% (Compounding)\n"
-               f"📉 Net DD: {net_dd}% (Fixed Size)\n"
+               f"📉 Gross DD: {gross_dd}% (Compounding) | 📅 {gdd_date} | 💰 ${gdd_capital:,} left\n"
+               f"📉 Net DD: {net_dd}% (Fixed Size) | 📅 {ndd_date} | 💰 ${ndd_capital:,} left\n"
                f"🎯 Win Rate: {win_rate}% | Sharpe: {sharpe}\n"
                f"🔄 Total Trades: {total_trades}\n"
                f"⚙️ Params: Len={length}, Mult={mult}\n"
@@ -147,6 +151,10 @@ def dispatch_average_strategies():
         roi = round(float(winner.get('Daily_ROI_%', 0.0)), 3)
         gross_dd = round(float(winner.get('Gross_DD_%', winner.get('Max_DD_%', 0.0))), 2)
         net_dd = round(float(winner.get('Net_DD_%', gross_dd)), 2)
+        gdd_date = str(winner.get('GDD_Date', 'N/A'))
+        gdd_capital = int(float(winner.get('GDD_Capital_Left', 0)))
+        ndd_date = str(winner.get('NDD_Date', 'N/A'))
+        ndd_capital = int(float(winner.get('NDD_Capital_Left', 0)))
         win_rate = round(float(winner.get('Win_Rate_%', 0.0)), 1)
         sharpe = round(float(winner.get('Sharpe_Ratio', 0.0)), 2)
         total_trades = int(winner.get('Total_Trades', 0))
@@ -185,7 +193,9 @@ if (time >= start_time)
         msg = (f"⚖️ <b>AVERAGE #{i+1}</b>\n"
                f"📊 {symbol} | {strat_display[:40]}\n"
                f"📈 ROI: {roi}% | WR: {win_rate}% | Sharpe: {sharpe}\n"
-               f"📉 DD: {gross_dd}% | Trades: {total_trades}\n"
+               f"📉 GDD: {gross_dd}% 📅{gdd_date} 💰${gdd_capital:,}\n"
+               f"📉 NDD: {net_dd}% 📅{ndd_date} 💰${ndd_capital:,}\n"
+               f"🔄 Trades: {total_trades}\n"
                f"⚙️ Params: Len={length}, Mult={mult}")
 
         telegram.send(severity=AlertSeverity.INFO, title=f"Average #{i+1}", message=msg)

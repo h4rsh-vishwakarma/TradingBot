@@ -71,6 +71,10 @@ def merge_results(summary_path, winners_path):
         elif sharpe >= 5.0 and daily_roi >= 0.1 and "ALPHA" not in tier:
             tier = "🎯 ALPHA"
 
+        # Capital left estimates (based on $100K starting capital)
+        gdd_capital = round(100000 * (1 + (-dd) / 100), 0)
+        ndd_capital = round(100000 * (1 + (-dd * 1.1) / 100), 0)
+
         rows.append({
             "Symbol": r["Symbol"],
             "Strategy": r["Strategy"],
@@ -78,6 +82,10 @@ def merge_results(summary_path, winners_path):
             "Gross_DD_%": round(-dd, 2),
             "Net_DD_%": round(-dd * 1.1, 2),
             "Max_DD_%": round(-dd, 2),
+            "GDD_Date": r.get("DD_Date", "N/A"),
+            "GDD_Capital_Left": int(gdd_capital),
+            "NDD_Date": r.get("DD_Date", "N/A"),
+            "NDD_Capital_Left": int(ndd_capital),
             "Win_Rate_%": round(wr, 1),
             "Sharpe_Ratio": sharpe,
             "Total_Trades": trades,

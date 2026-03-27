@@ -43,14 +43,14 @@ def strategy_tournament():
                 e_mult = params['mult'] + (idx * 0.01)
                 e_len = params['len'] + (idx % 3)
 
-                daily, gross_dd, net_dd, win_rate, sharpe, trades, status = run_test(df_raw, clean_name, True, e_mult, e_len)
+                daily, gross_dd, net_dd, win_rate, sharpe, trades, status, gdd_date, ndd_date, gdd_cap, ndd_cap = run_test(df_raw, clean_name, True, e_mult, e_len)
 
                 if daily > best_daily and status != "💀 ERROR":
                     best_daily = daily
-                    best_res = (daily, gross_dd, net_dd, win_rate, sharpe, trades, status, {'mult': e_mult, 'len': e_len})
+                    best_res = (daily, gross_dd, net_dd, win_rate, sharpe, trades, status, {'mult': e_mult, 'len': e_len}, gdd_date, ndd_date, gdd_cap, ndd_cap)
 
             if best_res:
-                daily_roi, gross_dd, net_dd, win_rate, sharpe, trades, tier, opt_p = best_res
+                daily_roi, gross_dd, net_dd, win_rate, sharpe, trades, tier, opt_p, gdd_date, ndd_date, gdd_cap, ndd_cap = best_res
 
                 # Out-of-sample validation (80/20 split)
                 oos_roi, oos_dd, oos_sharpe = 0.0, 0.0, 0.0
@@ -73,6 +73,10 @@ def strategy_tournament():
                         "Gross_DD_%": round(gross_dd, 2),
                         "Net_DD_%": round(net_dd, 2),
                         "Max_DD_%": round(gross_dd, 2),
+                        "GDD_Date": gdd_date,
+                        "GDD_Capital_Left": int(gdd_cap),
+                        "NDD_Date": ndd_date,
+                        "NDD_Capital_Left": int(ndd_cap),
                         "Win_Rate_%": win_rate,
                         "Sharpe_Ratio": sharpe,
                         "Total_Trades": trades,
@@ -100,9 +104,9 @@ def run_test_oos(df_raw, name, mult, length, train_pct=0.8):
     df_test['pct'] = df_test['close'].pct_change()
 
     # Optimize on train set
-    train_result = run_test(df_train, name, True, mult, length)
+    train_result = run_test(df_train, name, True, mult, length)[:7]
     # Validate on test set (same params, no re-optimization)
-    test_result = run_test(df_test, name, True, mult, length)
+    test_result = run_test(df_test, name, True, mult, length)[:7]
     return train_result, test_result
 
 
@@ -134,12 +138,22 @@ def run_test(df_raw, name, optimize, mult, length):
 
         # 📉 GROSS DD: Compounding (peak-to-trough equity curve)
         cum_res = (1 + df['daily_ret'].fillna(0)).cumprod()
-        gross_dd = ((cum_res - cum_res.cummax()) / cum_res.cummax()).min() * 100
+        gross_dd_series = ((cum_res - cum_res.cummax()) / cum_res.cummax()) * 100
+        gross_dd = gross_dd_series.min()
+        gross_dd_idx = gross_dd_series.idxmin()
+        gross_dd_date = str(df['timestamp'].iloc[gross_dd_idx])[:10] if 'timestamp' in df.columns and gross_dd_idx < len(df) else "N/A"
+        # Capital left after gross DD (compounding): start * (1 + dd/100)
+        gross_dd_capital = round(100000 * (1 + gross_dd / 100), 0)
 
         # 📉 NET DD: Non-compounding (cumulative sum, fixed position size)
         cum_sum = df['daily_ret'].fillna(0).cumsum() * 100
         cum_peak = cum_sum.cummax()
-        net_dd = (cum_sum - cum_peak).min()
+        net_dd_series = cum_sum - cum_peak
+        net_dd = net_dd_series.min()
+        net_dd_idx = net_dd_series.idxmin()
+        net_dd_date = str(df['timestamp'].iloc[net_dd_idx])[:10] if 'timestamp' in df.columns and net_dd_idx < len(df) else "N/A"
+        # Capital left after net DD (fixed size): start + start * dd/100
+        net_dd_capital = round(100000 * (1 + net_dd / 100), 0)
 
         # 📈 WIN RATE: Winning trades / Total trades
         trades = df['daily_ret'][df['daily_ret'] != 0]
@@ -188,9 +202,9 @@ def run_test(df_raw, name, optimize, mult, length):
         elif sharpe >= 5.0 and daily_roi >= 0.8 and "ALPHA" not in status:
             status = "🎯 ALPHA"
 
-        return daily_roi, gross_dd, net_dd, win_rate, sharpe, total_trades, status
+        return daily_roi, gross_dd, net_dd, win_rate, sharpe, total_trades, status, gross_dd_date, net_dd_date, gross_dd_capital, net_dd_capital
     except:
-        return -1, -1, -1, 0.0, 0.0, 0, "💀 ERROR"
+        return -1, -1, -1, 0.0, 0.0, 0, "💀 ERROR", "N/A", "N/A", 0, 0
 
 if __name__ == "__main__":
     strategy_tournament()

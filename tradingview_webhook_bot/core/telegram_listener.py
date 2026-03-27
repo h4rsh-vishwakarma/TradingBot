@@ -168,8 +168,8 @@ def cmd_top5(message):
             msg += f"<b>#{i+1} {r['Strategy']}</b>\n"
             msg += f"  📊 Symbol: {r['Symbol']}\n"
             msg += f"  📈 Daily ROI: {r['Daily_ROI_%']:.3f}%\n"
-            msg += f"  📉 Gross DD: {r.get('Gross_DD_%', 0):.2f}%\n"
-            msg += f"  📉 Net DD: {r.get('Net_DD_%', 0):.2f}%\n"
+            msg += f"  📉 Gross DD: {r.get('Gross_DD_%', 0):.2f}% | 📅 {r.get('GDD_Date', 'N/A')} | 💰 ${int(float(r.get('GDD_Capital_Left', 0))):,}\n"
+            msg += f"  📉 Net DD: {r.get('Net_DD_%', 0):.2f}% | 📅 {r.get('NDD_Date', 'N/A')} | 💰 ${int(float(r.get('NDD_Capital_Left', 0))):,}\n"
             msg += f"  🎯 Win Rate: {r.get('Win_Rate_%', 0):.1f}%\n"
             msg += f"  📐 Sharpe: {r.get('Sharpe_Ratio', 0):.2f}\n"
             msg += f"  🔄 Trades: {int(r.get('Total_Trades', 0))}\n"
@@ -329,6 +329,10 @@ def cmd_audit(message):
             roi = round(row['Daily_ROI_%'], 3)
             gross_dd = round(row.get('Gross_DD_%', row.get('Max_DD_%', 0)), 2)
             net_dd = round(row.get('Net_DD_%', gross_dd), 2)
+            gdd_date = row.get('GDD_Date', 'N/A')
+            gdd_capital = int(float(row.get('GDD_Capital_Left', 0)))
+            ndd_date = row.get('NDD_Date', 'N/A')
+            ndd_capital = int(float(row.get('NDD_Capital_Left', 0)))
             tier = row.get('Tier', 'N/A')
 
             win_rate = round(row.get('Win_Rate_%', 0), 1)
@@ -338,8 +342,8 @@ def cmd_audit(message):
                 f"\n<b>#{i+1}</b> {tier}\n"
                 f"   {symbol} | {strat}\n"
                 f"   📈 ROI: <code>{roi}%</code>/day\n"
-                f"   📉 Gross DD: <code>{gross_dd}%</code>\n"
-                f"   📉 Net DD: <code>{net_dd}%</code>\n"
+                f"   📉 Gross DD: <code>{gross_dd}%</code> | 📅 {gdd_date} | 💰 ${gdd_capital:,}\n"
+                f"   📉 Net DD: <code>{net_dd}%</code> | 📅 {ndd_date} | 💰 ${ndd_capital:,}\n"
                 f"   🎯 Win: <code>{win_rate}%</code> | Sharpe: <code>{sharpe}</code>"
             )
 
