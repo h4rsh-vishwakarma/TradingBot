@@ -113,23 +113,56 @@ def run_test_oos(df_raw, name, mult, length, train_pct=0.8):
 def run_test(df_raw, name, optimize, mult, length):
     df = df_raw.copy()
 
-    LEVERAGE = 2.5 if optimize else 1.0
-    STOP_LOSS = 0.02   # 2% SL
-    TAKE_PROFIT = 0.06 # 6% TP
+    # 🛡️ OPTIMIZED RISK PARAMETERS — Target NDD < -50%
+    LEVERAGE = 1.0              # No leverage (was 2.5x — #1 cause of -96% DD)
+    STOP_LOSS = 0.01            # 1% SL per bar (was 2%)
+    TAKE_PROFIT = 0.03          # 3% TP per bar (was 6%) — maintains 1:3 RR
+    MAX_DAILY_LOSS = -0.03      # Circuit breaker: -3% max loss per day
+    COOLDOWN_TRIGGER = 3        # Go flat after 3 consecutive losses
+    COOLDOWN_BARS = 4           # Skip 4 bars (1 hour on 15m data)
 
     try:
         df['sig'] = apply_strategy(df, name, optimize, mult, length)
 
-        # 🛡️ ADX > 25 FILTER IN BACKTEST (matches Pine Script logic)
-        # Pehle sirf Pine template mein tha, ab backtest mein bhi lagega
-        # Isse choppy market trades hata ke DD significantly drop hoga
+        # 🛡️ FILTER 1: ADX > 20 (relaxed from 25 to capture moderate trends)
         from my_strategies import calculate_adx
         adx = calculate_adx(df, n=14)
-        df['sig'] = np.where(adx > 25, df['sig'], 0)  # Kill signals in weak trends
+        df['sig'] = np.where(adx > 20, df['sig'], 0)
 
-        # Calculate daily returns (NON-COMPOUNDING to prevent e+22)
+        # 🛡️ FILTER 2: ATR Volatility — skip abnormally volatile periods
+        atr_14 = (df['high'] - df['low']).rolling(14).mean()
+        atr_ma = atr_14.rolling(100).mean()
+        df['sig'] = np.where(atr_14 > 2 * atr_ma, 0, df['sig'])
+
+        # Calculate daily returns
         df['daily_ret'] = df['sig'].shift(1) * df['pct'] * LEVERAGE
         df['daily_ret'] = df['daily_ret'].clip(lower=-STOP_LOSS, upper=TAKE_PROFIT)
+
+        # 🛡️ FILTER 3: Consecutive loss cooldown
+        # After COOLDOWN_TRIGGER consecutive losses, skip COOLDOWN_BARS bars
+        rets = df['daily_ret'].values.copy()
+        consec_losses = 0
+        skip_remaining = 0
+        for i in range(len(rets)):
+            if skip_remaining > 0:
+                rets[i] = 0.0
+                skip_remaining -= 1
+                continue
+            if rets[i] < 0:
+                consec_losses += 1
+                if consec_losses >= COOLDOWN_TRIGGER:
+                    skip_remaining = COOLDOWN_BARS
+                    consec_losses = 0
+            else:
+                consec_losses = 0
+        df['daily_ret'] = rets
+
+        # 🛡️ FILTER 4: Daily loss circuit breaker (-3% max per day)
+        if 'timestamp' in df.columns:
+            df['_date'] = pd.to_datetime(df['timestamp']).dt.date
+            df['_daily_cum'] = df.groupby('_date')['daily_ret'].cumsum()
+            df.loc[df['_daily_cum'] < MAX_DAILY_LOSS, 'daily_ret'] = 0.0
+            df.drop(columns=['_date', '_daily_cum'], inplace=True)
 
         # 📊 ROI Calculation
         total_days = 1095
@@ -167,39 +200,37 @@ def run_test(df_raw, name, optimize, mult, length):
         # 15m bars, ~96 bars/day, ~35040 bars/year
         sharpe = round((mean_ret / std_ret) * np.sqrt(35040), 2) if std_ret > 0 else 0.0
 
-        # --- QUALITY-BASED TIERING ---
-        # Not just ROI — also checks Sharpe, Win Rate, DD, and trade count
+        # --- QUALITY-BASED TIERING (Optimized for 1x leverage) ---
+        # DD thresholds tightened: NDD must be < -50% for any ALPHA tier
 
-        # Disqualify: DD > 80% is too risky regardless of ROI
-        if abs(gross_dd) > 80:
-            if daily_roi >= 1.0:
-                status = "🎯 ALPHA"  # High ROI but dangerous DD → downgrade from ALPHA++
-            elif daily_roi >= 0.3:
-                status = "⚖️ AVERAGE"
+        # Hard reject: DD > 50% or NDD > 50%
+        if abs(gross_dd) > 50 or abs(net_dd) > 50:
+            if daily_roi >= 0.5:
+                status = "⚖️ AVERAGE"  # High ROI but too much DD → AVERAGE only
             else:
                 status = "💀 REJECT"
-        # ALPHA++ — Elite tier: high ROI + quality metrics
-        elif daily_roi >= 1.8 and sharpe >= 4.0 and win_rate >= 45:
+        # ALPHA++ — Elite: good ROI + low DD + quality metrics
+        elif daily_roi >= 0.6 and sharpe >= 4.0 and win_rate >= 45 and abs(gross_dd) < 30:
             status = "🚀 ALPHA++"
-        elif daily_roi >= 1.5 and sharpe >= 3.5 and win_rate >= 45:
+        elif daily_roi >= 0.5 and sharpe >= 3.5 and win_rate >= 45 and abs(gross_dd) < 35:
             status = "🚀 ALPHA++"
-        # ALPHA — Solid performers
-        elif daily_roi >= 1.0 and sharpe >= 3.0 and win_rate >= 45:
+        # ALPHA — Solid performers with controlled DD
+        elif daily_roi >= 0.3 and sharpe >= 3.0 and win_rate >= 45 and abs(gross_dd) < 40:
             status = "🎯 ALPHA"
-        elif daily_roi >= 0.8 and sharpe >= 2.5 and win_rate >= 48:
+        elif daily_roi >= 0.25 and sharpe >= 2.5 and win_rate >= 48 and abs(gross_dd) < 45:
             status = "🎯 ALPHA"
         # AVERAGE — Marginal, needs manual review
-        elif daily_roi >= 0.3 and sharpe >= 1.5:
+        elif daily_roi >= 0.1 and sharpe >= 1.5:
             status = "⚖️ AVERAGE"
-        elif daily_roi >= 0.1:
+        elif daily_roi >= 0.05:
             status = "⚖️ AVERAGE"
         else:
             status = "💀 REJECT"
 
-        # Bonus: Extremely high Sharpe (>6) with decent ROI → upgrade
-        if sharpe >= 6.0 and daily_roi >= 1.0 and "ALPHA++" not in status:
+        # Bonus: Extremely high Sharpe with decent ROI and low DD
+        if sharpe >= 6.0 and daily_roi >= 0.3 and abs(gross_dd) < 30 and "ALPHA++" not in status:
             status = "🚀 ALPHA++"
-        elif sharpe >= 5.0 and daily_roi >= 0.8 and "ALPHA" not in status:
+        elif sharpe >= 5.0 and daily_roi >= 0.2 and abs(gross_dd) < 40 and "ALPHA" not in status:
             status = "🎯 ALPHA"
 
         return daily_roi, gross_dd, net_dd, win_rate, sharpe, total_trades, status, gross_dd_date, net_dd_date, gross_dd_capital, net_dd_capital

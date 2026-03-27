@@ -28,8 +28,8 @@ def dispatch_top_strategies(force=False):
         return
 
     # Header Message
-    telegram.send(severity=AlertSeverity.INFO, title="Alpha Engine v10.0 [GOD MODE + DD SHIELD]",
-                  message=f"🛡️ <b>PERMANENT ERROR BYPASS ACTIVE</b>\nDeploying {len(targets)} scripts with Zero-Margin logic.\n🛡️ <b>DD Reduction:</b> ADX &gt; 25 Filter + 4% Trailing Stop Active.")
+    telegram.send(severity=AlertSeverity.INFO, title="Alpha Engine v11.0 [LOW DD MODE]",
+                  message=f"🛡️ <b>DD SHIELD v2 ACTIVE</b>\nDeploying {len(targets)} scripts — 1x Leverage, NDD &lt; -50% target.\n🛡️ <b>Filters:</b> ADX &gt; 20 + ATR Vol Filter + 2% Trail Stop + Daily Circuit Breaker.")
     time.sleep(3)
 
     for i, (_, winner) in enumerate(targets.iterrows()):
@@ -82,27 +82,33 @@ webhook_secret = input.string("squeeze_tradingview_cluster_2026_secure", "Webhoo
 {core_logic}
 
 // --- Institutional DD Reduction: ADX Filter ---
-// Choppy market filter: Only trade when ADX > 25 (strong trend confirmed)
+// Moderate trend filter: Only trade when ADX > 20 (relaxed from 25)
 [diPlus, diMinus, adxValue] = ta.dmi(14, 14)
-adx_filter = adxValue > 25
+adx_filter = adxValue > 20
+
+// --- ATR Volatility Filter ---
+// Skip abnormally volatile periods (ATR > 2x its 100-bar average)
+atrVal = ta.atr(14)
+atrMA = ta.sma(atrVal, 100)
+vol_filter = atrVal < atrMA * 2
 
 // --- Zero-Error Execution Engine ---
 fixed_qty = 10
 start_time = timestamp(2024, 01, 01, 00, 00)
 
-// --- 4% Trailing Stop Loss (Profit Locking) ---
-trail_pct = 4.0
+// --- 2% Trailing Stop Loss (Tighter for DD Reduction) ---
+trail_pct = 2.0
 
 // --- Timeframe Detection ---
 tf_str = timeframe.period == "1D" ? "1d" : timeframe.period == "240" ? "4h" : timeframe.period == "60" ? "1h" : timeframe.period == "30" ? "30m" : timeframe.period == "15" ? "15m" : timeframe.period == "5" ? "5m" : timeframe.period == "1" ? "1m" : timeframe.period
 
 if (time >= start_time)
-    if long and adx_filter
+    if long and adx_filter and vol_filter
         strategy.entry("Long", strategy.long, qty=fixed_qty, comment='{{"ROI": "{roi}%"}}')
         strategy.exit("Trail Long", "Long", trail_points=close * trail_pct / 100 / syminfo.mintick, trail_offset=close * trail_pct / 100 / syminfo.mintick)
         if enable_webhook
             alert('{{"secret":"' + webhook_secret + '","strategy":"{strat_clean}","side":"BUY","symbol":"' + syminfo.ticker + '","timeframe":"' + tf_str + '","price":' + str.tostring(close) + ',"quantity":0.003,"exchange":"binance","indicator":"{strat_clean}","ROI":"{roi}%"}}', alert.freq_once_per_bar_close)
-    if short and adx_filter
+    if short and adx_filter and vol_filter
         strategy.entry("Short", strategy.short, qty=fixed_qty, comment='{{"ROI": "{roi}%"}}')
         strategy.exit("Trail Short", "Short", trail_points=close * trail_pct / 100 / syminfo.mintick, trail_offset=close * trail_pct / 100 / syminfo.mintick)
         if enable_webhook
@@ -124,7 +130,7 @@ if (time >= start_time)
                f"🎯 Win Rate: {win_rate}% | Sharpe: {sharpe}\n"
                f"🔄 Total Trades: {total_trades}\n"
                f"⚙️ Params: Len={length}, Mult={mult}\n"
-               f"🛡️ ADX &gt; 25 Filter: ON | Trailing Stop: 4%")
+               f"🛡️ ADX &gt; 20 + ATR Vol Filter: ON | Trailing Stop: 2%")
 
         telegram.send(severity=AlertSeverity.INFO, title=f"Rank #{i+1} Stats", message=msg)
         time.sleep(3)  # 3s between stats and code to avoid 429
@@ -187,15 +193,18 @@ enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_wh)
 webhook_secret = input.string("squeeze_tradingview_cluster_2026_secure", "Webhook Secret", group=grp_wh)
 {core_logic}
 [diPlus, diMinus, adxValue] = ta.dmi(14, 14)
-adx_filter = adxValue > 25
+adx_filter = adxValue > 20
+atrVal = ta.atr(14)
+atrMA = ta.sma(atrVal, 100)
+vol_filter = atrVal < atrMA * 2
 fixed_qty = 10
 start_time = timestamp(2024, 01, 01, 00, 00)
-trail_pct = 4.0
+trail_pct = 2.0
 if (time >= start_time)
-    if long and adx_filter
+    if long and adx_filter and vol_filter
         strategy.entry("Long", strategy.long, qty=fixed_qty)
         strategy.exit("Trail Long", "Long", trail_points=close * trail_pct / 100 / syminfo.mintick, trail_offset=close * trail_pct / 100 / syminfo.mintick)
-    if short and adx_filter
+    if short and adx_filter and vol_filter
         strategy.entry("Short", strategy.short, qty=fixed_qty)
         strategy.exit("Trail Short", "Short", trail_points=close * trail_pct / 100 / syminfo.mintick, trail_offset=close * trail_pct / 100 / syminfo.mintick)
 """
