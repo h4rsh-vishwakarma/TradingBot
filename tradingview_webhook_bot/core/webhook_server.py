@@ -1,3 +1,5 @@
+import hmac as _hmac
+import hashlib
 import sys, os, json, time, re, csv, threading
 from pathlib import Path
 from flask import Flask
@@ -237,6 +239,11 @@ class WebhookServer:
                 logger.error(f"Kill switch error: {e}")
                 return jsonify({"error": str(e)}), 500
 
+    def _verify_hmac(self, payload_bytes, sig):
+        if not sig: return True
+        expected = _hmac.new(self.webhook_secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
+        return _hmac.compare_digest(expected, sig)
+
     def setup_routes(self):
         @self.app.route('/webhook/tradingview', methods=['POST'])
         def receive_signal():
@@ -247,6 +254,9 @@ class WebhookServer:
                     return jsonify({'status': 'error', 'message': 'Rate limit exceeded'}), 429
 
                 raw_body = request.get_data(as_text=True).strip()
+                hmac_sig = request.headers.get('X-Signature', '')
+                if hmac_sig and not self._verify_hmac(raw_body.encode(), hmac_sig):
+                    return jsonify({'status': 'error', 'message': 'Invalid signature'}), 401
                 metrics.inc("bot_webhook_requests_total")
                 logger.info(f"📨 Webhook received: {raw_body[:200]}")
 

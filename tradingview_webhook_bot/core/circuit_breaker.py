@@ -30,6 +30,7 @@ class CircuitBreaker:
         self.daily_loss_limit_pct = config.get('daily_loss_limit_pct', 2.0)
         self.max_consecutive_losses = config.get('max_consecutive_losses', 5)
         self.cooldown_minutes = config.get('cooldown_minutes', 60)
+        self.max_drawdown_pct = config.get('max_drawdown_pct', 15.0)
         
         # Load or initialize state
         self._load_state()
@@ -48,6 +49,7 @@ class CircuitBreaker:
                 self.daily_start_balance = state.get('daily_start_balance', None)
                 self.daily_start_time = state.get('daily_start_time', None)
                 self.consecutive_losses = state.get('consecutive_losses', 0)
+                self.peak_balance = state.get('peak_balance', None)
                 
                 logger.info(f"📊 Loaded circuit breaker state: tripped={self.is_tripped}")
                 
@@ -66,6 +68,7 @@ class CircuitBreaker:
         self.daily_start_balance = None
         self.daily_start_time = None
         self.consecutive_losses = 0
+        self.peak_balance = None
         self._save_state()
     
     def _save_state(self):
@@ -79,6 +82,7 @@ class CircuitBreaker:
                 'daily_start_balance': self.daily_start_balance,
                 'daily_start_time': self.daily_start_time,
                 'consecutive_losses': self.consecutive_losses,
+                'peak_balance': self.peak_balance,
                 'last_updated': time.time()
             }
             
@@ -112,6 +116,14 @@ class CircuitBreaker:
             logger.info(f"📅 New trading day started | Balance: ${current_balance:.2f}")
             return False
         
+        if self.peak_balance is None or current_balance > self.peak_balance:
+            self.peak_balance = current_balance
+            self._save_state()
+        if self.peak_balance and self.peak_balance > 0:
+            cum_dd = ((self.peak_balance - current_balance) / self.peak_balance) * 100
+            if cum_dd >= self.max_drawdown_pct:
+                self._trip(f"Cumulative DD: {cum_dd:.1f}% from peak ${self.peak_balance:.0f}")
+                return True
         # Calculate daily loss
         if self.daily_start_balance:
             daily_loss = self.daily_start_balance - current_balance
@@ -198,6 +210,7 @@ class CircuitBreaker:
         self.trip_reason = None
         self.trip_time = None
         self.consecutive_losses = 0
+        self.peak_balance = None
         self._save_state()
         logger.info("✅ Circuit breaker reset")
     
