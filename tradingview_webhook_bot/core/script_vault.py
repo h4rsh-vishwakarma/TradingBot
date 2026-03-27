@@ -42,8 +42,12 @@ def dispatch_top_strategies(force=False):
         net_dd = round(float(winner.get('Net_DD_%', gross_dd)), 2)
         gdd_date = str(winner.get('GDD_Date', 'N/A'))
         gdd_capital = int(float(winner.get('GDD_Capital_Left', 0)))
+        if gdd_capital == 0 and gross_dd != 0:
+            gdd_capital = int(round(100000 * (1 + gross_dd / 100), 0))
         ndd_date = str(winner.get('NDD_Date', 'N/A'))
         ndd_capital = int(float(winner.get('NDD_Capital_Left', 0)))
+        if ndd_capital == 0 and net_dd != 0:
+            ndd_capital = int(round(100000 * (1 + net_dd / 100), 0))
         win_rate = round(float(winner.get('Win_Rate_%', 0.0)), 1)
         sharpe = round(float(winner.get('Sharpe_Ratio', 0.0)), 2)
         total_trades = int(winner.get('Total_Trades', 0))
@@ -153,8 +157,12 @@ def dispatch_average_strategies():
         net_dd = round(float(winner.get('Net_DD_%', gross_dd)), 2)
         gdd_date = str(winner.get('GDD_Date', 'N/A'))
         gdd_capital = int(float(winner.get('GDD_Capital_Left', 0)))
+        if gdd_capital == 0 and gross_dd != 0:
+            gdd_capital = int(round(100000 * (1 + gross_dd / 100), 0))
         ndd_date = str(winner.get('NDD_Date', 'N/A'))
         ndd_capital = int(float(winner.get('NDD_Capital_Left', 0)))
+        if ndd_capital == 0 and net_dd != 0:
+            ndd_capital = int(round(100000 * (1 + net_dd / 100), 0))
         win_rate = round(float(winner.get('Win_Rate_%', 0.0)), 1)
         sharpe = round(float(winner.get('Sharpe_Ratio', 0.0)), 2)
         total_trades = int(winner.get('Total_Trades', 0))
