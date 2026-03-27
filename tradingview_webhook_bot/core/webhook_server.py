@@ -1,4 +1,6 @@
-import sys, os, json, time, re, csv, threading, hmac, hashlib
+import hmac as _hmac
+import hashlib
+import sys, os, json, time, re, csv, threading
 from pathlib import Path
 from flask import Flask
 from flask import request, jsonify
@@ -130,15 +132,7 @@ class WebhookServer:
     def __init__(self, config, signals_queue_file):
         self.app = Flask(__name__)
         self.config = config
-        # Load secret from env (priority) or config (fallback, must not be placeholder)
-        env_secret = os.getenv("WEBHOOK_SECRET", "").strip()
-        cfg_secret = config['webhook'].get('secret', '').strip()
-        if env_secret:
-            self.webhook_secret = env_secret
-        elif cfg_secret and not cfg_secret.startswith("${"):
-            self.webhook_secret = cfg_secret
-        else:
-            raise ValueError("WEBHOOK_SECRET not set! Set it in /etc/tradingbot/env_vars")
+        self.webhook_secret = config['webhook']['secret'].strip()
         self.queue = AtomicJsonlQueue(signals_queue_file)
         # Durable SQLite queue (primary)
         db_path = signals_queue_file.replace('.jsonl', '_queue.db').replace('signals_queue', 'signal_queue')
@@ -160,18 +154,6 @@ class WebhookServer:
         self.setup_metrics_route()
         self.setup_kill_switch()
         self.setup_routes()
-
-    def _verify_hmac_signature(self, raw_body: str) -> bool:
-        """Verify HMAC-SHA256 signature from X-Signature header. Optional — skips if header absent."""
-        signature = request.headers.get("X-Signature", "").strip()
-        if not signature:
-            return True  # HMAC is optional for backward compatibility
-        expected = hmac.new(
-            self.webhook_secret.encode("utf-8"),
-            raw_body.encode("utf-8"),
-            hashlib.sha256
-        ).hexdigest()
-        return hmac.compare_digest(signature, expected)
 
     def _check_rate_limit(self):
         """Returns True if request should be rejected (rate limited)."""
@@ -257,6 +239,11 @@ class WebhookServer:
                 logger.error(f"Kill switch error: {e}")
                 return jsonify({"error": str(e)}), 500
 
+    def _verify_hmac(self, payload_bytes, sig):
+        if not sig: return True
+        expected = _hmac.new(self.webhook_secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
+        return _hmac.compare_digest(expected, sig)
+
     def setup_routes(self):
         @self.app.route('/webhook/tradingview', methods=['POST'])
         def receive_signal():
@@ -267,13 +254,11 @@ class WebhookServer:
                     return jsonify({'status': 'error', 'message': 'Rate limit exceeded'}), 429
 
                 raw_body = request.get_data(as_text=True).strip()
+                hmac_sig = request.headers.get('X-Signature', '')
+                if hmac_sig and not self._verify_hmac(raw_body.encode(), hmac_sig):
+                    return jsonify({'status': 'error', 'message': 'Invalid signature'}), 401
                 metrics.inc("bot_webhook_requests_total")
                 logger.info(f"📨 Webhook received: {raw_body[:200]}")
-
-                # --- HMAC SIGNATURE VERIFICATION (optional) ---
-                if not self._verify_hmac_signature(raw_body):
-                    logger.warning(f"❌ HMAC signature mismatch from {request.remote_addr}")
-                    return jsonify({'status': 'error', 'message': 'Invalid HMAC signature'}), 401
 
                 # --- DETECT FORMAT: JSON or Plain Text ---
                 parsed = None

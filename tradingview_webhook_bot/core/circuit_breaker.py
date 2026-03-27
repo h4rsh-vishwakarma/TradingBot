@@ -30,8 +30,8 @@ class CircuitBreaker:
         self.daily_loss_limit_pct = config.get('daily_loss_limit_pct', 2.0)
         self.max_consecutive_losses = config.get('max_consecutive_losses', 5)
         self.cooldown_minutes = config.get('cooldown_minutes', 60)
-        self.cumulative_dd_limit_pct = config.get('cumulative_dd_limit_pct', 15.0)
-
+        self.max_drawdown_pct = config.get('max_drawdown_pct', 15.0)
+        
         # Load or initialize state
         self._load_state()
     
@@ -49,9 +49,9 @@ class CircuitBreaker:
                 self.daily_start_balance = state.get('daily_start_balance', None)
                 self.daily_start_time = state.get('daily_start_time', None)
                 self.consecutive_losses = state.get('consecutive_losses', 0)
-                self.peak_equity = state.get('peak_equity', None)
-
-                logger.info(f"📊 Loaded circuit breaker state: tripped={self.is_tripped}, peak_equity={self.peak_equity}")
+                self.peak_balance = state.get('peak_balance', None)
+                
+                logger.info(f"📊 Loaded circuit breaker state: tripped={self.is_tripped}")
                 
             except Exception as e:
                 logger.error(f"Failed to load circuit breaker state: {e}")
@@ -68,7 +68,7 @@ class CircuitBreaker:
         self.daily_start_balance = None
         self.daily_start_time = None
         self.consecutive_losses = 0
-        self.peak_equity = None
+        self.peak_balance = None
         self._save_state()
     
     def _save_state(self):
@@ -82,7 +82,7 @@ class CircuitBreaker:
                 'daily_start_balance': self.daily_start_balance,
                 'daily_start_time': self.daily_start_time,
                 'consecutive_losses': self.consecutive_losses,
-                'peak_equity': self.peak_equity,
+                'peak_balance': self.peak_balance,
                 'last_updated': time.time()
             }
             
@@ -116,6 +116,14 @@ class CircuitBreaker:
             logger.info(f"📅 New trading day started | Balance: ${current_balance:.2f}")
             return False
         
+        if self.peak_balance is None or current_balance > self.peak_balance:
+            self.peak_balance = current_balance
+            self._save_state()
+        if self.peak_balance and self.peak_balance > 0:
+            cum_dd = ((self.peak_balance - current_balance) / self.peak_balance) * 100
+            if cum_dd >= self.max_drawdown_pct:
+                self._trip(f"Cumulative DD: {cum_dd:.1f}% from peak ${self.peak_balance:.0f}")
+                return True
         # Calculate daily loss
         if self.daily_start_balance:
             daily_loss = self.daily_start_balance - current_balance
@@ -129,36 +137,7 @@ class CircuitBreaker:
                 return True
         
         return False
-
-    def check_cumulative_drawdown(self, current_balance: float) -> bool:
-        """
-        Check if cumulative drawdown from peak equity exceeds limit.
-        Catches slow bleeds over days/weeks that daily reset misses.
-        Persisted across restarts via peak_equity in state file.
-
-        Returns:
-            True if trading should be paused (DD limit exceeded)
-        """
-        if current_balance <= 0:
-            return False
-
-        # Track peak equity (high-water mark)
-        if self.peak_equity is None or current_balance > self.peak_equity:
-            self.peak_equity = current_balance
-            self._save_state()
-
-        # Calculate drawdown from peak
-        dd_pct = ((self.peak_equity - current_balance) / self.peak_equity) * 100
-
-        if dd_pct >= self.cumulative_dd_limit_pct:
-            self._trip(
-                f"Cumulative drawdown limit exceeded: {dd_pct:.2f}% from peak "
-                f"(Peak: ${self.peak_equity:.2f}, Current: ${current_balance:.2f})"
-            )
-            return True
-
-        return False
-
+    
     def record_trade_result(self, is_win: bool):
         """
         Record trade result and check consecutive loss limit.
@@ -208,9 +187,7 @@ class CircuitBreaker:
         if current_balance is not None:
             if self.check_daily_loss(current_balance):
                 return False
-            if self.check_cumulative_drawdown(current_balance):
-                return False
-
+        
         return True
     
     def _trip(self, reason: str):
@@ -233,6 +210,7 @@ class CircuitBreaker:
         self.trip_reason = None
         self.trip_time = None
         self.consecutive_losses = 0
+        self.peak_balance = None
         self._save_state()
         logger.info("✅ Circuit breaker reset")
     
@@ -257,8 +235,6 @@ class CircuitBreaker:
             'trip_reason': self.trip_reason,
             'consecutive_losses': self.consecutive_losses,
             'daily_loss_limit_pct': self.daily_loss_limit_pct,
-            'cumulative_dd_limit_pct': self.cumulative_dd_limit_pct,
-            'peak_equity': self.peak_equity,
         }
         
         if self.daily_start_balance:
