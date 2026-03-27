@@ -51,8 +51,10 @@ def run_full_automation():
             f"<b>#{i+1}</b> {tier} | {sym}\n"
             f"   {strat}\n"
             f"   ROI: <code>{daily_roi}%</code>/day\n"
-            f"   Gross DD: <code>{gross_dd}%</code> | 📅 {gdd_date} | 💰 ${gdd_capital:,}\n"
-            f"   Net DD: <code>{net_dd}%</code> | 📅 {ndd_date} | 💰 ${ndd_capital:,}\n"
+            f"   Gross DD: <code>{gross_dd}%</code>\n"
+            f"      📅 {gdd_date} | 💰 ${gdd_capital:,} / $100K left\n"
+            f"   Net DD: <code>{net_dd}%</code>\n"
+            f"      📅 {ndd_date} | 💰 ${ndd_capital:,} / $100K left\n"
             f"   Win: <code>{win_rate}%</code> | Sharpe: <code>{sharpe}</code>\n"
         )
 

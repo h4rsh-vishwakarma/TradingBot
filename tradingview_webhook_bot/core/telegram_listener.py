@@ -172,8 +172,10 @@ def cmd_top5(message):
             _gdd_cap = int(float(r.get('GDD_Capital_Left', 0))) or int(round(100000 * (1 + float(_gdd) / 100)))
             _ndd = r.get('Net_DD_%', 0)
             _ndd_cap = int(float(r.get('NDD_Capital_Left', 0))) or int(round(100000 * (1 + float(_ndd) / 100)))
-            msg += f"  📉 Gross DD: {_gdd:.2f}% | 📅 {r.get('GDD_Date', 'N/A')} | 💰 ${_gdd_cap:,} left\n"
-            msg += f"  📉 Net DD: {_ndd:.2f}% | 📅 {r.get('NDD_Date', 'N/A')} | 💰 ${_ndd_cap:,} left\n"
+            msg += f"  📉 Gross DD: {_gdd:.2f}%\n"
+            msg += f"     📅 {r.get('GDD_Date', 'N/A')} | 💰 ${_gdd_cap:,} / $100K left\n"
+            msg += f"  📉 Net DD: {_ndd:.2f}%\n"
+            msg += f"     📅 {r.get('NDD_Date', 'N/A')} | 💰 ${_ndd_cap:,} / $100K left\n"
             msg += f"  🎯 Win Rate: {r.get('Win_Rate_%', 0):.1f}%\n"
             msg += f"  📐 Sharpe: {r.get('Sharpe_Ratio', 0):.2f}\n"
             msg += f"  🔄 Trades: {int(r.get('Total_Trades', 0))}\n"
@@ -346,8 +348,10 @@ def cmd_audit(message):
                 f"\n<b>#{i+1}</b> {tier}\n"
                 f"   {symbol} | {strat}\n"
                 f"   📈 ROI: <code>{roi}%</code>/day\n"
-                f"   📉 Gross DD: <code>{gross_dd}%</code> | 📅 {gdd_date} | 💰 ${gdd_capital:,} left\n"
-                f"   📉 Net DD: <code>{net_dd}%</code> | 📅 {ndd_date} | 💰 ${ndd_capital:,} left\n"
+                f"   📉 Gross DD: <code>{gross_dd}%</code>\n"
+                f"      📅 {gdd_date} | 💰 ${gdd_capital:,} / $100K left\n"
+                f"   📉 Net DD: <code>{net_dd}%</code>\n"
+                f"      📅 {ndd_date} | 💰 ${ndd_capital:,} / $100K left\n"
                 f"   🎯 Win: <code>{win_rate}%</code> | Sharpe: <code>{sharpe}</code>"
             )
 
