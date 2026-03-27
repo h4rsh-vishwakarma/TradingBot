@@ -341,7 +341,7 @@
     "webhook": {
         "host": "0.0.0.0",
         "port": 5000,
-        "secret": "squeeze_tradingview_cluster_2026_secure"
+        "secret": "${WEBHOOK_SECRET}"
     },
     "storage": {
         "signals_queue": "storage/signals_multi_strategy.jsonl",
@@ -349,7 +349,7 @@
         "balance": "storage/balance_multi_strategy.json"
     },
     "telegram": {
-        "token": "7709465703:AAG049m19b8J0SFwCoHtkyRAnveynLSNPZo",
-        "chat_id": "5736858710"
+        "token": "${TELEGRAM_BOT_TOKEN}",
+        "chat_id": "${TELEGRAM_CHAT_ID}"
     }
 }

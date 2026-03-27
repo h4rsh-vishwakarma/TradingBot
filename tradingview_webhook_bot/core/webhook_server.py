@@ -1,4 +1,4 @@
-import sys, os, json, time, re, csv, threading
+import sys, os, json, time, re, csv, threading, hmac, hashlib
 from pathlib import Path
 from flask import Flask
 from flask import request, jsonify
@@ -130,7 +130,15 @@ class WebhookServer:
     def __init__(self, config, signals_queue_file):
         self.app = Flask(__name__)
         self.config = config
-        self.webhook_secret = config['webhook']['secret'].strip()
+        # Load secret from env (priority) or config (fallback, must not be placeholder)
+        env_secret = os.getenv("WEBHOOK_SECRET", "").strip()
+        cfg_secret = config['webhook'].get('secret', '').strip()
+        if env_secret:
+            self.webhook_secret = env_secret
+        elif cfg_secret and not cfg_secret.startswith("${"):
+            self.webhook_secret = cfg_secret
+        else:
+            raise ValueError("WEBHOOK_SECRET not set! Set it in /etc/tradingbot/env_vars")
         self.queue = AtomicJsonlQueue(signals_queue_file)
         # Durable SQLite queue (primary)
         db_path = signals_queue_file.replace('.jsonl', '_queue.db').replace('signals_queue', 'signal_queue')
@@ -152,6 +160,18 @@ class WebhookServer:
         self.setup_metrics_route()
         self.setup_kill_switch()
         self.setup_routes()
+
+    def _verify_hmac_signature(self, raw_body: str) -> bool:
+        """Verify HMAC-SHA256 signature from X-Signature header. Optional — skips if header absent."""
+        signature = request.headers.get("X-Signature", "").strip()
+        if not signature:
+            return True  # HMAC is optional for backward compatibility
+        expected = hmac.new(
+            self.webhook_secret.encode("utf-8"),
+            raw_body.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(signature, expected)
 
     def _check_rate_limit(self):
         """Returns True if request should be rejected (rate limited)."""
@@ -249,6 +269,11 @@ class WebhookServer:
                 raw_body = request.get_data(as_text=True).strip()
                 metrics.inc("bot_webhook_requests_total")
                 logger.info(f"📨 Webhook received: {raw_body[:200]}")
+
+                # --- HMAC SIGNATURE VERIFICATION (optional) ---
+                if not self._verify_hmac_signature(raw_body):
+                    logger.warning(f"❌ HMAC signature mismatch from {request.remote_addr}")
+                    return jsonify({'status': 'error', 'message': 'Invalid HMAC signature'}), 401
 
                 # --- DETECT FORMAT: JSON or Plain Text ---
                 parsed = None

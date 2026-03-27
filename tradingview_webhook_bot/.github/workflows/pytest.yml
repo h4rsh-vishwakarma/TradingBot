@@ -21,10 +21,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pytest pydantic requests python-dotenv
+          pip install pytest pytest-cov flake8 pydantic requests python-dotenv
 
-      - name: Run Tests
+      - name: Lint with flake8
+        run: |
+          # Stop build on syntax errors or undefined names
+          flake8 tradingview_webhook_bot/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Warnings as non-blocking (max-line-length=120)
+          flake8 tradingview_webhook_bot/ --count --exit-zero --max-complexity=15 --max-line-length=120 --statistics
+
+      - name: Run Tests with Coverage
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          pytest tests/
+          pytest tests/ -v --tb=short --cov=tradingview_webhook_bot --cov-report=term-missing --cov-fail-under=40

@@ -39,6 +39,10 @@ def run_full_automation():
         daily_roi = round(row.get('Daily_ROI_%', 0), 3)
         gross_dd = round(row.get('Gross_DD_%', row.get('Max_DD_%', 0)), 2)
         net_dd = round(row.get('Net_DD_%', gross_dd), 2)
+        gdd_date = row.get('GDD_Date', 'N/A')
+        gdd_capital = int(float(row.get('GDD_Capital_Left', 0))) or int(round(100000 * (1 + gross_dd / 100)))
+        ndd_date = row.get('NDD_Date', 'N/A')
+        ndd_capital = int(float(row.get('NDD_Capital_Left', 0))) or int(round(100000 * (1 + net_dd / 100)))
         win_rate = round(row.get('Win_Rate_%', 0), 1)
         sharpe = round(row.get('Sharpe_Ratio', 0), 2)
         tier = row.get('Tier', 'N/A')
@@ -47,7 +51,10 @@ def run_full_automation():
             f"<b>#{i+1}</b> {tier} | {sym}\n"
             f"   {strat}\n"
             f"   ROI: <code>{daily_roi}%</code>/day\n"
-            f"   Gross DD: <code>{gross_dd}%</code> | Net DD: <code>{net_dd}%</code>\n"
+            f"   Gross DD: <code>{gross_dd}%</code>\n"
+            f"      📅 {gdd_date} | 💰 ${gdd_capital:,} / $100K left\n"
+            f"   Net DD: <code>{net_dd}%</code>\n"
+            f"      📅 {ndd_date} | 💰 ${ndd_capital:,} / $100K left\n"
             f"   Win: <code>{win_rate}%</code> | Sharpe: <code>{sharpe}</code>\n"
         )
 

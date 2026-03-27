@@ -94,6 +94,8 @@ class Orchestrator:
         self.processed_count = 0
         self._thread_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix='sheets')
         self.last_heartbeat = time.time()
+        self.last_reconcile = time.time()
+        self.RECONCILE_INTERVAL = int(os.getenv("RECONCILE_INTERVAL_SECONDS", "900"))  # 15 min
 
         # Circuit Breaker
         cb_state = os.path.join(base_storage, "circuit_breaker_state.json")
@@ -101,6 +103,7 @@ class Orchestrator:
             "daily_loss_limit_pct": float(os.getenv("CB_DAILY_LOSS_PCT", "5.0")),
             "max_consecutive_losses": int(os.getenv("CB_MAX_CONSECUTIVE_LOSSES", "8")),
             "cooldown_minutes": int(os.getenv("CB_COOLDOWN_MINUTES", "60")),
+            "cumulative_dd_limit_pct": float(os.getenv("CB_CUMULATIVE_DD_PCT", "15.0")),
         }
         try:
             self.circuit_breaker = CircuitBreaker(cb_state, cb_config)
@@ -223,7 +226,7 @@ class Orchestrator:
             signal_id = event.get("signal_id")
             logger.info(f"[{correlation_id}] Processing signal {signal_id}")
             if self.idempotency.is_seen(signal_id):
-                logger.info(f"Skipping duplicate: {signal_id}")
+                logger.info(f"[{correlation_id}] Skipping duplicate: {signal_id}")
                 return True
 
             payload_raw = event.get("payload", {})
@@ -247,7 +250,7 @@ class Orchestrator:
             # --- 1. BRAIN TIER CHECK ---
             is_allowed, reason, tier = self.check_tournament_alpha(symbol, strat_name)
             if not is_allowed:
-                logger.warning(f"AI Blocked: {reason}")
+                logger.warning(f"[{correlation_id}] AI Blocked: {reason}")
                 try:
                     self.sheets_logger.log_blocked_trade(
                         symbol=symbol, side="N/A", strategy=strat_name,
@@ -265,7 +268,7 @@ class Orchestrator:
             # --- 1.6. SYMBOL COOLDOWN CHECK ---
             if self._is_symbol_in_cooldown(symbol):
                 metrics.inc("bot_signals_blocked_total", labels={"reason": "cooldown"})
-                logger.info(f"Cooldown block: {symbol} (strategy: {strat_name})")
+                logger.info(f"[{correlation_id}] Cooldown block: {symbol} (strategy: {strat_name})")
                 return True
 
             # --- 1.7. CANDLE LOCK ---
@@ -283,7 +286,7 @@ class Orchestrator:
                 strat_info = json.loads(payload_raw.get("strategy", "{}"))
                 incoming_roi = float(strat_info.get("ROI", "0").replace("%", ""))
                 if incoming_roi <= 0:
-                    logger.warning(f"ROI Guard: Signal blocked ({incoming_roi}%)")
+                    logger.warning(f"[{correlation_id}] ROI Guard: Signal blocked ({incoming_roi}%)")
                     try:
                         self.sheets_logger.log_blocked_trade(
                             symbol=symbol, side="N/A", strategy=strat_name,
@@ -314,9 +317,9 @@ class Orchestrator:
                     live_price = self.exchange_binance.get_mainnet_mark_price(symbol)
                     if live_price and live_price > 0:
                         raw_price = live_price
-                        logger.info(f"Resolved price for {symbol}: ${raw_price}")
+                        logger.info(f"[{correlation_id}] Resolved price for {symbol}: ${raw_price}")
                     else:
-                        logger.warning(f"Cannot resolve price for {symbol}. Skipping.")
+                        logger.warning(f"[{correlation_id}] Cannot resolve price for {symbol}. Skipping.")
                         return True
                 signal_data["price"] = raw_price
                 signal_data["action"] = str(payload_raw.get("action") or event.get("action") or "BUY").upper()
@@ -324,7 +327,7 @@ class Orchestrator:
                 valid_payload = SignalPayload(**signal_data)
                 payload = valid_payload.model_dump()
             except Exception as e:
-                logger.error(f"Data Parsing Error: {e}")
+                logger.error(f"[{correlation_id}] Data Parsing Error: {e}")
                 return True
 
             side = "SELL" if payload["action"] in ["SELL", "TP", "EXIT", "SHORT", "OFF"] else "BUY"
@@ -343,7 +346,7 @@ class Orchestrator:
             if is_exit:
                 current_pos = self.ledger.get_position(f"{target_exchange}:{symbol}:{strat_name}")
                 if current_pos.quantity == 0:
-                    logger.info(f"Exit signal for {symbol} but no position open. Skipping.")
+                    logger.info(f"[{correlation_id}] Exit signal for {symbol} but no position open. Skipping.")
                     return True
                 if current_pos.quantity > 0:
                     side = "SELL"
@@ -351,18 +354,18 @@ class Orchestrator:
                 elif current_pos.quantity < 0:
                     side = "BUY"
                     qty = abs(current_pos.quantity)
-                logger.info(f"Exit signal: closing {symbol} position ({current_pos.quantity}) with {side} {qty}")
+                logger.info(f"[{correlation_id}] Exit signal: closing {symbol} position ({current_pos.quantity}) with {side} {qty}")
 
             # --- 4.9. KILL SWITCH CHECK ---
             kill_file = os.path.join(os.path.dirname(self.ledger_path), "KILL_SWITCH")
             if os.path.exists(kill_file):
-                logger.critical("KILL SWITCH ACTIVE — blocking all trades")
+                logger.critical(f"[{correlation_id}] KILL SWITCH ACTIVE — blocking all trades")
                 return True
 
             # --- 4.95. CIRCUIT BREAKER CHECK ---
             if self.circuit_breaker and not self.circuit_breaker.should_allow_trade():
                 cb_reason = self.circuit_breaker.get_status().get('trip_reason', 'Circuit breaker tripped')
-                logger.warning(f"Circuit Breaker: {cb_reason}")
+                logger.warning(f"[{correlation_id}] Circuit Breaker: {cb_reason}")
                 def _cb_alert():
                     try:
                         self.telegram.send(severity=AlertSeverity.CRITICAL, title="CIRCUIT BREAKER TRIPPED",
@@ -409,21 +412,21 @@ class Orchestrator:
                         avail = health.get("available_balance", 0)
                         if avail > 0 and price_signal > 0:
                             qty = (avail * equity_pct) / price_signal
-                            logger.info(f"Equity sizing: {equity_pct*100}% of ${avail:.2f} = {qty:.6f} {symbol}")
+                            logger.info(f"[{correlation_id}] Equity sizing: {equity_pct*100}% of ${avail:.2f} = {qty:.6f} {symbol}")
                 except Exception as e:
-                    logger.warning(f"Equity sizing failed, using signal qty: {e}")
+                    logger.warning(f"[{correlation_id}] Equity sizing failed, using signal qty: {e}")
 
             # Max qty cap
             max_allowed = self.MAX_QTY.get(symbol, 1.0)
             if qty > max_allowed:
-                logger.warning(f"Qty capped: {qty} -> {max_allowed} for {symbol}")
+                logger.warning(f"[{correlation_id}] Qty capped: {qty} -> {max_allowed} for {symbol}")
                 qty = max_allowed
 
             # --- 6. ACTUAL EXECUTION ---
             execution_res, fill_price = {}, price_signal
             if target_exchange == "hyperliquid":
                 if not self.exchange_hl:
-                    logger.warning(f"HL client not available, skipping {symbol}")
+                    logger.warning(f"[{correlation_id}] HL client not available, skipping {symbol}")
                     return True
                 try:
                     res = self.exchange_hl.market_order(symbol, (side == "BUY"), qty)
@@ -436,7 +439,7 @@ class Orchestrator:
                     else:
                         execution_res = {"status": "FAILED", "reason": str(res)}
                 except Exception as e:
-                    logger.error(f"HL execution error: {e}")
+                    logger.error(f"[{correlation_id}] HL execution error: {e}")
                     execution_res = {"status": "FAILED", "reason": str(e)}
             else:
                 execution_res = self.exchange_binance.execute_futures_order(symbol, side, qty, price_signal, signal_id=signal_id)
@@ -450,7 +453,7 @@ class Orchestrator:
                     pos_key = f"{target_exchange}:{symbol}:{strat_name}"
                     pos_snapshot = self.ledger.apply_fill(pos_key, side, qty, fill_price)
                 except Exception as e:
-                    logger.critical(f"LEDGER WRITE FAILED: {e}. Trade OK but ledger desynced!")
+                    logger.critical(f"[{correlation_id}] LEDGER WRITE FAILED: {e}. Trade OK but ledger desynced!")
                     def _alert_desync():
                         try:
                             self.telegram.send(severity=AlertSeverity.CRITICAL, title="LEDGER DESYNC",
@@ -468,14 +471,14 @@ class Orchestrator:
                     tp_pct = float(os.getenv("TAKE_PROFIT_PCT", "5.0"))
                     sl_res = self.exchange_binance.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
                     if sl_res.get("status") == "SUCCESS":
-                        logger.info(f"SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
+                        logger.info(f"[{correlation_id}] SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
                     else:
-                        logger.warning(f"SL placement failed for {symbol}: {sl_res.get('msg')}")
+                        logger.warning(f"[{correlation_id}] SL placement failed for {symbol}: {sl_res.get('msg')}")
                     tp_res = self.exchange_binance.place_take_profit(symbol, side, qty, fill_price, tp_pct=tp_pct, signal_id=signal_id)
                     if tp_res.get("status") == "SUCCESS":
-                        logger.info(f"TP placed for {symbol} @ ${tp_res.get('tpPrice')}")
+                        logger.info(f"[{correlation_id}] TP placed for {symbol} @ ${tp_res.get('tpPrice')}")
                     else:
-                        logger.warning(f"TP placement failed for {symbol}: {tp_res.get('msg')}")
+                        logger.warning(f"[{correlation_id}] TP placement failed for {symbol}: {tp_res.get('msg')}")
 
                 self.processed_count += 1
                 metrics.inc("bot_trades_executed_total", labels={"symbol": symbol, "side": side})
@@ -565,7 +568,7 @@ class Orchestrator:
                 return False
 
         except Exception as e:
-            logger.error(f"Critical Error in handle_signal: {e}")
+            logger.error(f"[{correlation_id}] Critical Error in handle_signal: {e}")
             try:
                 with open(self.dlq_path, 'a') as dlq:
                     dlq.write(json.dumps({"ts": datetime.utcnow().isoformat(), "err": str(e), "event": event}) + "\n")
@@ -602,6 +605,38 @@ class Orchestrator:
                 self.durable_queue.poll(handler=self.handle_signal, batch_size=1)
             else:
                 self.consumer.poll(handler=self.handle_signal, batch_size=1)
+
+            # --- PERIODIC RECONCILER (every 15 min) ---
+            if time.time() - self.last_reconcile > self.RECONCILE_INTERVAL:
+                self.last_reconcile = time.time()
+                def _run_reconcile():
+                    try:
+                        exchange_positions = self.exchange_binance.get_open_positions()
+                        if exchange_positions:
+                            exchange_data = {}
+                            for pos in exchange_positions:
+                                sym = pos.get('symbol', '')
+                                qty = float(pos.get('positionAmt', 0))
+                                if abs(qty) > 0:
+                                    exchange_data[f"binance:{sym}"] = {
+                                        'quantity': qty,
+                                        'side': 'LONG' if qty > 0 else 'SHORT'
+                                    }
+                            alerts = self.reconciler.reconcile_with_exchange(exchange_data)
+                            if alerts:
+                                for alert_msg in alerts:
+                                    self.telegram.send(
+                                        severity=AlertSeverity.WARNING,
+                                        title="🔧 Reconciler Fix",
+                                        message=alert_msg
+                                    )
+                                logger.info(f"Reconciler: {len(alerts)} drift(s) fixed")
+                            else:
+                                logger.debug("Reconciler: Ledger synced with exchange")
+                    except Exception as e:
+                        logger.warning(f"Reconciler run failed: {e}")
+                self._thread_pool.submit(_run_reconcile)
+
             if time.time() - self.last_heartbeat > 900:
                 logger.info(f"Heartbeat: Orchestrator running. Processed: {self.processed_count}")
                 self.last_heartbeat = time.time()

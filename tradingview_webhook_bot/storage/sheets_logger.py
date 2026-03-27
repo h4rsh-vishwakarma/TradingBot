@@ -61,7 +61,7 @@ class GoogleSheetsLogger:
         """Reconnect to Google Sheets if token expired."""
         try:
             logger.info("Reconnecting to Google Sheets...")
-            self._connect()
+            self._authenticate()
         except Exception as e:
             logger.error(f"Sheets reconnect failed: {e}")
 
@@ -93,6 +93,17 @@ class GoogleSheetsLogger:
             
             self.sheet.append_row(row)
             logger.info(f"📊 Sheet Updated: {symbol} | PnL: ${pnl}")
+        except gspread.exceptions.APIError as e:
+            if 'UNAUTHENTICATED' in str(e) or '401' in str(e):
+                logger.warning("Token expired, reconnecting...")
+                self._reconnect()
+                try:
+                    if self.sheet:
+                        self.sheet.append_row(row)
+                except Exception as retry_e:
+                    logger.error(f"❌ Retry failed: {retry_e}")
+            else:
+                logger.error(f"❌ Failed to update sheet: {e}")
         except Exception as e:
             logger.error(f"❌ Failed to update sheet: {e}")
 
@@ -117,5 +128,16 @@ class GoogleSheetsLogger:
             ]
             self.blocked_sheet.append_row(row)
             logger.info(f"🚫 Blocked Trade Logged: {symbol} {side} — {reason}")
+        except gspread.exceptions.APIError as e:
+            if 'UNAUTHENTICATED' in str(e) or '401' in str(e):
+                logger.warning("Token expired for blocked sheet, reconnecting...")
+                self._reconnect()
+                try:
+                    if self.blocked_sheet:
+                        self.blocked_sheet.append_row(row)
+                except Exception as retry_e:
+                    logger.error(f"❌ Blocked sheet retry failed: {retry_e}")
+            else:
+                logger.error(f"❌ Failed to log blocked trade: {e}")
         except Exception as e:
             logger.error(f"❌ Failed to log blocked trade: {e}")

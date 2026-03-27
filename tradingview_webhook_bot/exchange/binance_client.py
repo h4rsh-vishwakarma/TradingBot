@@ -249,6 +249,15 @@ class BinanceClient:
             logger.error(f"❌ Take-Profit Error: {e}")
             return {"status": "FAILED", "msg": str(e)}
 
+    def get_open_positions(self):
+        """Fetch all open futures positions from Binance."""
+        try:
+            positions = self.client.futures_position_information()
+            return [p for p in positions if float(p.get('positionAmt', 0)) != 0]
+        except Exception as e:
+            logger.error(f"Failed to fetch open positions: {e}")
+            return []
+
     def close_all_positions(self):
         """Emergency kill switch: close ALL open futures positions."""
         closed = []
