@@ -1,4 +1,84 @@
 {
-  "positions": {},
-  "trade_history": []
+    "positions": {
+        "binance:ETHUSDT:SMC_Strategy_LuxAlgo__Webhook,_LuxAlgo_-_SMC": {
+            "symbol": "binance:ETHUSDT:SMC_Strategy_LuxAlgo__Webhook,_LuxAlgo_-_SMC",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-26"
+        },
+        "binance:ETHUSDT:Reversed_BarUpDn_Strategy": {
+            "symbol": "binance:ETHUSDT:Reversed_BarUpDn_Strategy",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-26"
+        },
+        "binance:ETHUSDT:Reverse_Liquidity_Trap": {
+            "symbol": "binance:ETHUSDT:Reverse_Liquidity_Trap",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": -0.0017999999999997272,
+            "daily_realized_pnl": -0.0017999999999997272,
+            "last_update_date": "2026-03-27"
+        },
+        "binance:ETHUSDT:Reverse Liquidity Trap": {
+            "symbol": "binance:ETHUSDT:Reverse Liquidity Trap",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-27"
+        },
+        "binance:ETHUSDT:smc strategy luxalgo webhook luxalgo smc": {
+            "symbol": "binance:ETHUSDT:smc strategy luxalgo webhook luxalgo smc",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-27"
+        },
+        "binance:ETHUSDT:reversed barupdn strategy": {
+            "symbol": "binance:ETHUSDT:reversed barupdn strategy",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-28"
+        },
+        "binance:ETHUSDT:reverse liquidity trap": {
+            "symbol": "binance:ETHUSDT:reverse liquidity trap",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-27"
+        },
+        "ETHUSDT": {
+            "symbol": "ETHUSDT",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": ""
+        },
+        "binance:ETHUSDT": {
+            "symbol": "binance:ETHUSDT",
+            "quantity": -0.011,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": ""
+        }
+    },
+    "trade_history": [
+        {
+            "timestamp": "2026-03-27T02:00:10.975200",
+            "symbol": "binance:ETHUSDT:Reverse_Liquidity_Trap",
+            "pnl": -0.0017999999999997272,
+            "exit_price": 2074.2
+        }
+    ]
 }

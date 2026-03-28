@@ -1,133 +1,175 @@
 """
-Lighter.xyz DEX Client - same interface as BinanceClient/HyperliquidClient.
-Zero-fee perpetual futures on Ethereum L2 ZK-rollup.
+Lighter.xyz Exchange Client — Testnet/Mainnet support.
+Same interface as BinanceClient for drop-in orchestrator integration.
 """
-import os, time, logging, asyncio
+import os
+import time
+import logging
+import asyncio
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-SYMBOL_TO_MARKET = {
-    "ETHUSDT": 0, "ETHUSD": 0, "ETH": 0,
-    "LINKUSDT": 1, "LINKUSD": 1, "LINK": 1,
-    "UNIUSDT": 2, "UNIUSD": 2, "UNI": 2,
-    "AAVEUSDT": 3, "AAVEUSD": 3, "AAVE": 3,
-    "LDOUSDT": 4, "LDOUSD": 4, "LDO": 4,
+try:
+    from lighter import SignerClient, Configuration, OrderApi, AccountApi, InfoApi
+    LIGHTER_SDK_AVAILABLE = True
+except ImportError:
+    LIGHTER_SDK_AVAILABLE = False
+    logger.warning("lighter-sdk not installed. Run: pip install lighter-sdk")
+
+SYMBOL_MAP = {
+    "ETHUSDT": "ETH-USDC",
+    "BTCUSDT": "BTC-USDC",
+    "SOLUSDT": "SOL-USDC",
+    "LINKUSDT": "LINK-USDC",
+    "AAVEUSDT": "AAVE-USDC",
+    "UNIUSDT": "UNI-USDC",
 }
+REVERSE_SYMBOL_MAP = {v: k for k, v in SYMBOL_MAP.items()}
+
 
 class LighterClient:
+    """Lighter.xyz exchange client with same interface as BinanceClient."""
+
     def __init__(self):
-        self.url = os.getenv("LIGHTER_API_URL", "https://mainnet.lighter.xyz")
+        if not LIGHTER_SDK_AVAILABLE:
+            raise ImportError("lighter-sdk not installed")
+
+        self.api_url = os.getenv("LIGHTER_API_URL", "https://testnet.lighter.xyz")
         self.account_index = int(os.getenv("LIGHTER_ACCOUNT_INDEX", "0"))
-        api_key_index = int(os.getenv("LIGHTER_API_KEY_INDEX", "4"))
-        api_private_key = os.getenv("LIGHTER_API_PRIVATE_KEY", "")
+        self.api_key_index = int(os.getenv("LIGHTER_API_KEY_INDEX", "4"))
+        self.private_key = os.getenv("LIGHTER_PRIVATE_KEY", "")
+        self.api_private_key = os.getenv("LIGHTER_API_PRIVATE_KEY", self.private_key)
         self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
-        if not api_private_key:
-            logger.warning("LIGHTER_API_PRIVATE_KEY not set. Lighter disabled.")
-            self.client = None
-            return
+
+        if not self.private_key:
+            raise ValueError("LIGHTER_PRIVATE_KEY not set in env_vars")
+
+        if not self.private_key.startswith("0x"):
+            self.private_key = "0x" + self.private_key
+        if self.api_private_key and not self.api_private_key.startswith("0x"):
+            self.api_private_key = "0x" + self.api_private_key
+
+        self.is_testnet = "testnet" in self.api_url.lower()
+
         try:
-            import lighter
-            self.signer = lighter.SignerClient(
-                url=self.url, account_index=self.account_index,
-                api_private_keys={api_key_index: api_private_key})
-            self.api_client = lighter.ApiClient()
-            self.account_api = lighter.AccountApi(self.api_client)
-            self.order_api = lighter.OrderApi(self.api_client)
-            self.client = self.signer
-            self._counter = int(time.time()) % 100000
-            logger.info("Lighter.xyz connected | Account: %d" % self.account_index)
+            api_keys = {self.api_key_index: self.api_private_key}
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            self.signer = SignerClient(
+                url=self.api_url,
+                account_index=self.account_index,
+                api_private_keys=api_keys,
+            )
+            self.config = Configuration(host=self.api_url)
+            self.order_api = OrderApi(configuration=self.config)
+            self.account_api = AccountApi(configuration=self.config)
+            self.info_api = InfoApi(configuration=self.config)
+
+            mode = "TESTNET" if self.is_testnet else "MAINNET"
+            logger.info("Connected to Lighter [%s] | Account: %d", mode, self.account_index)
         except Exception as e:
-            logger.error("Lighter init failed: %s" % e)
-            self.client = None
+            logger.error("Lighter connection failed: %s", e)
+            raise
 
-    def _market_idx(self, symbol):
-        s = symbol.upper().replace("_PREMIUM","").replace("_PERP","")
-        idx = SYMBOL_TO_MARKET.get(s)
-        if idx is None:
-            idx = SYMBOL_TO_MARKET.get(s.replace("USDT","").replace("USD",""))
-        return idx
+    def _to_lighter_symbol(self, symbol):
+        return SYMBOL_MAP.get(symbol, symbol)
 
-    def _next_idx(self):
-        self._counter += 1
-        return self._counter
-
-    def _scale(self, market_index):
-        from lighter import SignerClient
-        return SignerClient.ASSET_TO_TICKER_SCALE.get(market_index + 1, 1e8)
-
-    def market_order(self, symbol, is_buy, quantity, price=0, signal_id=""):
-        if not self.client:
-            return {"status": "error", "msg": "Not initialized"}
+    def execute_futures_order(self, symbol, side, quantity, price=None, order_type='MARKET', signal_id=None):
+        lighter_symbol = self._to_lighter_symbol(symbol)
         if not self.allow_real:
-            logger.info("PAPER (Lighter): %s %s %s @ $%s" % ("BUY" if is_buy else "SELL", quantity, symbol, price))
-            return {"status": "ok", "response": {"data": {"statuses": [{"filled": {"avgPx": str(price)}}]}}, "paper": True}
-        mi = self._market_idx(symbol)
-        if mi is None:
-            return {"status": "error", "msg": "Unknown market: %s" % symbol}
-        try:
-            best = self.signer.get_best_price(mi, is_ask=(not is_buy))
-            if best == 0 and price > 0:
-                best = int(price * self._scale(mi))
-            base = int(quantity * self._scale(mi))
-            logger.info("Lighter: %s %s %s" % ("BUY" if is_buy else "SELL", quantity, symbol))
-            tx, resp, err = self.signer.create_market_order(
-                market_index=mi, client_order_index=self._next_idx(),
-                base_amount=base, avg_execution_price=best, is_ask=(not is_buy))
-            if err:
-                return {"status": "error", "msg": str(err)}
-            return {"status": "ok", "response": {"data": {"statuses": [{"filled": {"avgPx": str(price)}}]}},
-                    "orderId": "LIGHTER_%d" % self._counter}
-        except Exception as e:
-            return {"status": "error", "msg": str(e)}
+            sim_id = "LIGHTER_PAPER_%s" % (signal_id or int(time.time()))
+            logger.info("PAPER TRADE [Lighter]: %s %s %s @ $%s", side, quantity, lighter_symbol, price)
+            return {"status": "SUCCESS", "orderId": sim_id, "avg_price": price, "paper": True, "exchange": "lighter"}
 
-    def place_stop_loss(self, symbol, is_buy, quantity, entry_price, sl_pct=3.0):
-        if not self.client: return {"status": "error", "msg": "Not initialized"}
-        mi = self._market_idx(symbol)
-        if mi is None: return {"status": "error", "msg": "Unknown market"}
         try:
-            tp = entry_price * (1 - sl_pct/100) if is_buy else entry_price * (1 + sl_pct/100)
-            s = self._scale(mi)
-            tx, resp, err = self.signer.create_sl_order(
-                market_index=mi, client_order_index=self._next_idx(),
-                base_amount=int(quantity * s), trigger_price=int(tp * s),
-                price=int(tp * s), is_ask=is_buy, reduce_only=True)
-            if err: return {"status": "error", "msg": str(err)}
-            logger.info("Lighter SL: %s @ $%.2f" % (symbol, tp))
-            return {"status": "ok", "trigger_price": tp}
+            is_buy = side.upper() == "BUY"
+            logger.info("Executing %s %s %s on Lighter", side, quantity, lighter_symbol)
+            result = self.signer.create_market_order(
+                order_book_symbol=lighter_symbol,
+                size=str(quantity),
+                is_buy=is_buy,
+            )
+            if result:
+                logger.info("Lighter order: %s", result)
+                return {"status": "SUCCESS", "orderId": str(result), "avg_price": price, "exchange": "lighter"}
+            return {"status": "FAILED", "reason": "permanent", "msg": "Empty result", "exchange": "lighter"}
         except Exception as e:
-            return {"status": "error", "msg": str(e)}
+            logger.error("Lighter execution error: %s", e)
+            return {"status": "FAILED", "reason": "permanent", "msg": str(e), "exchange": "lighter"}
 
-    def place_take_profit(self, symbol, is_buy, quantity, entry_price, tp_pct=5.0):
-        if not self.client: return {"status": "error", "msg": "Not initialized"}
-        mi = self._market_idx(symbol)
-        if mi is None: return {"status": "error", "msg": "Unknown market"}
+    def place_stop_loss(self, symbol, side, quantity, entry_price, sl_pct=3.0, signal_id=None):
+        if not self.allow_real:
+            return {"status": "SKIPPED", "msg": "Paper mode"}
+        lighter_symbol = self._to_lighter_symbol(symbol)
+        stop_side = not (side.upper() == "BUY")
+        if side.upper() == "BUY":
+            stop_price = round(entry_price * (1 - sl_pct / 100), 2)
+        else:
+            stop_price = round(entry_price * (1 + sl_pct / 100), 2)
         try:
-            tp = entry_price * (1 + tp_pct/100) if is_buy else entry_price * (1 - tp_pct/100)
-            s = self._scale(mi)
-            tx, resp, err = self.signer.create_tp_order(
-                market_index=mi, client_order_index=self._next_idx(),
-                base_amount=int(quantity * s), trigger_price=int(tp * s),
-                price=int(tp * s), is_ask=is_buy, reduce_only=True)
-            if err: return {"status": "error", "msg": str(err)}
-            logger.info("Lighter TP: %s @ $%.2f" % (symbol, tp))
-            return {"status": "ok", "trigger_price": tp}
+            self.signer.create_sl_order(order_book_symbol=lighter_symbol, size=str(quantity),
+                trigger_price=str(stop_price), is_buy=stop_side)
+            logger.info("Lighter SL: %s @ $%s", lighter_symbol, stop_price)
+            return {"status": "SUCCESS", "stopPrice": stop_price}
         except Exception as e:
-            return {"status": "error", "msg": str(e)}
+            logger.error("Lighter SL error: %s", e)
+            return {"status": "FAILED", "msg": str(e)}
 
-    def cancel_all_orders(self):
-        if not self.client: return {"status": "error"}
+    def place_take_profit(self, symbol, side, quantity, entry_price, tp_pct=5.0, signal_id=None):
+        if not self.allow_real:
+            return {"status": "SKIPPED", "msg": "Paper mode"}
+        lighter_symbol = self._to_lighter_symbol(symbol)
+        tp_side = not (side.upper() == "BUY")
+        if side.upper() == "BUY":
+            tp_price = round(entry_price * (1 + tp_pct / 100), 2)
+        else:
+            tp_price = round(entry_price * (1 - tp_pct / 100), 2)
         try:
-            from lighter import SignerClient
-            tx, resp, err = self.signer.cancel_all_orders(
-                time_in_force=SignerClient.CANCEL_ALL_TIF_IMMEDIATE,
-                timestamp_ms=int(time.time() * 1000))
-            if err: return {"status": "error", "msg": str(err)}
-            return {"status": "ok"}
+            self.signer.create_tp_order(order_book_symbol=lighter_symbol, size=str(quantity),
+                trigger_price=str(tp_price), is_buy=tp_side)
+            logger.info("Lighter TP: %s @ $%s", lighter_symbol, tp_price)
+            return {"status": "SUCCESS", "tpPrice": tp_price}
         except Exception as e:
-            return {"status": "error", "msg": str(e)}
+            logger.error("Lighter TP error: %s", e)
+            return {"status": "FAILED", "msg": str(e)}
 
     def close_all_positions(self):
-        if not self.client: return []
-        self.cancel_all_orders()
-        return []
+        try:
+            result = self.signer.cancel_all_orders()
+            logger.critical("Lighter: All orders cancelled: %s", result)
+            return [{"exchange": "lighter", "action": "cancel_all"}]
+        except Exception as e:
+            logger.error("Lighter cancel all failed: %s", e)
+            return []
+
+    def get_account_info(self):
+        try:
+            from lighter.models import ReqGetAccount
+            account = self.account_api.get_account(ReqGetAccount(account_index=str(self.account_index)))
+            return {"account_index": self.account_index, "data": account.to_dict() if account else {}}
+        except Exception as e:
+            logger.error("Lighter account error: %s", e)
+            return None
+
+    def get_supported_markets(self):
+        try:
+            orderbooks = self.info_api.get_order_books()
+            return [str(ob) for ob in (orderbooks.order_books or [])] if orderbooks else []
+        except Exception as e:
+            logger.error("Lighter markets error: %s", e)
+            return []
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    from dotenv import load_dotenv
+    load_dotenv("/etc/tradingbot/env_vars")
+    try:
+        client = LighterClient()
+        print("Connected!")
+        print("Markets:", client.get_supported_markets())
+        client.allow_real = False
+        print("Paper trade:", client.execute_futures_order("ETHUSDT", "BUY", 0.01, 2000))
+    except Exception as e:
+        print("Error: %s" % e)

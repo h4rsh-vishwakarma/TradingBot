@@ -5,6 +5,7 @@
   "manual_pause": false,
   "daily_start_balance": null,
   "daily_start_time": null,
-  "consecutive_losses": 7,
-  "last_updated": 1774436415.3045824
+  "consecutive_losses": 0,
+  "peak_balance": null,
+  "last_updated": 1774674007.7393231
 }

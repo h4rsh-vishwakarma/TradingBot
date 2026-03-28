@@ -132,7 +132,10 @@ class WebhookServer:
     def __init__(self, config, signals_queue_file):
         self.app = Flask(__name__)
         self.config = config
-        self.webhook_secret = config['webhook']['secret'].strip()
+        raw_secret = config['webhook']['secret'].strip()
+        # Resolve ${ENV_VAR} references in secret
+        import re as _re
+        self.webhook_secret = _re.sub(r'\$\{(\w+)\}', lambda m: os.environ.get(m.group(1), m.group(0)), raw_secret)
         self.queue = AtomicJsonlQueue(signals_queue_file)
         # Durable SQLite queue (primary)
         db_path = signals_queue_file.replace('.jsonl', '_queue.db').replace('signals_queue', 'signal_queue')
