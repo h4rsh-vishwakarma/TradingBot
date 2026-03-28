@@ -15,6 +15,11 @@ if os.path.exists(ENV_VARS_PATH):
     load_dotenv(dotenv_path=ENV_VARS_PATH, override=True)
 
 from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert, AlertSeverity
+from tradingview_webhook_bot.tournament_rules import (
+    AUTO_TRADE_MAX_NET_DD,
+    AUTO_TRADE_MIN_DAILY_ROI,
+    filter_auto_trade_eligible,
+)
 
 def dispatch_top_strategies(force=False):
     telegram = TelegramAlert()
@@ -22,14 +27,23 @@ def dispatch_top_strategies(force=False):
 
     try:
         df = pd.read_csv(report_path)
-        targets = df[df['Tier'].str.contains('ALPHA', na=False)].sort_values(by='Daily_ROI_%', ascending=False)
+        targets = filter_auto_trade_eligible(df).sort_values(by='Daily_ROI_%', ascending=False)
     except Exception as e:
         print(f"❌ Error: {e}")
         return
 
     # Header Message
-    telegram.send(severity=AlertSeverity.INFO, title="Alpha Engine v11.0 [LOW DD MODE]",
-                  message=f"🛡️ <b>DD SHIELD v2 ACTIVE</b>\nDeploying {len(targets)} scripts — 1x Leverage, NDD &lt; -50% target.\n🛡️ <b>Filters:</b> ADX &gt; 20 + ATR Vol Filter + 2% Trail Stop + Daily Circuit Breaker.")
+    telegram.send(
+        severity=AlertSeverity.INFO,
+        title="Alpha Engine v12.0 [ROI/NDD FILTER]",
+        message=(
+            f"🛡️ <b>Auto-Trade Filter ACTIVE</b>\n"
+            f"Deploying {len(targets)} scripts.\n"
+            f"📈 <b>Rule:</b> ROI &gt;= {AUTO_TRADE_MIN_DAILY_ROI:.1f}%\n"
+            f"📉 <b>Rule:</b> Net DD &lt;= {AUTO_TRADE_MAX_NET_DD:.0f}%\n"
+            f"🛡️ <b>Filters:</b> ADX &gt; 20 + ATR Vol Filter + 2% Trail Stop + Daily Circuit Breaker."
+        ),
+    )
     time.sleep(3)
 
     for i, (_, winner) in enumerate(targets.iterrows()):

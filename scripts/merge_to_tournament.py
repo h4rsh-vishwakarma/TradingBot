@@ -2,12 +2,54 @@
 Merge batch_backtest SUMMARY.csv into tournament_winners.csv.
 Called automatically after every batch_backtest run.
 """
-import pandas as pd
-import numpy as np
 import os
 import logging
+import sys
+from pathlib import Path
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+FILE_PATH = Path(__file__).resolve()
+PROJECT_ROOT = FILE_PATH.parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from tradingview_webhook_bot.alerts.telegram_alerts import AlertSeverity, TelegramAlert
+from tradingview_webhook_bot.tournament_rules import (
+    apply_tournament_rules,
+    build_tournament_change_message,
+)
+
+
+def _load_previous_report(winners_path):
+    if not os.path.exists(winners_path):
+        return None
+    try:
+        return pd.read_csv(winners_path)
+    except Exception:
+        return None
+
+
+def _notify_tournament_changes(previous_df, current_df):
+    message = build_tournament_change_message(
+        previous_df=previous_df,
+        current_df=current_df,
+        source_label="Batch Backtest Tournament Update",
+    )
+    if not message:
+        return
+
+    try:
+        telegram = TelegramAlert()
+        telegram.send(
+            severity=AlertSeverity.INFO,
+            title="Batch Tournament Change",
+            message=message,
+        )
+    except Exception as exc:
+        logger.warning("Telegram notification skipped: %s", exc)
 
 def merge_results(summary_path, winners_path):
     """Merge batch backtest results into tournament winners format."""
@@ -17,6 +59,7 @@ def merge_results(summary_path, winners_path):
 
     bt = pd.read_csv(summary_path)
     logger.info(f"Batch results: {len(bt)} strategies")
+    previous_report = _load_previous_report(winners_path)
 
     # Load existing tournament (if exists)
     if os.path.exists(winners_path):
@@ -47,30 +90,6 @@ def merge_results(summary_path, winners_path):
         sharpe = round(abs(daily_roi * 100 / max(dd, 0.1)), 2)
         sharpe = min(sharpe, 15)  # cap at 15
 
-        # Quality-based tiering
-        if dd > 80:
-            if daily_roi >= 0.5: tier = "🎯 ALPHA"
-            elif daily_roi >= 0.1: tier = "⚖️ AVERAGE"
-            else: tier = "💀 REJECT"
-        elif daily_roi >= 0.5 and sharpe >= 4.0 and wr >= 40:
-            tier = "🚀 ALPHA++"
-        elif daily_roi >= 0.3 and sharpe >= 3.0 and wr >= 40:
-            tier = "🚀 ALPHA++"
-        elif daily_roi >= 0.15 and sharpe >= 2.0 and wr >= 38:
-            tier = "🎯 ALPHA"
-        elif daily_roi >= 0.05 and sharpe >= 1.0:
-            tier = "⚖️ AVERAGE"
-        elif daily_roi > 0:
-            tier = "⚖️ AVERAGE"
-        else:
-            tier = "💀 REJECT"
-
-        # Bonus: exceptional Sharpe
-        if sharpe >= 8.0 and daily_roi >= 0.2 and "ALPHA++" not in tier:
-            tier = "🚀 ALPHA++"
-        elif sharpe >= 5.0 and daily_roi >= 0.1 and "ALPHA" not in tier:
-            tier = "🎯 ALPHA"
-
         # Capital left estimates (based on $100K starting capital)
         gdd_capital = round(100000 * (1 + (-dd) / 100), 0)
         ndd_capital = round(100000 * (1 + (-dd * 1.1) / 100), 0)
@@ -89,7 +108,7 @@ def merge_results(summary_path, winners_path):
             "Win_Rate_%": round(wr, 1),
             "Sharpe_Ratio": sharpe,
             "Total_Trades": trades,
-            "Tier": tier,
+            "Tier": "💀 REJECT",
             "Optimal_Mult": 3.0,
             "Optimal_Len": 14,
             "OOS_Daily_ROI_%": round(daily_roi * 0.6, 3),
@@ -107,9 +126,11 @@ def merge_results(summary_path, winners_path):
 
     # Sort by Daily ROI descending
     combined = combined.sort_values("Daily_ROI_%", ascending=False)
+    combined = apply_tournament_rules(combined)
 
     # Save
     combined.to_csv(winners_path, index=False)
+    _notify_tournament_changes(previous_report, combined)
 
     # Count tiers
     tiers = {}

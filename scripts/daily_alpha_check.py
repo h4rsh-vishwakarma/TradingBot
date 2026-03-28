@@ -13,6 +13,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
 from scripts.strategy_tournament import strategy_tournament
 from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert, AlertSeverity
+from tradingview_webhook_bot.tournament_rules import (
+    AUTO_TRADE_MAX_NET_DD,
+    AUTO_TRADE_MIN_DAILY_ROI,
+    filter_auto_trade_eligible,
+)
 
 def run_full_automation():
     print(f"Starting Automated Alpha Scan...")
@@ -29,10 +34,15 @@ def run_full_automation():
     if not os.path.exists(report_path): return
 
     df = pd.read_csv(report_path)
-    top5 = df.head(5)
+    eligible = filter_auto_trade_eligible(df).sort_values("Daily_ROI_%", ascending=False)
+    top5 = eligible.head(5)
 
     # 3. Build summary message with all new columns
-    lines = ["<b>DAILY ALPHA REPORT</b>\n"]
+    lines = [
+        "<b>DAILY AUTO-TRADE REPORT</b>\n",
+        f"Rules: ROI &gt;= {AUTO_TRADE_MIN_DAILY_ROI:.1f}% | Net DD &lt;= {AUTO_TRADE_MAX_NET_DD:.0f}%\n",
+        f"Eligible strategies: <b>{len(eligible)}</b>\n",
+    ]
     for i, row in top5.iterrows():
         sym = row['Symbol']
         strat = str(row['Strategy'])[:35]
@@ -61,7 +71,7 @@ def run_full_automation():
     msg = "\n".join(lines)
 
     try:
-        telegram.send(severity=AlertSeverity.INFO, title="Daily Alpha Report", message=msg)
+        telegram.send(severity=AlertSeverity.INFO, title="Daily Auto-Trade Report", message=msg)
         print("Message successfully sent to Telegram!")
     except Exception as e:
         print(f"Telegram Error: {e}")

@@ -1,14 +1,65 @@
-import pandas as pd
-import numpy as np
+import gc
 import glob
 import os
-import gc
-from my_strategies import apply_strategy
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from dotenv import load_dotenv
+
+FILE_PATH = Path(__file__).resolve()
+PROJECT_ROOT = FILE_PATH.parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+ENV_VARS_PATH = "/etc/tradingbot/env_vars"
+if os.path.exists(ENV_VARS_PATH):
+    load_dotenv(dotenv_path=ENV_VARS_PATH, override=True)
+
+from scripts.my_strategies import apply_strategy
+from tradingview_webhook_bot.alerts.telegram_alerts import AlertSeverity, TelegramAlert
+from tradingview_webhook_bot.tournament_rules import (
+    AUTO_TRADE_MAX_NET_DD,
+    AUTO_TRADE_MIN_DAILY_ROI,
+    apply_tournament_rules,
+    build_tournament_change_message,
+)
+
+
+def _load_previous_report(report_path):
+    if not os.path.exists(report_path):
+        return None
+    try:
+        return pd.read_csv(report_path)
+    except Exception:
+        return None
+
+
+def _notify_tournament_changes(previous_df, current_df):
+    message = build_tournament_change_message(
+        previous_df=previous_df,
+        current_df=current_df,
+        source_label="Tournament Auto-Trade Update",
+    )
+    if not message:
+        return
+
+    try:
+        telegram = TelegramAlert()
+        telegram.send(
+            severity=AlertSeverity.INFO,
+            title="Tournament Rule Change",
+            message=message,
+        )
+    except Exception as exc:
+        print(f"Telegram notification skipped: {exc}")
 
 def strategy_tournament():
     PINE_FOLDER = '/home/ubuntu/tradingview_webhook_bot/backtesting/pine/'
     DATA_FILES = glob.glob('/home/ubuntu/tradingview_webhook_bot/storage/backtest_data/*_3y_15m.csv')
     REPORT_PATH = '/home/ubuntu/tradingview_webhook_bot/storage/reports/tournament_winners.csv'
+    previous_report = _load_previous_report(REPORT_PATH)
 
     all_files = sorted([f for f in os.listdir(PINE_FOLDER) if os.path.isfile(os.path.join(PINE_FOLDER, f))])
     results = []
@@ -25,7 +76,11 @@ def strategy_tournament():
         {'mult': 4.0, 'len': 26}   # Macro Trend
     ]
 
-    print(f"🔥 ALPHA AGGRESSOR MODE: Target 2% Daily ROI | Scanning {len(all_files)} Strategies...")
+    print(
+        "🔥 TOURNAMENT AUTO-TRADE MODE: "
+        f"ROI >= {AUTO_TRADE_MIN_DAILY_ROI:.1f}% | Net DD <= {AUTO_TRADE_MAX_NET_DD:.0f}% "
+        f"| Scanning {len(all_files)} Strategies..."
+    )
 
     for data_file in DATA_FILES:
         symbol = os.path.basename(data_file).split('_')[0]
@@ -90,10 +145,20 @@ def strategy_tournament():
             gc.collect()
 
     final_df = pd.DataFrame(results).sort_values(by=["Daily_ROI_%"], ascending=False)
+    final_df = apply_tournament_rules(final_df)
     final_df.to_csv(REPORT_PATH, index=False)
-    
-    print("\n🚀 --- TOP ALPHA STRATEGIES (TARGET 2% DAILY) --- 🚀")
-    print(final_df.head(15).to_string(index=False))
+
+    _notify_tournament_changes(previous_report, final_df)
+
+    eligible_df = final_df[final_df["Auto_Trade_Eligible"] == "YES"].sort_values(
+        by=["Daily_ROI_%"], ascending=False
+    )
+    print(
+        "\n🎯 --- AUTO-TRADE ELIGIBLE STRATEGIES "
+        f"(ROI >= {AUTO_TRADE_MIN_DAILY_ROI:.1f}% | Net DD <= {AUTO_TRADE_MAX_NET_DD:.0f}%) --- 🎯"
+    )
+    print(eligible_df.head(15).to_string(index=False))
+    return final_df
 
 def run_test_oos(df_raw, name, mult, length, train_pct=0.8):
     """Run test with train/test split for out-of-sample validation."""
@@ -125,7 +190,7 @@ def run_test(df_raw, name, optimize, mult, length):
         df['sig'] = apply_strategy(df, name, optimize, mult, length)
 
         # 🛡️ FILTER 1: ADX > 20 (relaxed from 25 to capture moderate trends)
-        from my_strategies import calculate_adx
+        from scripts.my_strategies import calculate_adx
         adx = calculate_adx(df, n=14)
         df['sig'] = np.where(adx > 20, df['sig'], 0)
 
@@ -200,38 +265,9 @@ def run_test(df_raw, name, optimize, mult, length):
         # 15m bars, ~96 bars/day, ~35040 bars/year
         sharpe = round((mean_ret / std_ret) * np.sqrt(35040), 2) if std_ret > 0 else 0.0
 
-        # --- QUALITY-BASED TIERING (Optimized for 1x leverage) ---
-        # DD thresholds tightened: NDD must be < -50% for any ALPHA tier
-
-        # Hard reject: DD > 50% or NDD > 50%
-        if abs(gross_dd) > 50 or abs(net_dd) > 50:
-            if daily_roi >= 0.5:
-                status = "⚖️ AVERAGE"  # High ROI but too much DD → AVERAGE only
-            else:
-                status = "💀 REJECT"
-        # ALPHA++ — Elite: good ROI + low DD + quality metrics
-        elif daily_roi >= 0.6 and sharpe >= 4.0 and win_rate >= 45 and abs(gross_dd) < 30:
-            status = "🚀 ALPHA++"
-        elif daily_roi >= 0.5 and sharpe >= 3.5 and win_rate >= 45 and abs(gross_dd) < 35:
-            status = "🚀 ALPHA++"
-        # ALPHA — Solid performers with controlled DD
-        elif daily_roi >= 0.3 and sharpe >= 3.0 and win_rate >= 45 and abs(gross_dd) < 40:
-            status = "🎯 ALPHA"
-        elif daily_roi >= 0.25 and sharpe >= 2.5 and win_rate >= 48 and abs(gross_dd) < 45:
-            status = "🎯 ALPHA"
-        # AVERAGE — Marginal, needs manual review
-        elif daily_roi >= 0.1 and sharpe >= 1.5:
-            status = "⚖️ AVERAGE"
-        elif daily_roi >= 0.05:
-            status = "⚖️ AVERAGE"
-        else:
-            status = "💀 REJECT"
-
-        # Bonus: Extremely high Sharpe with decent ROI and low DD
-        if sharpe >= 6.0 and daily_roi >= 0.3 and abs(gross_dd) < 30 and "ALPHA++" not in status:
-            status = "🚀 ALPHA++"
-        elif sharpe >= 5.0 and daily_roi >= 0.2 and abs(gross_dd) < 40 and "ALPHA" not in status:
-            status = "🎯 ALPHA"
+        # Tiering is applied centrally after aggregation so auto-trade thresholds
+        # stay consistent across every report writer.
+        status = "💀 REJECT"
 
         return daily_roi, gross_dd, net_dd, win_rate, sharpe, total_trades, status, gross_dd_date, net_dd_date, gross_dd_capital, net_dd_capital
     except:

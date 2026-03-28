@@ -36,6 +36,7 @@ try:
     from tradingview_webhook_bot.exchange.binance_client import BinanceClient
     from tradingview_webhook_bot.core.circuit_breaker import CircuitBreaker
     from tradingview_webhook_bot.core.metrics import metrics
+    from tradingview_webhook_bot.tournament_rules import parse_auto_trade_flag
     from backtesting.engine import BacktestEngine
     from tradingview_webhook_bot.exchange.hl_client import HyperliquidClient
     from tradingview_webhook_bot.exchange.lighter_client import LighterClient
@@ -158,6 +159,104 @@ class Orchestrator:
             s = s.replace(ch, ' ')
         return re.sub(r'\s+', ' ', s).strip().lower()
 
+    @staticmethod
+    def _strategy_display_name(name) -> str:
+        if isinstance(name, dict):
+            for key in ("name", "strategy", "title", "id"):
+                value = name.get(key)
+                if value:
+                    return str(value)
+            try:
+                return json.dumps(name, sort_keys=True)
+            except Exception:
+                return str(name)
+        return str(name or "SMC")
+
+    def _send_telegram_alert(self, severity, title: str, message: str, alert_key: str | None = None, force: bool = False):
+        def _send():
+            try:
+                self.telegram.send(
+                    severity=severity,
+                    title=title,
+                    message=message,
+                    alert_key=alert_key,
+                    force=force,
+                )
+            except Exception as e:
+                logger.debug(f"Telegram failed: {e}")
+
+        pool = getattr(self, "_thread_pool", None)
+        if pool:
+            try:
+                pool.submit(_send)
+                return
+            except Exception:
+                pass
+        _send()
+
+    def _log_blocked_trade_safe(self, symbol: str, side: str, strategy: str, reason: str, signal_id: str):
+        try:
+            self.sheets_logger.log_blocked_trade(
+                symbol=symbol,
+                side=side,
+                strategy=strategy,
+                reason=reason,
+                signal_id=signal_id,
+            )
+        except Exception as e:
+            logger.debug(f"Sheets log failed: {e}")
+
+    def _send_auto_reject_alert(self, signal_id: str, symbol: str, side: str, strategy: str, reason: str, tier: str):
+        self._send_telegram_alert(
+            severity=AlertSeverity.WARNING,
+            title="Auto Rejected",
+            message=(
+                "🚫 <b>Bot Alert: Auto Rejected</b>\n\n"
+                f"📍 <b>Symbol:</b> <code>{symbol}</code>\n"
+                f"🧭 <b>Side:</b> <code>{side or 'N/A'}</code>\n"
+                f"📋 <b>Strategy:</b> <code>{strategy}</code>\n"
+                f"📈 <b>Tier:</b> <code>{tier or 'NONE'}</code>\n"
+                f"⚠️ <b>Reason:</b> {reason}\n"
+                "🤖 <b>Decision:</b> No auto-trade executed.\n"
+                f"🆔 <b>ID:</b> <code>{signal_id}</code>"
+            ),
+            alert_key=f"auto_reject_{signal_id}",
+        )
+
+    def _send_match_error_alert(self, signal_id: str, symbol: str, side: str, strategy: str, stage: str, reason: str):
+        self._send_telegram_alert(
+            severity=AlertSeverity.HIGH,
+            title="Strategy Match Error",
+            message=(
+                "🛠️ <b>Bot Alert: Strategy Match Error</b>\n\n"
+                f"📍 <b>Symbol:</b> <code>{symbol}</code>\n"
+                f"🧭 <b>Side:</b> <code>{side or 'N/A'}</code>\n"
+                f"📋 <b>Strategy:</b> <code>{strategy}</code>\n"
+                f"🧪 <b>Stage:</b> <code>{stage}</code>\n"
+                f"⚠️ <b>Error:</b> {reason}\n"
+                "🤖 <b>Decision:</b> No auto-trade executed.\n"
+                f"🆔 <b>ID:</b> <code>{signal_id}</code>"
+            ),
+            alert_key=f"match_error_{signal_id}_{stage}",
+        )
+
+    def _send_execution_failure_alert(self, signal_id: str, symbol: str, side: str, strategy: str, reason: str, detail: str = ""):
+        extra_detail = f"\n🧾 <b>Detail:</b> {detail}" if detail else ""
+        self._send_telegram_alert(
+            severity=AlertSeverity.HIGH,
+            title="Execution Failure",
+            message=(
+                "❌ <b>Bot Alert: Execution Failed</b>\n\n"
+                f"📍 <b>Symbol:</b> <code>{symbol}</code>\n"
+                f"🧭 <b>Side:</b> <code>{side or 'N/A'}</code>\n"
+                f"📋 <b>Strategy:</b> <code>{strategy}</code>\n"
+                f"⚠️ <b>Reason:</b> {reason}{extra_detail}\n"
+                "🤖 <b>Decision:</b> Auto-trade was attempted but not executed.\n"
+                f"🆔 <b>ID:</b> <code>{signal_id}</code>"
+            ),
+            alert_key=f"execution_failure_{signal_id}",
+        )
+
     def _is_symbol_in_cooldown(self, symbol: str, strategy: str = "") -> bool:
         cooldown_key = f"{symbol}:{strategy}" if strategy else symbol
         last_trade = self._symbol_cooldown.get(cooldown_key, 0)
@@ -195,23 +294,31 @@ class Orchestrator:
                 return True, "No report found, allowing", "ALPHA"
         try:
             df = pd.read_csv(self.report_path)
-            import re as _re
-            def _normalize(s):
-                s = str(s)
-                for ch in ['_', "'", '"', '[', ']', '+', ',', '-', '|']:
-                    s = s.replace(ch, ' ')
-                return _re.sub(r"\s+", " ", s).strip().lower()
-            strat_clean = _normalize(strategy_name)
+            strat_clean = self._normalize_strategy(strategy_name)
             def _strat_match(row_strat):
-                row_clean = _normalize(row_strat)
+                row_clean = self._normalize_strategy(row_strat)
                 return strat_clean in row_clean or row_clean in strat_clean
-            match = df[(df['Symbol'].str.contains(symbol, case=False)) & (df['Strategy'].apply(_strat_match))]
+            symbol_upper = str(symbol).upper()
+            symbol_series = df['Symbol'].fillna('').astype(str)
+            exact_symbol_match = symbol_series.str.upper() == symbol_upper
+            if exact_symbol_match.any():
+                symbol_mask = exact_symbol_match
+            else:
+                symbol_mask = symbol_series.str.contains(symbol_upper, case=False, na=False)
+            match = df[symbol_mask & df['Strategy'].fillna('').astype(str).apply(_strat_match)]
             if match.empty:
                 return False, f"Strategy {strategy_name} for {symbol} not in Leaderboard.", "NONE"
             row = match.iloc[0]
             tier = str(row.get('Tier', ''))
+            auto_trade_eligible = parse_auto_trade_flag(row.get("Auto_Trade_Eligible"), None)
+            auto_trade_reason = str(row.get("Auto_Trade_Reason", "")).strip()
+            if auto_trade_eligible is False and "ALPHA" in tier:
+                reason = auto_trade_reason or "Strategy no longer meets tournament auto-trade rules."
+                return True, reason, "AVERAGE"
             if "ALPHA" in tier: return True, "Verified ALPHA: Direct Execution", "ALPHA"
-            if "AVERAGE" in tier: return True, "Verified AVERAGE: Human Approval Needed", "AVERAGE"
+            if "AVERAGE" in tier:
+                reason = auto_trade_reason or "Verified AVERAGE: Human Approval Needed"
+                return True, reason, "AVERAGE"
             return False, f"Strategy Tier is {tier}. Blocked.", tier
         except Exception as e:
             logger.error(f"Leaderboard Check Error: {e}")
@@ -246,8 +353,16 @@ class Orchestrator:
 
             target_exchange = str(payload_raw.get("exchange") or event.get("exchange") or "binance").lower()
             strat_name_raw = payload_raw.get("strategy") or event.get("strategy") or "SMC"
-            strat_name = self._normalize_strategy(strat_name_raw)
+            strategy_display = self._strategy_display_name(strat_name_raw)
+            strat_name = self._normalize_strategy(strategy_display)
             symbol_raw = str(payload_raw.get("symbol") or event.get("symbol") or "BTCUSDT").upper()
+            side_hint = str(
+                payload_raw.get("action")
+                or event.get("action")
+                or payload_raw.get("side")
+                or event.get("side")
+                or "N/A"
+            ).upper()
 
             # --- SYMBOL CLEANING ---
             symbol = symbol_raw.split('_')[0]
@@ -278,17 +393,35 @@ class Orchestrator:
             is_allowed, reason, tier = self.check_tournament_alpha(symbol, strat_name)
             if not is_allowed:
                 logger.warning(f"[{correlation_id}] AI Blocked: {reason}")
-                try:
-                    self.sheets_logger.log_blocked_trade(
-                        symbol=symbol, side="N/A", strategy=strat_name,
-                        reason=f"Tier Block: {reason}", signal_id=signal_id)
-                except Exception as e:
-                    logger.debug(f"Sheets log failed: {e}")
+                if tier == "ERROR":
+                    self._send_match_error_alert(
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        side=side_hint,
+                        strategy=strategy_display,
+                        stage="leaderboard_check",
+                        reason=reason,
+                    )
+                else:
+                    self._send_auto_reject_alert(
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        side=side_hint,
+                        strategy=strategy_display,
+                        reason=reason,
+                        tier=tier,
+                    )
+                self._log_blocked_trade_safe(
+                    symbol=symbol,
+                    side=side_hint,
+                    strategy=strategy_display,
+                    reason=f"Tier Block: {reason}",
+                    signal_id=signal_id,
+                )
                 metrics.inc("bot_signals_blocked_total", labels={"reason": "tier_block"})
                 return True
 
             # --- 1.5. SIGNAL DEDUP CHECK ---
-            side_hint = str(payload_raw.get("action") or event.get("action") or "").upper()
             if self._is_duplicate_signal(strat_name, symbol, side_hint):
                 return True
 
@@ -314,23 +447,42 @@ class Orchestrator:
                 incoming_roi = float(strat_info.get("ROI", "0").replace("%", ""))
                 if incoming_roi <= 0:
                     logger.warning(f"[{correlation_id}] ROI Guard: Signal blocked ({incoming_roi}%)")
-                    try:
-                        self.sheets_logger.log_blocked_trade(
-                            symbol=symbol, side="N/A", strategy=strat_name,
-                            reason=f"ROI Guard: {incoming_roi}% (Negative)", signal_id=signal_id)
-                    except Exception as e:
-                        logger.debug(f"Sheets log failed: {e}")
+                    self._send_auto_reject_alert(
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        side=side_hint,
+                        strategy=strategy_display,
+                        reason=f"ROI Guard blocked incoming ROI {incoming_roi}%",
+                        tier="ROI_GUARD",
+                    )
+                    self._log_blocked_trade_safe(
+                        symbol=symbol,
+                        side=side_hint,
+                        strategy=strategy_display,
+                        reason=f"ROI Guard: {incoming_roi}% (Negative)",
+                        signal_id=signal_id,
+                    )
                     return True
             except (json.JSONDecodeError, ValueError, TypeError):
                 pass  # ROI check is optional — strategy field is usually plain text
 
             # --- 3. TIER-BASED INTERACTIVE GATE ---
             if "AVERAGE" in tier:
-                try:
-                    self.telegram.send(severity=AlertSeverity.WARNING, title="Manual Sync Needed",
-                        message=f"AVERAGE Strategy: {strat_name} for {symbol}. No auto-trade. ID: {signal_id}")
-                except Exception as e:
-                    logger.debug(f"Telegram failed: {e}")
+                self._send_auto_reject_alert(
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    side=side_hint,
+                    strategy=strategy_display,
+                    reason=f"{reason} Manual review required.",
+                    tier=tier,
+                )
+                self._log_blocked_trade_safe(
+                    symbol=symbol,
+                    side=side_hint,
+                    strategy=strategy_display,
+                    reason=f"AVERAGE Tier: {reason}",
+                    signal_id=signal_id,
+                )
                 return True
 
             # --- 4. PREPARE EXECUTION DATA ---
@@ -347,6 +499,14 @@ class Orchestrator:
                         logger.info(f"[{correlation_id}] Resolved price for {symbol}: ${raw_price}")
                     else:
                         logger.warning(f"[{correlation_id}] Cannot resolve price for {symbol}. Skipping.")
+                        self._send_match_error_alert(
+                            signal_id=signal_id,
+                            symbol=symbol,
+                            side=side_hint,
+                            strategy=strategy_display,
+                            stage="price_resolution",
+                            reason="Incoming alert had no usable price and mainnet price lookup failed.",
+                        )
                         return True
                 signal_data["price"] = raw_price
                 signal_data["action"] = str(payload_raw.get("action") or event.get("action") or "BUY").upper()
@@ -355,6 +515,21 @@ class Orchestrator:
                 payload = valid_payload.model_dump()
             except Exception as e:
                 logger.error(f"[{correlation_id}] Data Parsing Error: {e}")
+                self._send_match_error_alert(
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    side=side_hint,
+                    strategy=strategy_display,
+                    stage="payload_validation",
+                    reason=str(e),
+                )
+                self._log_blocked_trade_safe(
+                    symbol=symbol,
+                    side=side_hint,
+                    strategy=strategy_display,
+                    reason=f"Payload Validation: {e}",
+                    signal_id=signal_id,
+                )
                 return True
 
             side = "SELL" if payload["action"] in ["SELL", "TP", "EXIT", "SHORT", "OFF"] else "BUY"
@@ -584,7 +759,7 @@ class Orchestrator:
                     tp_info = f"\n🎯 <b>Take-Profit:</b> <code>${tp_price_est:,.2f}</code> ({tp_pct_val}%)"
                 try:
                     self.telegram.send(severity=AlertSeverity.INFO, title="Trade Success",
-                        message=(f"{emoji} <b>Bot Alert: Trade Executed</b>\n\n"
+                        message=(f"{emoji} <b>Bot Alert: Auto Trade Executed</b>\n\n"
                                  f"✅ <b>Action:</b> {trade_type} {symbol}\n"
                                  f"💰 <b>Price:</b> <code>${fill_price:,.2f}</code>\n"
                                  f"📊 <b>Quantity:</b> <code>{qty}</code>\n"
@@ -600,12 +775,21 @@ class Orchestrator:
                 exec_msg = execution_res.get('msg', '')
                 metrics.inc("bot_execution_failures_total")
                 logger.error(f"[{correlation_id}] Execution Failure: {exec_reason} | Detail: {exec_msg}")
-                try:
-                    self.sheets_logger.log_blocked_trade(
-                        symbol=symbol, side=side, strategy=strat_name,
-                        reason=f"Execution Failed: {exec_reason}", signal_id=signal_id)
-                except Exception as e:
-                    logger.debug(f"Sheets log failed: {e}")
+                self._send_execution_failure_alert(
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    side=side,
+                    strategy=strategy_display,
+                    reason=exec_reason,
+                    detail=exec_msg,
+                )
+                self._log_blocked_trade_safe(
+                    symbol=symbol,
+                    side=side,
+                    strategy=strategy_display,
+                    reason=f"Execution Failed: {exec_reason}",
+                    signal_id=signal_id,
+                )
                 if exec_reason == "permanent":
                     self.idempotency.mark_seen(signal_id)
                     return True
@@ -613,6 +797,14 @@ class Orchestrator:
 
         except Exception as e:
             logger.error(f"[{correlation_id}] Critical Error in handle_signal: {e}")
+            self._send_match_error_alert(
+                signal_id=event.get("signal_id", "unknown"),
+                symbol=str(event.get("symbol") or event.get("payload", {}).get("symbol") or "UNKNOWN"),
+                side=str(event.get("action") or event.get("payload", {}).get("action") or "N/A").upper(),
+                strategy=self._strategy_display_name(event.get("strategy") or event.get("payload", {}).get("strategy") or "SMC"),
+                stage="handle_signal",
+                reason=str(e),
+            )
             try:
                 with open(self.dlq_path, 'a') as dlq:
                     dlq.write(json.dumps({"ts": datetime.utcnow().isoformat(), "err": str(e), "event": event}) + "\n")

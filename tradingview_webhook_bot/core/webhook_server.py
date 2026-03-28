@@ -1,6 +1,7 @@
 import hmac as _hmac
 import hashlib
 import sys, os, json, time, re, csv, threading
+from html import escape
 from pathlib import Path
 from flask import Flask
 from flask import request, jsonify
@@ -190,6 +191,26 @@ class WebhookServer:
 
         return 0.0
 
+    @staticmethod
+    def _sanitize_alert_excerpt(raw_text: str, limit: int = 220) -> str:
+        text = str(raw_text or "").strip()
+        text = re.sub(r'("secret"\s*:\s*")[^"]+(")', r'\1***\2', text, flags=re.IGNORECASE)
+        text = re.sub(r'(Webhook\s*\()[^)]+(\))', r'\1***\2', text, flags=re.IGNORECASE)
+        if len(text) > limit:
+            text = text[:limit] + "..."
+        return text
+
+    def _send_script_error_alert(self, title: str, message: str, alert_key: str):
+        try:
+            self.telegram.send(
+                severity=AlertSeverity.HIGH,
+                title=title,
+                message=message,
+                alert_key=alert_key,
+            )
+        except Exception as e:
+            logger.warning(f"Telegram script-error notify failed (non-critical): {e}")
+
 
     def setup_health_route(self):
         @self.app.route("/health", methods=["GET"])
@@ -250,6 +271,7 @@ class WebhookServer:
     def setup_routes(self):
         @self.app.route('/webhook/tradingview', methods=['POST'])
         def receive_signal():
+            raw_body = ""
             try:
                 # Rate limiting
                 if self._check_rate_limit():
@@ -292,6 +314,24 @@ class WebhookServer:
                     price = payload.get('price')
 
                     if not all([raw_symbol, side, price]):
+                        strategy_display = str(payload.get("strategy", "Unknown"))
+                        missing = [
+                            field for field, value in (
+                                ("symbol", raw_symbol),
+                                ("action", side),
+                                ("price", price),
+                            ) if not value
+                        ]
+                        self._send_script_error_alert(
+                            title="TradingView Script Error",
+                            message=(
+                                "🛠️ <b>Incoming JSON alert does not match bot webhook requirements.</b>\n\n"
+                                f"📋 <b>Strategy:</b> <code>{escape(strategy_display)}</code>\n"
+                                f"⚠️ <b>Missing Fields:</b> {escape(', '.join(missing))}\n"
+                                "🤖 <b>Decision:</b> No auto-trade evaluation executed."
+                            ),
+                            alert_key=f"tv_json_missing_{hashlib.sha256(raw_body.encode()).hexdigest()[:12]}",
+                        )
                         return jsonify({'status': 'error', 'message': 'Missing symbol, action, or price'}), 400
 
                     # Clean symbol (remove _PREMIUM, _PERP, etc)
@@ -304,6 +344,18 @@ class WebhookServer:
                     try:
                         price_val = float(price)
                     except (ValueError, TypeError):
+                        strategy_display = str(payload.get("strategy", "Unknown"))
+                        self._send_script_error_alert(
+                            title="TradingView Script Error",
+                            message=(
+                                "🛠️ <b>Incoming JSON alert has an invalid price for bot execution.</b>\n\n"
+                                f"📋 <b>Strategy:</b> <code>{escape(strategy_display)}</code>\n"
+                                f"📍 <b>Symbol:</b> <code>{escape(symbol)}</code>\n"
+                                f"⚠️ <b>Price Value:</b> <code>{escape(str(price))}</code>\n"
+                                "🤖 <b>Decision:</b> No auto-trade evaluation executed."
+                            ),
+                            alert_key=f"tv_json_price_{hashlib.sha256(raw_body.encode()).hexdigest()[:12]}",
+                        )
                         return jsonify({'status': 'error', 'message': f'Invalid price: {price}'}), 400
 
                     if price_val <= 0:
@@ -319,6 +371,17 @@ class WebhookServer:
                     parsed = parse_plain_text_alert(raw_body)
                     if not parsed:
                         logger.warning(f"❌ Could not parse alert: {raw_body[:200]}")
+                        excerpt = self._sanitize_alert_excerpt(raw_body)
+                        self._send_script_error_alert(
+                            title="TradingView Script Error",
+                            message=(
+                                "🛠️ <b>Incoming plain-text alert did not match the bot parser.</b>\n\n"
+                                f"🧾 <b>Alert Snippet:</b> <code>{escape(excerpt)}</code>\n"
+                                "⚠️ <b>Reason:</b> TradingView script/alert format does not match bot logic.\n"
+                                "🤖 <b>Decision:</b> No auto-trade evaluation executed."
+                            ),
+                            alert_key=f"tv_plain_parse_{hashlib.sha256(excerpt.encode()).hexdigest()[:12]}",
+                        )
                         logger.info(f'Ignoring unrecognized alert format')
                         return jsonify({'status': 'ignored', 'message': 'Unrecognized alert format'}), 200
 
@@ -400,6 +463,17 @@ class WebhookServer:
 
             except Exception as e:
                 logger.error(f"🔥 Webhook Server Error: {str(e)}")
+                excerpt = self._sanitize_alert_excerpt(raw_body)
+                self._send_script_error_alert(
+                    title="Webhook Processing Error",
+                    message=(
+                        "🛠️ <b>Webhook processing failed before the bot could classify the strategy.</b>\n\n"
+                        f"🧾 <b>Alert Snippet:</b> <code>{escape(excerpt)}</code>\n"
+                        f"⚠️ <b>Error:</b> {escape(str(e))}\n"
+                        "🤖 <b>Decision:</b> No auto-trade evaluation executed."
+                    ),
+                    alert_key=f"tv_webhook_error_{hashlib.sha256((excerpt + str(e)).encode()).hexdigest()[:12]}",
+                )
                 return jsonify({'status': 'error', 'message': 'Internal Server Error'}), 500
 
         @self.app.route('/backtest-report', methods=['POST'])

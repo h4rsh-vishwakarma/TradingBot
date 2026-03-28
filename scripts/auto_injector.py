@@ -6,11 +6,18 @@ Runs every hour via cron. Checks:
 3. Signal queue is not stuck (DLQ check)
 4. Tournament data is fresh (< 36 hours old)
 5. Alerts on Telegram if anything is wrong
+6. Sends a quiet-hour live confirmation if no signals arrived recently
 """
 
-import os, sys, time, subprocess, requests, logging
-from pathlib import Path
+import logging
+import os
+import sqlite3
+import subprocess
+import sys
 from datetime import datetime, timedelta
+from pathlib import Path
+
+import requests
 from dotenv import load_dotenv
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(message)s')
@@ -25,6 +32,8 @@ if os.path.exists(ENV_VARS_PATH):
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "5736858710")
+SIGNAL_DB_PATH = PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "signal_queue.db"
+QUIET_LOOKBACK_MINUTES = 60
 
 def send_alert(message):
     if not TOKEN:
@@ -64,6 +73,29 @@ def check_dlq():
             count = sum(1 for _ in f)
         return count
     return 0
+
+
+def check_recent_signal_activity(lookback_minutes=QUIET_LOOKBACK_MINUTES):
+    if not SIGNAL_DB_PATH.exists():
+        return False, f"signal_queue.db missing ({SIGNAL_DB_PATH})"
+
+    lookback_seconds = max(1, int(lookback_minutes * 60))
+    with sqlite3.connect(SIGNAL_DB_PATH) as conn:
+        cursor = conn.execute(
+            """
+            SELECT COUNT(*), MAX(created_at)
+            FROM signals
+            WHERE created_at >= ?
+            """,
+            (datetime.utcnow().timestamp() - lookback_seconds,),
+        )
+        count, last_seen = cursor.fetchone()
+
+    if count:
+        last_seen_text = datetime.utcfromtimestamp(last_seen).strftime("%Y-%m-%d %H:%M:%S UTC")
+        return True, f"{count} queued signal(s) in last {lookback_minutes}m (latest {last_seen_text})"
+
+    return False, f"No queued signals in last {lookback_minutes}m"
 
 def run_scan():
     issues = []
@@ -105,6 +137,12 @@ def run_scan():
     else:
         status_lines.append("Dead Letter Queue: Clean")
 
+    # 5. Recent live activity
+    has_recent_signals, activity_detail = check_recent_signal_activity()
+    status_lines.append(f"Recent Signals: {activity_detail}")
+    if "missing" in activity_detail:
+        issues.append(f"Signal activity check issue: {activity_detail}")
+
     # Log everything
     logger.info("Heartbeat scan complete: " + " | ".join(status_lines))
 
@@ -119,7 +157,21 @@ def run_scan():
         )
         send_alert(msg)
     else:
-        logger.info("All systems nominal. No alert needed.")
+        if has_recent_signals:
+            logger.info("All systems nominal. Recent signals exist, so no extra heartbeat alert needed.")
+        else:
+            msg = (
+                "<b>HOURLY LIVE CONFIRMATION</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "<b>Status:</b> Bot is live and healthy.\n"
+                f"<b>Signals:</b> {activity_detail}\n"
+                f"<b>Tournament:</b> {detail}\n"
+                "<b>Queue:</b> Dead Letter Queue clean\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"<i>{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</i>"
+            )
+            send_alert(msg)
+            logger.info("All systems nominal. Quiet-hour confirmation alert sent.")
 
 if __name__ == "__main__":
     run_scan()
