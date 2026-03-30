@@ -36,6 +36,7 @@ try:
     from tradingview_webhook_bot.core.circuit_breaker import CircuitBreaker
     from backtesting.engine import BacktestEngine
     from tradingview_webhook_bot.exchange.hl_client import HyperliquidClient
+    from tradingview_webhook_bot.exchange.lighter_client import LighterClient
 except ImportError as e:
     logger.error(f"Import failed: {e}")
     sys.exit(1)
@@ -86,6 +87,19 @@ class Orchestrator:
         except Exception as e:
             logger.warning(f"HL Client initialization failed: {e}")
             self.exchange_hl = None
+
+        try:
+            lighter_key = os.getenv("LIGHTER_API_PRIVATE_KEY") or os.getenv("LIGHTER_PRIVATE_KEY")
+            if lighter_key:
+                self.exchange_lighter = LighterClient()
+                logger.info("Lighter client initialized [%s]",
+                            "TESTNET" if self.exchange_lighter.is_testnet else "MAINNET")
+            else:
+                self.exchange_lighter = None
+                logger.info("Lighter client disabled — LIGHTER_PRIVATE_KEY not set")
+        except Exception as e:
+            logger.warning(f"Lighter Client initialization failed: {e}")
+            self.exchange_lighter = None
 
         self.bt_engine = BacktestEngine()
         self.processed_count = 0
@@ -223,8 +237,8 @@ class Orchestrator:
 
             # --- SYMBOL CLEANING ---
             symbol = symbol_raw.split('_')[0]
-            if target_exchange == "hyperliquid":
-                symbol = symbol.replace("USDT", "").replace("USD", "")
+            if target_exchange in ("hyperliquid", "lighter"):
+                symbol = symbol.replace("USDT", "").replace("USD", "") if target_exchange == "hyperliquid" else symbol
             else:
                 if "USDT" not in symbol:
                     symbol = f"{symbol.replace('USD', '')}USDT"
@@ -395,13 +409,16 @@ class Orchestrator:
             if size_mode == "equity_pct":
                 equity_pct = float(os.getenv("EQUITY_PCT_PER_TRADE", "5.0")) / 100
                 try:
-                    health = self.exchange_binance.get_account_health()
-                    if health:
-                        avail = health.get("available_balance", 0)
+                    if target_exchange == "lighter" and self.exchange_lighter:
+                        avail = self.exchange_lighter.get_account_balance() or 0
+                        sizing_price = self.exchange_lighter.get_mark_price(symbol) or price_signal
+                    else:
+                        health = self.exchange_binance.get_account_health()
+                        avail = float(health.get("available_balance", 0)) if health else 0
                         sizing_price = self.exchange_binance.get_mainnet_mark_price(symbol) or price_signal
-                        if avail > 0 and sizing_price > 0:
-                            qty = (avail * equity_pct) / sizing_price
-                            logger.info(f"Equity sizing: {equity_pct*100}% of ${avail:.2f} @ ${sizing_price:.2f} = {qty:.6f} {symbol}")
+                    if avail > 0 and sizing_price > 0:
+                        qty = (avail * equity_pct) / sizing_price
+                        logger.info(f"Equity sizing [{target_exchange}]: {equity_pct*100}% of ${avail:.2f} @ ${sizing_price:.2f} = {qty:.6f} {symbol}")
                 except Exception as e:
                     logger.warning(f"Equity sizing failed, using signal qty: {e}")
 
@@ -419,7 +436,20 @@ class Orchestrator:
             self._set_candle_lock(symbol, side, strat_name)
 
             execution_res, fill_price = {}, price_signal
-            if target_exchange == "hyperliquid":
+            if target_exchange == "lighter":
+                if not self.exchange_lighter:
+                    logger.warning(f"Lighter client not available, skipping {symbol}")
+                    return True
+                execution_res = self.exchange_lighter.execute_futures_order(
+                    symbol, side, qty, price=price_signal, signal_id=signal_id
+                )
+                if execution_res.get("status") == "SUCCESS":
+                    fill_price = float(
+                        execution_res.get("avg_price") or
+                        self.exchange_lighter.get_mark_price(symbol) or
+                        price_signal
+                    )
+            elif target_exchange == "hyperliquid":
                 if not self.exchange_hl:
                     logger.warning(f"HL client not available, skipping {symbol}")
                     return True
@@ -461,6 +491,13 @@ class Orchestrator:
                     pos_snapshot = self.ledger.get_position(f"{target_exchange}:{symbol}")
 
                 # Place exchange-side stop-loss
+                if not is_exit and target_exchange == "lighter" and self.exchange_lighter:
+                    sl_pct = float(os.getenv("STOP_LOSS_PCT", "3.0"))
+                    sl_res = self.exchange_lighter.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
+                    if sl_res.get("status") == "SUCCESS":
+                        logger.info(f"Lighter SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
+                    else:
+                        logger.warning(f"Lighter SL failed for {symbol}: {sl_res.get('msg')}")
                 if not is_exit and target_exchange == "binance":
                     sl_pct = float(os.getenv("STOP_LOSS_PCT", "3.0"))
                     sl_res = self.exchange_binance.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
@@ -495,7 +532,7 @@ class Orchestrator:
 
                 emoji = "🟢" if side == "BUY" else "🔴"
                 sl_info = ""
-                if not is_exit and target_exchange == "binance":
+                if not is_exit and target_exchange in ("binance", "lighter"):
                     sl_pct_val = float(os.getenv("STOP_LOSS_PCT", "3.0"))
                     sl_price_est = fill_price * (1 - sl_pct_val / 100) if side == "BUY" else fill_price * (1 + sl_pct_val / 100)
                     sl_info = f"\n🛡️ <b>Stop-Loss:</b> <code>${sl_price_est:,.2f}</code> ({sl_pct_val}%)"
