@@ -22,7 +22,10 @@ def dispatch_top_strategies(force=False):
 
     try:
         df = pd.read_csv(report_path)
-        targets = df[df['Daily_ROI_%'] >= 1.2].sort_values(by='Daily_ROI_%', ascending=False)
+        # ── Filter: ONLY ALPHA strategies (NDD >= -30% AND ROI >= 0.5%) ──
+        # BLOCKED strategies are excluded even if ROI looks high
+        alpha_mask = df['Tier'].str.contains('ALPHA', na=False)
+        targets = df[alpha_mask].sort_values(by='Daily_ROI_%', ascending=False)
     except Exception as e:
         print(f"❌ Error: {e}")
         return
