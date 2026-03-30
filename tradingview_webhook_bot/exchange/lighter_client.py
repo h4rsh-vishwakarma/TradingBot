@@ -117,7 +117,12 @@ class LighterClient:
         self.api_key_index = int(os.getenv("LIGHTER_API_KEY_INDEX", "4"))
         self.private_key = os.getenv("LIGHTER_PRIVATE_KEY", "")
         self.api_private_key = os.getenv("LIGHTER_API_PRIVATE_KEY", self.private_key)
-        self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
+        # Lighter-specific override; falls back to global ALLOW_REAL_TRADES
+        lighter_override = os.getenv("LIGHTER_ALLOW_REAL_TRADES", "").strip().lower()
+        if lighter_override in ("true", "false"):
+            self.allow_real = lighter_override == "true"
+        else:
+            self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
         self.max_slippage = float(os.getenv("LIGHTER_MAX_SLIPPAGE", "0.01"))
         self.is_testnet = "testnet" in self.api_url.lower()
 
@@ -361,7 +366,7 @@ class LighterClient:
     def _client_order_index(seed: Optional[str]) -> int:
         raw = seed or str(time.time_ns())
         digest = hashlib.sha256(raw.encode("utf-8")).digest()
-        return int.from_bytes(digest[:8], "big") & ((1 << 63) - 1)
+        return int.from_bytes(digest[:8], "big") & ((1 << 48) - 1)
 
     async def _async_market_order(self, market: MarketSpec, is_buy: bool, base_amount: int, signal_id: Optional[str]):
         return await self.signer.create_market_order_limited_slippage(
