@@ -1,4 +1,4 @@
-import time, logging, os, json, sys, signal as _signal, pandas as pd
+import time, logging, os, json, sys, re, signal as _signal, pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -363,23 +363,37 @@ class Orchestrator:
                 signal_data["symbol"] = symbol
                 signal_data["quantity"] = float(payload_raw.get("quantity") or event.get("quantity") or 0.003)
 
-                raw_price = float(payload_raw.get("price") or event.get("price") or 0.0)
+                signal_price = float(payload_raw.get("price") or event.get("price") or 0.0)
+
+                # ── LIVE PRICE OVERRIDE (always use real Binance price) ──────────
+                # Signal price from TradingView may be wrong/stale/hardcoded.
+                # We ALWAYS fetch live Binance mainnet price and use that.
+                # Signal price is kept only for logging/reference.
                 live_price = self.exchange_binance.get_mainnet_mark_price(symbol)
-                if raw_price <= 0:
-                    if live_price and live_price > 0:
-                        raw_price = live_price
-                        logger.info(f"Resolved missing price for {symbol}: ${raw_price}")
-                    else:
-                        logger.warning(f"Cannot resolve price for {symbol}. Skipping.")
-                        return True
-                elif live_price and live_price > 0:
-                    deviation = abs(raw_price - live_price) / live_price
-                    if deviation > 0.80:
-                        logger.warning(
-                            f"⚠️ Signal price ${raw_price:,.2f} deviates {deviation*100:.0f}% from "
-                            f"market ${live_price:,.2f} for {symbol}. Replacing with market price."
-                        )
-                        raw_price = live_price
+
+                if live_price and live_price > 0:
+                    if signal_price > 0:
+                        deviation = abs(signal_price - live_price) / live_price * 100
+                        if deviation > 5.0:
+                            logger.warning(
+                                f"⚠️ Price override [{symbol}]: signal=${signal_price:,.4f} → "
+                                f"live=${live_price:,.4f} (deviation={deviation:.1f}%)"
+                            )
+                        else:
+                            logger.debug(
+                                f"Price OK [{symbol}]: signal=${signal_price:,.4f} "
+                                f"live=${live_price:,.4f} ({deviation:.1f}% diff)"
+                            )
+                    raw_price = live_price  # ALWAYS use live price
+                elif signal_price > 0:
+                    # Live fetch failed — fallback to signal price with safety check
+                    logger.warning(f"Live price fetch failed for {symbol}. Using signal price ${signal_price:,.4f} as fallback.")
+                    raw_price = signal_price
+                else:
+                    logger.warning(f"Cannot resolve price for {symbol} (no live price, no signal price). Skipping.")
+                    return True
+                # ── END LIVE PRICE OVERRIDE ───────────────────────────────────────
+
                 signal_data["price"] = raw_price
                 signal_data["action"] = str(payload_raw.get("action") or event.get("action") or "BUY").upper()
 
