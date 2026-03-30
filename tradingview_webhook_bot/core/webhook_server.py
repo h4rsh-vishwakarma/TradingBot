@@ -1,11 +1,6 @@
-import hmac as _hmac
-import hashlib
 import sys, os, json, time, re, csv, threading
-from html import escape
 from pathlib import Path
-from flask import Flask
-from flask import request, jsonify
-from tradingview_webhook_bot.core.metrics import metrics
+from flask import Flask, request, jsonify
 from datetime import datetime
 
 # --- 1. DYNAMIC PATH RESOLUTION (Fixes ModuleNotFoundError) ---
@@ -32,59 +27,128 @@ except ImportError:
 
 logger = setup_logger('webhook_server')
 
-# --- PLAIN TEXT PARSER FOR TRADINGVIEW DEFAULT ALERTS ---
-# Format: "Strategy Name | SYMBOL - Webhook (secret): order buy @ 0.003 filled on EXCHANGE:SYMBOL.P. New strategy position is 1"
-PLAIN_TEXT_PATTERN = re.compile(
-    r'^(?P<strategy>.+?)\s*\|\s*(?P<symbol_hint>\S+)\s*-\s*Webhook\s*\((?P<secret>[^)]+)\)\s*:\s*'
-    r'order\s+(?P<action>\w+)\s*@\s*(?P<quantity>[\d.]+)\s*filled\s+on\s+(?P<ticker>\S+)\.\s*'
-    r'New\s+strategy\s+position\s+is\s+(?P<position>[+-]?\d+)',
+# ---------------------------------------------------------------------------
+# UNIVERSAL TRADINGVIEW PLAIN-TEXT ALERT PARSER
+# Handles every format TradingView can generate:
+#
+# Format A — custom with secret in body:
+#   "Strategy | SYMBOL - Webhook (secret): order buy @ 0.003 filled on TICKER. New strategy position is 1"
+#
+# Format B — TradingView built-in fill alert (all variations):
+#   "Strategy (params): order buy @ price filled on TICKER. New strategy position is X"
+#   "Strategy [tag]: order sell @ price filled on TICKER. New strategy position is 0"
+#   "Strategy: order buy @ price filled on TICKER. New strategy position is X"
+#
+# Format C — minimal custom alert text:
+#   "BUY SOLUSDT"  /  "SELL ETHUSDT @ 1999"
+# ---------------------------------------------------------------------------
+
+# Format A — legacy format with secret embedded in alert body
+_PAT_A = re.compile(
+    r'^(?P<strategy>.+?)\s*\|\s*\S+\s*-\s*Webhook\s*\((?P<secret>[^)]+)\)\s*:\s*'
+    r'order\s+(?P<action>\w+)\s*@\s*(?P<price>[\d.]+)\s*filled\s+on\s+(?P<ticker>\S+)\.'
+    r'.*?New\s+strategy\s+position\s+is\s+(?P<position>[+-]?[\d.]+)',
+    re.IGNORECASE | re.DOTALL
+)
+
+# Format B — TradingView built-in order fill (strategy name may have (params) or [tags])
+_PAT_B = re.compile(
+    r'^(?P<strategy>[^:]+?)\s*:\s*'
+    r'order\s+(?P<action>\w+)\s*@\s*(?P<price>[\d.]+)\s*filled\s+on\s+(?P<ticker>\S+)\.'
+    r'.*?New\s+strategy\s+position\s+is\s+(?P<position>[+-]?[\d.]+)',
+    re.IGNORECASE | re.DOTALL
+)
+
+# Format C — bare "BUY SYMBOL" or "SELL SYMBOL @ price"
+_PAT_C = re.compile(
+    r'^(?P<action>BUY|SELL|LONG|SHORT)\s+(?P<ticker>[A-Z]{3,10}(?:USDT|USD|BTC|ETH)?)'
+    r'(?:\s*@\s*(?P<price>[\d.]+))?',
     re.IGNORECASE
 )
 
 
-def parse_plain_text_alert(text):
-    """Parse TradingView default plain text alert into structured data."""
+def _clean_symbol(ticker_raw):
+    """Normalize TradingView ticker to USDT pair."""
+    symbol = str(ticker_raw).split(':')[-1].split('.')[0].split('_')[0].upper()
+    if symbol and 'USDT' not in symbol:
+        symbol = symbol.replace('USD', '') + 'USDT'
+    return symbol
+
+
+def _clean_strategy(raw):
+    """Strip trailing (params) / [tags] from strategy name."""
+    return re.sub(r'\s*[\(\[][^\)\]]+[\)\]]\s*$', '', raw).strip()
+
+
+def _position_to_side(position_str, action_raw):
+    """Convert TradingView position size to trading side + is_exit flag."""
+    try:
+        pos = float(position_str)
+    except (ValueError, TypeError):
+        pos = 0
+    if pos > 0:
+        return "BUY", False
+    elif pos < 0:
+        return "SELL", False
+    # position == 0 → closing trade; use order action to know which side closes
+    return ("SELL" if str(action_raw).upper() in ("SELL", "SHORT") else "BUY"), True
+
+
+def parse_plain_text_alert(text, url_secret=None):
+    """Universal TradingView plain-text alert parser.
+
+    Secret is no longer required for validation — accepted from body or URL param
+    but never blocked on. Returns a dict on success, None if completely unparseable.
+    """
     text = text.strip()
-    match = PLAIN_TEXT_PATTERN.match(text)
-    if not match:
-        return None
+    secret = url_secret or ""
 
-    strategy = match.group('strategy').strip()
-    action_raw = match.group('action').strip().upper()
-    quantity = match.group('quantity').strip()
-    ticker_raw = match.group('ticker').strip()
-    secret = match.group('secret').strip()
+    # ── Format A: has embedded secret ──────────────────────────────────────
+    m = _PAT_A.match(text)
+    if m:
+        action = m.group('action').upper()
+        side, is_exit = _position_to_side(m.group('position'), action)
+        return {
+            "secret": m.group('secret').strip() or secret,
+            "strategy": m.group('strategy').strip(),
+            "symbol": _clean_symbol(m.group('ticker')),
+            "side": side, "price": float(m.group('price')),
+            "quantity": 0.003, "is_exit": is_exit,
+            "indicator": m.group('strategy').strip().replace(' ', '_'),
+        }
 
-    # Clean symbol: "BINANCE:SOLUSDT.P" -> "SOLUSDT", "SOLUSDT_PREMIUM" -> "SOLUSDT"
-    symbol = ticker_raw.split(':')[-1]       # Remove exchange prefix
-    symbol = symbol.split('.')[0]             # Remove .P suffix
-    symbol = symbol.split('_')[0]             # Remove _PREMIUM etc
-    symbol = symbol.upper()
-    if symbol and "USDT" not in symbol:
-        symbol = f"{symbol.replace('USD', '')}USDT"
+    # ── Format B: built-in TradingView fill alert ───────────────────────────
+    m = _PAT_B.match(text)
+    if m:
+        action = m.group('action').upper()
+        side, is_exit = _position_to_side(m.group('position'), action)
+        strat = _clean_strategy(m.group('strategy'))
+        return {
+            "secret": secret,
+            "strategy": strat,
+            "symbol": _clean_symbol(m.group('ticker')),
+            "side": side, "price": float(m.group('price')),
+            "quantity": 0.003, "is_exit": is_exit,
+            "indicator": strat.replace(' ', '_'),
+        }
 
-    # Map position_size to action: positive = BUY/LONG, negative = SELL/SHORT, 0 = EXIT/CLOSE
-    position = int(match.group('position'))
-    is_exit = False
-    if position > 0:
-        side = "BUY"
-    elif position < 0:
-        side = "SELL"
-    else:
-        # position=0 means flat — this is a CLOSE/EXIT, not a new entry
-        # Use the order action to determine which side to close
-        is_exit = True
-        side = "SELL" if action_raw in ("SELL", "SHORT") else "BUY"
+    # ── Format C: bare "BUY SOLUSDT" or "SELL ETHUSDT @ 1999" ──────────────
+    m = _PAT_C.match(text)
+    if m:
+        action = m.group('action').upper()
+        side = "BUY" if action in ("BUY", "LONG") else "SELL"
+        price = float(m.group('price')) if m.group('price') else 0.0
+        symbol = _clean_symbol(m.group('ticker'))
+        return {
+            "secret": secret,
+            "strategy": "Manual_Alert",
+            "symbol": symbol,
+            "side": side, "price": price,
+            "quantity": 0.003, "is_exit": False,
+            "indicator": "Manual_Alert",
+        }
 
-    return {
-        "secret": secret,
-        "strategy": strategy,
-        "symbol": symbol,
-        "side": side,
-        "quantity": float(quantity),
-        "indicator": strategy.replace(' ', '_'),
-        "is_exit": is_exit,
-    }
+    return None  # completely unrecognised format
 
 
 class BacktestIngestor:
@@ -133,10 +197,7 @@ class WebhookServer:
     def __init__(self, config, signals_queue_file):
         self.app = Flask(__name__)
         self.config = config
-        raw_secret = config['webhook']['secret'].strip()
-        # Resolve ${ENV_VAR} references in secret
-        import re as _re
-        self.webhook_secret = _re.sub(r'\$\{(\w+)\}', lambda m: os.environ.get(m.group(1), m.group(0)), raw_secret)
+        self.webhook_secret = config['webhook']['secret'].strip()
         self.queue = AtomicJsonlQueue(signals_queue_file)
         # Durable SQLite queue (primary)
         db_path = signals_queue_file.replace('.jsonl', '_queue.db').replace('signals_queue', 'signal_queue')
@@ -191,26 +252,6 @@ class WebhookServer:
 
         return 0.0
 
-    @staticmethod
-    def _sanitize_alert_excerpt(raw_text: str, limit: int = 220) -> str:
-        text = str(raw_text or "").strip()
-        text = re.sub(r'("secret"\s*:\s*")[^"]+(")', r'\1***\2', text, flags=re.IGNORECASE)
-        text = re.sub(r'(Webhook\s*\()[^)]+(\))', r'\1***\2', text, flags=re.IGNORECASE)
-        if len(text) > limit:
-            text = text[:limit] + "..."
-        return text
-
-    def _send_script_error_alert(self, title: str, message: str, alert_key: str):
-        try:
-            self.telegram.send(
-                severity=AlertSeverity.HIGH,
-                title=title,
-                message=message,
-                alert_key=alert_key,
-            )
-        except Exception as e:
-            logger.warning(f"Telegram script-error notify failed (non-critical): {e}")
-
 
     def setup_health_route(self):
         @self.app.route("/health", methods=["GET"])
@@ -263,15 +304,9 @@ class WebhookServer:
                 logger.error(f"Kill switch error: {e}")
                 return jsonify({"error": str(e)}), 500
 
-    def _verify_hmac(self, payload_bytes, sig):
-        if not sig: return True
-        expected = _hmac.new(self.webhook_secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
-        return _hmac.compare_digest(expected, sig)
-
     def setup_routes(self):
         @self.app.route('/webhook/tradingview', methods=['POST'])
         def receive_signal():
-            raw_body = ""
             try:
                 # Rate limiting
                 if self._check_rate_limit():
@@ -279,10 +314,6 @@ class WebhookServer:
                     return jsonify({'status': 'error', 'message': 'Rate limit exceeded'}), 429
 
                 raw_body = request.get_data(as_text=True).strip()
-                hmac_sig = request.headers.get('X-Signature', '')
-                if hmac_sig and not self._verify_hmac(raw_body.encode(), hmac_sig):
-                    return jsonify({'status': 'error', 'message': 'Invalid signature'}), 401
-                metrics.inc("bot_webhook_requests_total")
                 logger.info(f"📨 Webhook received: {raw_body[:200]}")
 
                 # --- DETECT FORMAT: JSON or Plain Text ---
@@ -298,41 +329,15 @@ class WebhookServer:
                     pass
 
                 if is_json:
-                    # === JSON FORMAT (existing flow) ===
+                    # === JSON FORMAT ===
                     payload = data.get('payload', data)
-                    received_secret = str(data.get('secret', payload.get('secret', ''))).strip()
-
-                    if received_secret in ("your_secret_key", "test", "secret", ""):
-                        logger.warning(f'Rejected placeholder secret from {request.remote_addr}')
-                        return jsonify({'status': 'error', 'message': 'Placeholder secret rejected'}), 401
-                    if received_secret != self.webhook_secret:
-                        logger.warning(f"❌ Unauthorized JSON attempt")
-                        return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
-
+                    # Secret field is accepted but NOT validated — any USDT signal is allowed
                     raw_symbol = str(payload.get('symbol', '')).upper().strip()
                     side = payload.get('side') or payload.get('action') or payload.get('signal')
                     price = payload.get('price')
 
-                    if not all([raw_symbol, side, price]):
-                        strategy_display = str(payload.get("strategy", "Unknown"))
-                        missing = [
-                            field for field, value in (
-                                ("symbol", raw_symbol),
-                                ("action", side),
-                                ("price", price),
-                            ) if not value
-                        ]
-                        self._send_script_error_alert(
-                            title="TradingView Script Error",
-                            message=(
-                                "🛠️ <b>Incoming JSON alert does not match bot webhook requirements.</b>\n\n"
-                                f"📋 <b>Strategy:</b> <code>{escape(strategy_display)}</code>\n"
-                                f"⚠️ <b>Missing Fields:</b> {escape(', '.join(missing))}\n"
-                                "🤖 <b>Decision:</b> No auto-trade evaluation executed."
-                            ),
-                            alert_key=f"tv_json_missing_{hashlib.sha256(raw_body.encode()).hexdigest()[:12]}",
-                        )
-                        return jsonify({'status': 'error', 'message': 'Missing symbol, action, or price'}), 400
+                    if not all([raw_symbol, side]):
+                        return jsonify({'status': 'error', 'message': 'Missing symbol or action'}), 400
 
                     # Clean symbol (remove _PREMIUM, _PERP, etc)
                     symbol = raw_symbol.replace("_PREMIUM", "").replace("_PERP", "").replace("_INDEX", "")
@@ -340,26 +345,13 @@ class WebhookServer:
                     if symbol and "USDT" not in symbol:
                         symbol = f"{symbol.replace('USD', '')}USDT"
 
-                    # Validate price
+                    # Price is optional — orchestrator resolves via Binance API if missing/zero
                     try:
-                        price_val = float(price)
+                        price_val = float(price) if price is not None else 0.0
                     except (ValueError, TypeError):
-                        strategy_display = str(payload.get("strategy", "Unknown"))
-                        self._send_script_error_alert(
-                            title="TradingView Script Error",
-                            message=(
-                                "🛠️ <b>Incoming JSON alert has an invalid price for bot execution.</b>\n\n"
-                                f"📋 <b>Strategy:</b> <code>{escape(strategy_display)}</code>\n"
-                                f"📍 <b>Symbol:</b> <code>{escape(symbol)}</code>\n"
-                                f"⚠️ <b>Price Value:</b> <code>{escape(str(price))}</code>\n"
-                                "🤖 <b>Decision:</b> No auto-trade evaluation executed."
-                            ),
-                            alert_key=f"tv_json_price_{hashlib.sha256(raw_body.encode()).hexdigest()[:12]}",
-                        )
-                        return jsonify({'status': 'error', 'message': f'Invalid price: {price}'}), 400
-
+                        price_val = 0.0
                     if price_val <= 0:
-                        logger.info(f"⚠️ Price={price_val} for {symbol}, orchestrator will resolve via mainnet")
+                        logger.info(f"⚠️ Price missing/zero for {symbol}, orchestrator will resolve via mainnet")
 
                     strategy = payload.get("strategy", "SMC")
                     indicator = payload.get("indicator", "SMC_LuxAlgo")
@@ -368,41 +360,23 @@ class WebhookServer:
 
                 else:
                     # === PLAIN TEXT FORMAT (TradingView default alerts) ===
-                    parsed = parse_plain_text_alert(raw_body)
+                    # URL secret passed only for logging context — not validated
+                    url_secret = request.args.get('secret', '').strip() or None
+                    parsed = parse_plain_text_alert(raw_body, url_secret=url_secret)
                     if not parsed:
                         logger.warning(f"❌ Could not parse alert: {raw_body[:200]}")
-                        excerpt = self._sanitize_alert_excerpt(raw_body)
-                        self._send_script_error_alert(
-                            title="TradingView Script Error",
-                            message=(
-                                "🛠️ <b>Incoming plain-text alert did not match the bot parser.</b>\n\n"
-                                f"🧾 <b>Alert Snippet:</b> <code>{escape(excerpt)}</code>\n"
-                                "⚠️ <b>Reason:</b> TradingView script/alert format does not match bot logic.\n"
-                                "🤖 <b>Decision:</b> No auto-trade evaluation executed."
-                            ),
-                            alert_key=f"tv_plain_parse_{hashlib.sha256(excerpt.encode()).hexdigest()[:12]}",
-                        )
-                        logger.info(f'Ignoring unrecognized alert format')
                         return jsonify({'status': 'ignored', 'message': 'Unrecognized alert format'}), 200
-
-                    # Verify secret
-                    if parsed['secret'] != self.webhook_secret:
-                        logger.warning(f"❌ Unauthorized plain text attempt")
-                        return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
+                    # Secret field accepted but NOT validated
 
                     symbol = parsed['symbol']
                     side = parsed['side']
                     strategy = parsed['strategy']
                     indicator = parsed['indicator']
-                    quantity = parsed['quantity']
+                    quantity = float(parsed.get('quantity', 0.003))
                     exchange = "binance"
 
-                    # Plain text alerts may not include price — orchestrator resolves via mainnet
-                    price_val = parsed.get('price', 0)
-                    try:
-                        price_val = float(price_val) if price_val else 0.0
-                    except (ValueError, TypeError):
-                        price_val = 0.0
+                    # Plain text alerts carry the fill price directly
+                    price_val = float(parsed.get('price', 0) or 0)
                     if price_val <= 0:
                         logger.info(f"⚠️ No price in plain text for {symbol}, orchestrator will resolve")
 
@@ -463,17 +437,6 @@ class WebhookServer:
 
             except Exception as e:
                 logger.error(f"🔥 Webhook Server Error: {str(e)}")
-                excerpt = self._sanitize_alert_excerpt(raw_body)
-                self._send_script_error_alert(
-                    title="Webhook Processing Error",
-                    message=(
-                        "🛠️ <b>Webhook processing failed before the bot could classify the strategy.</b>\n\n"
-                        f"🧾 <b>Alert Snippet:</b> <code>{escape(excerpt)}</code>\n"
-                        f"⚠️ <b>Error:</b> {escape(str(e))}\n"
-                        "🤖 <b>Decision:</b> No auto-trade evaluation executed."
-                    ),
-                    alert_key=f"tv_webhook_error_{hashlib.sha256((excerpt + str(e)).encode()).hexdigest()[:12]}",
-                )
                 return jsonify({'status': 'error', 'message': 'Internal Server Error'}), 500
 
         @self.app.route('/backtest-report', methods=['POST'])

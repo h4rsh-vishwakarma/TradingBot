@@ -33,13 +33,7 @@ def cmd_help(message):
         "🤖 <b>Alpha Engine v10.0 — Command Center</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
-        "🚀 <b>/alpha</b> — Deploy all ALPHA scripts to Telegram\n"
-        "📊 <b>/winners</b> — Quick leaderboard summary (all tiers)\n"
-        "🏆 <b>/top5</b> — Top 5 strategies with full details\n"
-        "⚖️ <b>/average</b> — AVERAGE tier strategies\n"
-        "🔍 <b>/strategy</b> &lt;name&gt; — Search strategy by name\n"
-        "💵 <b>/pnl</b> — Today's P&amp;L and open positions\n"
-        "📊 <b>/categories</b> — Strategy risk categories (High vs Safe)\n"
+        "🚀 <b>/alpha</b>\n"
         "   Deploy top Alpha++ strategies to Telegram.\n"
         "   Pine Script + Stats (ROI, Gross DD, Net DD).\n"
         "   Auto-runs daily 9 AM UTC via cron.\n\n"
@@ -116,209 +110,8 @@ def cmd_alpha(message):
     )
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# /winners — Quick Summary of ALL strategies (no scripts)
+# /audit — Tournament Leaderboard
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-@bot.message_handler(commands=['winners'])
-def cmd_winners(message):
-    try:
-        import pandas as pd
-        report = PROJECT_ROOT / "storage/reports/tournament_winners.csv"
-        df = pd.read_csv(report)
-
-        # Count by tier
-        alpha_pp = df[df['Tier'].str.contains('ALPHA\\+\\+', na=False)]
-        alpha = df[df['Tier'].str.contains('ALPHA', na=False) & ~df['Tier'].str.contains('ALPHA\\+\\+', na=False)]
-        average = df[df['Tier'].str.contains('AVERAGE', na=False)]
-        reject = df[df['Tier'].str.contains('REJECT', na=False)]
-
-        msg = "📊 <b>TOURNAMENT LEADERBOARD</b>\n"
-        msg += "━━━━━━━━━━━━━━━━━━\n\n"
-        msg += f"🚀 <b>ALPHA++:</b> {len(alpha_pp)} strategies\n"
-        msg += f"🎯 <b>ALPHA:</b> {len(alpha)} strategies\n"
-        msg += f"⚖️ <b>AVERAGE:</b> {len(average)} strategies\n"
-        msg += f"💀 <b>REJECT:</b> {len(reject)} strategies\n"
-        msg += f"📈 <b>Total:</b> {len(df)} strategies\n\n"
-
-        # Top 10 summary
-        msg += "<b>TOP 10 STRATEGIES:</b>\n"
-        for i, (_, r) in enumerate(df.head(10).iterrows()):
-            tier_emoji = "🚀" if "ALPHA++" in str(r.get('Tier','')) else "🎯"
-            msg += f"{tier_emoji} #{i+1} {r['Symbol']} | {str(r['Strategy'])[:30]} | ROI: {r['Daily_ROI_%']:.2f}%\n"
-
-        msg += "\n<i>Use /alpha for full scripts | /top5 for details | /average for AVERAGE tier</i>"
-        bot.reply_to(message, msg, parse_mode='HTML')
-    except Exception as e:
-        bot.reply_to(message, f"❌ Error: {e}")
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# /top5 — Top 5 with full details (no scripts)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-@bot.message_handler(commands=['top5'])
-def cmd_top5(message):
-    try:
-        import pandas as pd
-        report = PROJECT_ROOT / "storage/reports/tournament_winners.csv"
-        df = pd.read_csv(report)
-
-        msg = "🏆 <b>TOP 5 STRATEGIES</b>\n"
-        msg += "━━━━━━━━━━━━━━━━━━\n\n"
-
-        for i, (_, r) in enumerate(df.head(5).iterrows()):
-            tier = str(r.get('Tier', ''))
-            msg += f"<b>#{i+1} {r['Strategy']}</b>\n"
-            msg += f"  📊 Symbol: {r['Symbol']}\n"
-            msg += f"  📈 Daily ROI: {r['Daily_ROI_%']:.3f}%\n"
-            _gdd = r.get('Gross_DD_%', 0)
-            _gdd_cap = int(float(r.get('GDD_Capital_Left', 0))) or int(round(100000 * (1 + float(_gdd) / 100)))
-            _ndd = r.get('Net_DD_%', 0)
-            _ndd_cap = int(float(r.get('NDD_Capital_Left', 0))) or int(round(100000 * (1 + float(_ndd) / 100)))
-            msg += f"  📉 Gross DD: {_gdd:.2f}%\n"
-            msg += f"     📅 {r.get('GDD_Date', 'N/A')} | 💰 ${_gdd_cap:,} / $100K left\n"
-            msg += f"  📉 Net DD: {_ndd:.2f}%\n"
-            msg += f"     📅 {r.get('NDD_Date', 'N/A')} | 💰 ${_ndd_cap:,} / $100K left\n"
-            msg += f"  🎯 Win Rate: {r.get('Win_Rate_%', 0):.1f}%\n"
-            msg += f"  📐 Sharpe: {r.get('Sharpe_Ratio', 0):.2f}\n"
-            msg += f"  🔄 Trades: {int(r.get('Total_Trades', 0))}\n"
-            msg += f"  🏷️ Tier: {tier}\n"
-            msg += f"  ⚙️ Params: Len={int(r.get('Optimal_Len', 0))}, Mult={r.get('Optimal_Mult', 0):.2f}\n\n"
-
-        msg += "<i>Use /alpha for full Pine scripts</i>"
-        bot.reply_to(message, msg, parse_mode='HTML')
-    except Exception as e:
-        bot.reply_to(message, f"❌ Error: {e}")
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# /average — AVERAGE tier strategies with scripts
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-@bot.message_handler(commands=['average'])
-def cmd_average(message):
-    try:
-        import pandas as pd
-        report = PROJECT_ROOT / "storage/reports/tournament_winners.csv"
-        df = pd.read_csv(report)
-        avg = df[df['Tier'].str.contains('AVERAGE', na=False)].head(10)
-
-        if avg.empty:
-            bot.reply_to(message, "No AVERAGE strategies found.")
-            return
-
-        msg = "⚖️ <b>AVERAGE TIER STRATEGIES (Top 10)</b>\n"
-        msg += "━━━━━━━━━━━━━━━━━━\n\n"
-
-        for i, (_, r) in enumerate(avg.iterrows()):
-            msg += f"#{i+1} {r['Symbol']} | {str(r['Strategy'])[:35]}\n"
-            msg += f"  ROI: {r['Daily_ROI_%']:.3f}% | WR: {r.get('Win_Rate_%', 0):.1f}% | DD: {r.get('Gross_DD_%', 0):.1f}%\n\n"
-
-        msg += f"<i>Total AVERAGE: {len(df[df['Tier'].str.contains('AVERAGE', na=False)])} strategies</i>\n"
-        msg += "<i>Use /average-scripts to get Pine scripts for these</i>"
-        bot.reply_to(message, msg, parse_mode='HTML')
-    except Exception as e:
-        bot.reply_to(message, f"❌ Error: {e}")
-
-@bot.message_handler(commands=['average_scripts'])
-def cmd_average_scripts(message):
-    bot.reply_to(message, "⚖️ <b>Deploying AVERAGE tier scripts...</b>\nTop 15 incoming.", parse_mode='HTML')
-    subprocess.Popen(
-        [sys.executable, str(PROJECT_ROOT / "tradingview_webhook_bot/core/script_vault.py"), "--average"],
-        cwd=str(PROJECT_ROOT)
-    )
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# /strategy <name> — Search specific strategy
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-@bot.message_handler(commands=['strategy'])
-def cmd_strategy_search(message):
-    try:
-        import pandas as pd
-        query = message.text.replace('/strategy', '').strip().lower()
-        if not query:
-            bot.reply_to(message, "Usage: /strategy <name>\nExample: /strategy ema cloud")
-            return
-
-        report = PROJECT_ROOT / "storage/reports/tournament_winners.csv"
-        df = pd.read_csv(report)
-        matches = df[df['Strategy'].str.lower().str.contains(query, na=False)]
-
-        if matches.empty:
-            bot.reply_to(message, f"❌ No strategy found matching '{query}'")
-            return
-
-        msg = f"🔍 <b>Search: '{query}'</b> — {len(matches)} results\n\n"
-        for i, (_, r) in enumerate(matches.head(10).iterrows()):
-            tier = str(r.get('Tier', ''))
-            tier_emoji = "🚀" if "ALPHA++" in tier else "🎯" if "ALPHA" in tier else "⚖️" if "AVERAGE" in tier else "💀"
-            msg += f"{tier_emoji} {r['Symbol']} | {r['Strategy']}\n"
-            msg += f"  ROI: {r['Daily_ROI_%']:.3f}% | WR: {r.get('Win_Rate_%',0):.1f}% | Sharpe: {r.get('Sharpe_Ratio',0):.2f} | {tier}\n\n"
-
-        bot.reply_to(message, msg, parse_mode='HTML')
-    except Exception as e:
-        bot.reply_to(message, f"❌ Error: {e}")
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        "💵 <b>/pnl</b> — Today's P&amp;L and open positions\n"
-        "📊 <b>/categories</b> — Strategy risk categories (High vs Safe)\n"
-@bot.message_handler(commands=['pnl'])
-def cmd_pnl(message):
-    try:
-        import json
-        ledger_path = PROJECT_ROOT / "tradingview_webhook_bot/storage/ledger_state.json"
-        with open(ledger_path) as f:
-            state = json.load(f)
-
-        daily_pnl = state.get('daily_pnl', 0)
-        positions = state.get('positions', {})
-        open_pos = {k: v for k, v in positions.items() if v.get('quantity', 0) != 0}
-
-        msg = "💵 <b>TODAY'S PERFORMANCE</b>\n"
-        msg += "━━━━━━━━━━━━━━━━━━\n\n"
-        msg += f"📈 <b>Daily PnL:</b> <code>${daily_pnl:.2f}</code>\n"
-        msg += f"📊 <b>Open Positions:</b> {len(open_pos)}\n\n"
-
-        if open_pos:
-            msg += "<b>Open Positions:</b>\n"
-            for key, pos in open_pos.items():
-                qty = pos.get('quantity', 0)
-                avg = pos.get('avg_price', 0)
-                side = "LONG" if qty > 0 else "SHORT"
-                msg += f"  {'🟢' if qty > 0 else '🔴'} {key} | {side} {abs(qty):.4f} @ ${avg:.2f}\n"
-
-        bot.reply_to(message, msg, parse_mode='HTML')
-    except Exception as e:
-        bot.reply_to(message, f"❌ Error: {e}")
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-@bot.message_handler(commands=["categories"])
-# /categories — Strategy risk categories
-def cmd_categories(message):
-    try:
-        import pandas as pd
-        df = pd.read_csv('storage/reports/tournament_winners.csv')
-        cat1 = df[(df['Daily_ROI_%'] >= 1.5) & (df['Net_DD_%'].abs() >= 75)].sort_values('Daily_ROI_%', ascending=False)
-        cat2 = df[df['Daily_ROI_%'] > 0].sort_values('Net_DD_%', ascending=False).head(10)
-        lines = ["STRATEGY CATEGORIES", "=" * 20, ""]
-        lines.append("CAT 1: HIGH RETURN + HIGH RISK")
-        lines.append("(ROI >1.5%/day, DD >75%)")
-        lines.append("")
-        for _, r in cat1.head(5).iterrows():
-            nd = abs(r['Net_DD_%'])
-            cap = int(10000 * (1 - nd/100))
-            lines.append("  %s | %s" % (r['Symbol'], str(r['Strategy'])[:28]))
-            lines.append("  ROI: %.2f%% | DD: %.1f%% | Worst: $%d" % (r['Daily_ROI_%'], nd, cap))
-            lines.append("")
-        lines.append("CAT 2: SAFE + STEADY")
-        lines.append("(Lowest DD, capital >$8,000)")
-        lines.append("")
-        for _, r in cat2.head(5).iterrows():
-            nd = abs(r['Net_DD_%'])
-            cap = int(10000 * (1 - nd/100))
-            lines.append("  %s | %s" % (r['Symbol'], str(r['Strategy'])[:28]))
-            lines.append("  ROI: %.2f%% | DD: %.1f%% | Worst: $%d" % (r['Daily_ROI_%'], nd, cap))
-            lines.append("")
-        lines.append("Cat 1: %d | Cat 2: %d strategies" % (len(cat1), len(cat2)))
-        bot.send_message(message.chat.id, chr(10).join(lines))
-    except Exception as e:
-        bot.send_message(message.chat.id, "Error: %s" % str(e))
-
 @bot.message_handler(commands=['audit'])
 def cmd_audit(message):
     if not os.path.exists(REPORT_PATH):
@@ -331,28 +124,32 @@ def cmd_audit(message):
 
         for i, row in df.iterrows():
             symbol = row['Symbol']
-            strat = str(row['Strategy'])[:30]
+            strat = str(row['Strategy'])[:35]
             roi = round(row['Daily_ROI_%'], 3)
             gross_dd = round(row.get('Gross_DD_%', row.get('Max_DD_%', 0)), 2)
             net_dd = round(row.get('Net_DD_%', gross_dd), 2)
-            gdd_date = row.get('GDD_Date', 'N/A')
-            gdd_capital = int(float(row.get('GDD_Capital_Left', 0))) or int(round(100000 * (1 + gross_dd / 100)))
-            ndd_date = row.get('NDD_Date', 'N/A')
-            ndd_capital = int(float(row.get('NDD_Capital_Left', 0))) or int(round(100000 * (1 + net_dd / 100)))
             tier = row.get('Tier', 'N/A')
-
             win_rate = round(row.get('Win_Rate_%', 0), 1)
             sharpe = round(row.get('Sharpe_Ratio', 0), 2)
+            total_trades = int(row.get('Total_Trades', 0))
+            params_str = f"Mult: {round(float(row.get('Optimal_Mult', 0)), 2)} | Len: {int(row.get('Optimal_Len', 0))}"
+            gdd_date = row.get('Gross_DD_Date', 'N/A')
+            ndd_date = row.get('Net_DD_Date', 'N/A')
+            gdd_cap = row.get('Gross_DD_Capital_Left', None)
+            ndd_cap = row.get('Net_DD_Capital_Left', None)
+            gdd_cap_str = f"${gdd_cap:,.0f}" if gdd_cap is not None and str(gdd_cap) not in ('', 'nan') else "N/A"
+            ndd_cap_str = f"${ndd_cap:,.0f}" if ndd_cap is not None and str(ndd_cap) not in ('', 'nan') else "N/A"
 
             lines.append(
                 f"\n<b>#{i+1}</b> {tier}\n"
-                f"   {symbol} | {strat}\n"
-                f"   📈 ROI: <code>{roi}%</code>/day\n"
-                f"   📉 Gross DD: <code>{gross_dd}%</code>\n"
-                f"      📅 {gdd_date} | 💰 ${gdd_capital:,} / $100K left\n"
-                f"   📉 Net DD: <code>{net_dd}%</code>\n"
-                f"      📅 {ndd_date} | 💰 ${ndd_capital:,} / $100K left\n"
-                f"   🎯 Win: <code>{win_rate}%</code> | Sharpe: <code>{sharpe}</code>"
+                f"   <b>Symbol:</b> {symbol} | <b>Strategy:</b> {strat}\n"
+                f"   📈 <b>Daily ROI:</b> <code>{roi}%</code>/day\n"
+                f"   📉 <b>Gross DD:</b> <code>{gross_dd}%</code> (Compounding) | Date: {gdd_date} | Capital Left: {gdd_cap_str}\n"
+                f"   📉 <b>Net DD:</b> <code>{net_dd}%</code> (Fixed Size) | Date: {ndd_date} | Capital Left: {ndd_cap_str}\n"
+                f"   🎯 <b>Win Rate:</b> <code>{win_rate}%</code> | <b>Sharpe:</b> <code>{sharpe}</code>\n"
+                f"   🔄 <b>Total Trades:</b> <code>{total_trades}</code>\n"
+                f"   ⚙️ <b>Params:</b> {params_str}\n"
+                f"   🛡️ <b>ADX &gt; 25:</b> ON | <b>Trailing Stop:</b> 4%"
             )
 
         bot.send_message(message.chat.id, "\n".join(lines), parse_mode='HTML')
@@ -411,5 +208,5 @@ def cmd_trade(message):
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if __name__ == "__main__":
-    print('Telegram Listener starting...')
-    bot.infinity_polling(timeout=60, long_polling_timeout=60)
+    print("🛰️ Telegram Listener Active — All commands: /help /alpha /status /audit /buy /sell /override")
+    bot.infinity_polling()

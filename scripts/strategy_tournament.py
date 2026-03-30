@@ -1,65 +1,17 @@
-import gc
+import pandas as pd
+import numpy as np
 import glob
 import os
-import sys
-from pathlib import Path
+import gc
+from my_strategies import apply_strategy
 
-import numpy as np
-import pandas as pd
-from dotenv import load_dotenv
+INITIAL_CAPITAL = 10_000  # $10K starting capital for capital-remaining calculations
 
-FILE_PATH = Path(__file__).resolve()
-PROJECT_ROOT = FILE_PATH.parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-ENV_VARS_PATH = "/etc/tradingbot/env_vars"
-if os.path.exists(ENV_VARS_PATH):
-    load_dotenv(dotenv_path=ENV_VARS_PATH, override=True)
-
-from scripts.my_strategies import apply_strategy
-from tradingview_webhook_bot.alerts.telegram_alerts import AlertSeverity, TelegramAlert
-from tradingview_webhook_bot.tournament_rules import (
-    AUTO_TRADE_MAX_NET_DD,
-    AUTO_TRADE_MIN_DAILY_ROI,
-    apply_tournament_rules,
-    build_tournament_change_message,
-)
-
-
-def _load_previous_report(report_path):
-    if not os.path.exists(report_path):
-        return None
-    try:
-        return pd.read_csv(report_path)
-    except Exception:
-        return None
-
-
-def _notify_tournament_changes(previous_df, current_df):
-    message = build_tournament_change_message(
-        previous_df=previous_df,
-        current_df=current_df,
-        source_label="Tournament Auto-Trade Update",
-    )
-    if not message:
-        return
-
-    try:
-        telegram = TelegramAlert()
-        telegram.send(
-            severity=AlertSeverity.INFO,
-            title="Tournament Rule Change",
-            message=message,
-        )
-    except Exception as exc:
-        print(f"Telegram notification skipped: {exc}")
 
 def strategy_tournament():
     PINE_FOLDER = '/home/ubuntu/tradingview_webhook_bot/backtesting/pine/'
     DATA_FILES = glob.glob('/home/ubuntu/tradingview_webhook_bot/storage/backtest_data/*_3y_15m.csv')
     REPORT_PATH = '/home/ubuntu/tradingview_webhook_bot/storage/reports/tournament_winners.csv'
-    previous_report = _load_previous_report(REPORT_PATH)
 
     all_files = sorted([f for f in os.listdir(PINE_FOLDER) if os.path.isfile(os.path.join(PINE_FOLDER, f))])
     results = []
@@ -76,11 +28,7 @@ def strategy_tournament():
         {'mult': 4.0, 'len': 26}   # Macro Trend
     ]
 
-    print(
-        "🔥 TOURNAMENT AUTO-TRADE MODE: "
-        f"ROI >= {AUTO_TRADE_MIN_DAILY_ROI:.1f}% | Net DD <= {AUTO_TRADE_MAX_NET_DD:.0f}% "
-        f"| Scanning {len(all_files)} Strategies..."
-    )
+    print(f"🔥 ALPHA AGGRESSOR MODE: Target 2% Daily ROI | Scanning {len(all_files)} Strategies...")
 
     for data_file in DATA_FILES:
         symbol = os.path.basename(data_file).split('_')[0]
@@ -98,14 +46,14 @@ def strategy_tournament():
                 e_mult = params['mult'] + (idx * 0.01)
                 e_len = params['len'] + (idx % 3)
 
-                daily, gross_dd, net_dd, win_rate, sharpe, trades, status, gdd_date, ndd_date, gdd_cap, ndd_cap = run_test(df_raw, clean_name, True, e_mult, e_len)
+                daily, gross_dd, net_dd, win_rate, sharpe, trades, status, gdd_date, ndd_date = run_test(df_raw, clean_name, True, e_mult, e_len)
 
                 if daily > best_daily and status != "💀 ERROR":
                     best_daily = daily
-                    best_res = (daily, gross_dd, net_dd, win_rate, sharpe, trades, status, {'mult': e_mult, 'len': e_len}, gdd_date, ndd_date, gdd_cap, ndd_cap)
+                    best_res = (daily, gross_dd, net_dd, win_rate, sharpe, trades, status, {'mult': e_mult, 'len': e_len}, gdd_date, ndd_date)
 
             if best_res:
-                daily_roi, gross_dd, net_dd, win_rate, sharpe, trades, tier, opt_p, gdd_date, ndd_date, gdd_cap, ndd_cap = best_res
+                daily_roi, gross_dd, net_dd, win_rate, sharpe, trades, tier, opt_p, gdd_date, ndd_date = best_res
 
                 # Out-of-sample validation (80/20 split)
                 oos_roi, oos_dd, oos_sharpe = 0.0, 0.0, 0.0
@@ -128,10 +76,6 @@ def strategy_tournament():
                         "Gross_DD_%": round(gross_dd, 2),
                         "Net_DD_%": round(net_dd, 2),
                         "Max_DD_%": round(gross_dd, 2),
-                        "GDD_Date": gdd_date,
-                        "GDD_Capital_Left": int(gdd_cap),
-                        "NDD_Date": ndd_date,
-                        "NDD_Capital_Left": int(ndd_cap),
                         "Win_Rate_%": win_rate,
                         "Sharpe_Ratio": sharpe,
                         "Total_Trades": trades,
@@ -141,24 +85,18 @@ def strategy_tournament():
                         "OOS_Daily_ROI_%": round(oos_roi, 3),
                         "OOS_Gross_DD_%": round(oos_dd, 2),
                         "OOS_Sharpe": round(oos_sharpe, 2),
+                        "Gross_DD_Date": gdd_date,
+                        "Net_DD_Date": ndd_date,
+                        "Gross_DD_Capital_Left": round(INITIAL_CAPITAL * (1 + gross_dd / 100), 2),
+                        "Net_DD_Capital_Left": round(INITIAL_CAPITAL * (1 + net_dd / 100), 2),
                     })
             gc.collect()
 
     final_df = pd.DataFrame(results).sort_values(by=["Daily_ROI_%"], ascending=False)
-    final_df = apply_tournament_rules(final_df)
     final_df.to_csv(REPORT_PATH, index=False)
-
-    _notify_tournament_changes(previous_report, final_df)
-
-    eligible_df = final_df[final_df["Auto_Trade_Eligible"] == "YES"].sort_values(
-        by=["Daily_ROI_%"], ascending=False
-    )
-    print(
-        "\n🎯 --- AUTO-TRADE ELIGIBLE STRATEGIES "
-        f"(ROI >= {AUTO_TRADE_MIN_DAILY_ROI:.1f}% | Net DD <= {AUTO_TRADE_MAX_NET_DD:.0f}%) --- 🎯"
-    )
-    print(eligible_df.head(15).to_string(index=False))
-    return final_df
+    
+    print("\n🚀 --- TOP ALPHA STRATEGIES (TARGET 2% DAILY) --- 🚀")
+    print(final_df.head(15).to_string(index=False))
 
 def run_test_oos(df_raw, name, mult, length, train_pct=0.8):
     """Run test with train/test split for out-of-sample validation."""
@@ -168,66 +106,31 @@ def run_test_oos(df_raw, name, mult, length, train_pct=0.8):
     df_train['pct'] = df_train['close'].pct_change()
     df_test['pct'] = df_test['close'].pct_change()
 
-    # Optimize on train set
-    train_result = run_test(df_train, name, True, mult, length)[:7]
-    # Validate on test set (same params, no re-optimization)
-    test_result = run_test(df_test, name, True, mult, length)[:7]
+    train_result = run_test(df_train, name, True, mult, length)
+    test_result = run_test(df_test, name, True, mult, length)
     return train_result, test_result
 
 
 def run_test(df_raw, name, optimize, mult, length):
     df = df_raw.copy()
 
-    # 🛡️ OPTIMIZED RISK PARAMETERS — Target NDD < -50%
-    LEVERAGE = 1.0              # No leverage (was 2.5x — #1 cause of -96% DD)
-    STOP_LOSS = 0.01            # 1% SL per bar (was 2%)
-    TAKE_PROFIT = 0.03          # 3% TP per bar (was 6%) — maintains 1:3 RR
-    MAX_DAILY_LOSS = -0.03      # Circuit breaker: -3% max loss per day
-    COOLDOWN_TRIGGER = 3        # Go flat after 3 consecutive losses
-    COOLDOWN_BARS = 4           # Skip 4 bars (1 hour on 15m data)
+    LEVERAGE = 2.5 if optimize else 1.0
+    STOP_LOSS = 0.02   # 2% SL
+    TAKE_PROFIT = 0.06 # 6% TP
 
     try:
         df['sig'] = apply_strategy(df, name, optimize, mult, length)
 
-        # 🛡️ FILTER 1: ADX > 20 (relaxed from 25 to capture moderate trends)
-        from scripts.my_strategies import calculate_adx
+        # 🛡️ ADX > 25 FILTER IN BACKTEST (matches Pine Script logic)
+        # Pehle sirf Pine template mein tha, ab backtest mein bhi lagega
+        # Isse choppy market trades hata ke DD significantly drop hoga
+        from my_strategies import calculate_adx
         adx = calculate_adx(df, n=14)
-        df['sig'] = np.where(adx > 20, df['sig'], 0)
+        df['sig'] = np.where(adx > 25, df['sig'], 0)  # Kill signals in weak trends
 
-        # 🛡️ FILTER 2: ATR Volatility — skip abnormally volatile periods
-        atr_14 = (df['high'] - df['low']).rolling(14).mean()
-        atr_ma = atr_14.rolling(100).mean()
-        df['sig'] = np.where(atr_14 > 2 * atr_ma, 0, df['sig'])
-
-        # Calculate daily returns
+        # Calculate daily returns (NON-COMPOUNDING to prevent e+22)
         df['daily_ret'] = df['sig'].shift(1) * df['pct'] * LEVERAGE
         df['daily_ret'] = df['daily_ret'].clip(lower=-STOP_LOSS, upper=TAKE_PROFIT)
-
-        # 🛡️ FILTER 3: Consecutive loss cooldown
-        # After COOLDOWN_TRIGGER consecutive losses, skip COOLDOWN_BARS bars
-        rets = df['daily_ret'].values.copy()
-        consec_losses = 0
-        skip_remaining = 0
-        for i in range(len(rets)):
-            if skip_remaining > 0:
-                rets[i] = 0.0
-                skip_remaining -= 1
-                continue
-            if rets[i] < 0:
-                consec_losses += 1
-                if consec_losses >= COOLDOWN_TRIGGER:
-                    skip_remaining = COOLDOWN_BARS
-                    consec_losses = 0
-            else:
-                consec_losses = 0
-        df['daily_ret'] = rets
-
-        # 🛡️ FILTER 4: Daily loss circuit breaker (-3% max per day)
-        if 'timestamp' in df.columns:
-            df['_date'] = pd.to_datetime(df['timestamp']).dt.date
-            df['_daily_cum'] = df.groupby('_date')['daily_ret'].cumsum()
-            df.loc[df['_daily_cum'] < MAX_DAILY_LOSS, 'daily_ret'] = 0.0
-            df.drop(columns=['_date', '_daily_cum'], inplace=True)
 
         # 📊 ROI Calculation
         total_days = 1095
@@ -236,22 +139,18 @@ def run_test(df_raw, name, optimize, mult, length):
 
         # 📉 GROSS DD: Compounding (peak-to-trough equity curve)
         cum_res = (1 + df['daily_ret'].fillna(0)).cumprod()
-        gross_dd_series = ((cum_res - cum_res.cummax()) / cum_res.cummax()) * 100
+        gross_dd_series = (cum_res - cum_res.cummax()) / cum_res.cummax() * 100
         gross_dd = gross_dd_series.min()
-        gross_dd_idx = gross_dd_series.idxmin()
-        gross_dd_date = str(df['timestamp'].iloc[gross_dd_idx])[:10] if 'timestamp' in df.columns and gross_dd_idx < len(df) else "N/A"
-        # Capital left after gross DD (compounding): start * (1 + dd/100)
-        gross_dd_capital = round(100000 * (1 + gross_dd / 100), 0)
+        _gdd_idx = gross_dd_series.values.argmin()
+        gross_dd_date = str(df['timestamp'].iloc[_gdd_idx])[:10] if 'timestamp' in df.columns else "N/A"
 
         # 📉 NET DD: Non-compounding (cumulative sum, fixed position size)
         cum_sum = df['daily_ret'].fillna(0).cumsum() * 100
         cum_peak = cum_sum.cummax()
         net_dd_series = cum_sum - cum_peak
         net_dd = net_dd_series.min()
-        net_dd_idx = net_dd_series.idxmin()
-        net_dd_date = str(df['timestamp'].iloc[net_dd_idx])[:10] if 'timestamp' in df.columns and net_dd_idx < len(df) else "N/A"
-        # Capital left after net DD (fixed size): start + start * dd/100
-        net_dd_capital = round(100000 * (1 + net_dd / 100), 0)
+        _ndd_idx = net_dd_series.values.argmin()
+        net_dd_date = str(df['timestamp'].iloc[_ndd_idx])[:10] if 'timestamp' in df.columns else "N/A"
 
         # 📈 WIN RATE: Winning trades / Total trades
         trades = df['daily_ret'][df['daily_ret'] != 0]
@@ -265,13 +164,15 @@ def run_test(df_raw, name, optimize, mult, length):
         # 15m bars, ~96 bars/day, ~35040 bars/year
         sharpe = round((mean_ret / std_ret) * np.sqrt(35040), 2) if std_ret > 0 else 0.0
 
-        # Tiering is applied centrally after aggregation so auto-trade thresholds
-        # stay consistent across every report writer.
-        status = "💀 REJECT"
+        # Tiering based on 2% Goal
+        if daily_roi >= 1.5: status = "🚀 ALPHA++"
+        elif daily_roi >= 0.5: status = "🎯 ALPHA"
+        elif daily_roi > 0.1: status = "⚖️ AVERAGE"
+        else: status = "💀 REJECT"
 
-        return daily_roi, gross_dd, net_dd, win_rate, sharpe, total_trades, status, gross_dd_date, net_dd_date, gross_dd_capital, net_dd_capital
+        return daily_roi, gross_dd, net_dd, win_rate, sharpe, total_trades, status, gross_dd_date, net_dd_date
     except:
-        return -1, -1, -1, 0.0, 0.0, 0, "💀 ERROR", "N/A", "N/A", 0, 0
+        return -1, -1, -1, 0.0, 0.0, 0, "💀 ERROR", "N/A", "N/A"
 
 if __name__ == "__main__":
     strategy_tournament()

@@ -13,7 +13,7 @@ class TradeAction(str, Enum):
     SELL = "SELL"
 
 class SignalPayload(BaseModel):
-    secret: str
+    secret: str = ""   # optional — no longer required for authentication
     strategy: str
     symbol: str
     action: TradeAction
