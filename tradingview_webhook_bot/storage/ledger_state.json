@@ -66,11 +66,59 @@
         },
         "binance:ETHUSDT": {
             "symbol": "binance:ETHUSDT",
-            "quantity": -0.055,
+            "quantity": 0.0,
             "avg_price": 0.0,
             "realized_pnl": 0.0,
             "daily_realized_pnl": 0.0,
-            "last_update_date": ""
+            "last_update_date": "2026-03-30"
+        },
+        "binance:SOLUSDT:smc strategy luxalgo webhook luxalgo smc": {
+            "symbol": "binance:SOLUSDT:smc strategy luxalgo webhook luxalgo smc",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-29"
+        },
+        "binance:SOLUSDT:reversed barupdn strategy": {
+            "symbol": "binance:SOLUSDT:reversed barupdn strategy",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-29"
+        },
+        "binance:SOLUSDT:reverse liquidity trap": {
+            "symbol": "binance:SOLUSDT:reverse liquidity trap",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-29"
+        },
+        "binance:SOLUSDT": {
+            "symbol": "binance:SOLUSDT",
+            "quantity": 0.003,
+            "avg_price": 84.15020742000002,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-30"
+        },
+        "binance:SOLUSDT:hybrid smc markittick": {
+            "symbol": "binance:SOLUSDT:hybrid smc markittick",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-29"
+        },
+        "binance:LINKUSDT": {
+            "symbol": "binance:LINKUSDT",
+            "quantity": 0.0,
+            "avg_price": 0.0,
+            "realized_pnl": 0.0,
+            "daily_realized_pnl": 0.0,
+            "last_update_date": "2026-03-30"
         }
     },
     "trade_history": [
@@ -79,6 +127,36 @@
             "symbol": "binance:ETHUSDT:Reverse_Liquidity_Trap",
             "pnl": -0.0017999999999997272,
             "exit_price": 2074.2
+        },
+        {
+            "timestamp": "2026-03-29T16:00:20.161176",
+            "symbol": "binance:SOLUSDT",
+            "pnl": -0.24543,
+            "exit_price": 81.81
+        },
+        {
+            "timestamp": "2026-03-29T22:56:04.356976",
+            "symbol": "binance:SOLUSDT",
+            "pnl": -10.0,
+            "exit_price": 10.0
+        },
+        {
+            "timestamp": "2026-03-30T04:00:27.003335",
+            "symbol": "binance:ETHUSDT",
+            "pnl": -20.097915,
+            "exit_price": 6699.305
+        },
+        {
+            "timestamp": "2026-03-30T04:00:31.852895",
+            "symbol": "binance:SOLUSDT",
+            "pnl": -185.492109,
+            "exit_price": 61830.703
+        },
+        {
+            "timestamp": "2026-03-30T04:00:37.343364",
+            "symbol": "binance:LINKUSDT",
+            "pnl": 0.0,
+            "exit_price": 63225.247
         }
     ]
 }
