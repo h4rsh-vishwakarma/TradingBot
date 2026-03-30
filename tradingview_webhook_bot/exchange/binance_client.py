@@ -164,7 +164,10 @@ class BinanceClient:
             logger.info(f"🚀 Executing {order_type} {side} on {symbol} (ID: {client_order_id})...")
             response = self.client.futures_create_order(**params)
             response["status"] = "SUCCESS"
-            logger.info(f"✅ Order Success: {response.get('orderId')}")
+            # Normalize camelCase avgPrice (Binance API) -> snake_case avg_price
+            raw_avg = float(response.get("avgPrice") or 0)
+            response["avg_price"] = raw_avg if raw_avg > 0 else (price or 0)
+            logger.info(f"✅ Order filled: {response.get('orderId')} | price=${response['avg_price']:.4f}")
             return response
 
         except BinanceAPIException as e:

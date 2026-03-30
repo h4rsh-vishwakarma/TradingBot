@@ -293,14 +293,22 @@ class Orchestrator:
                 signal_data["quantity"] = float(payload_raw.get("quantity") or event.get("quantity") or 0.003)
 
                 raw_price = float(payload_raw.get("price") or event.get("price") or 0.0)
+                live_price = self.exchange_binance.get_mainnet_mark_price(symbol)
                 if raw_price <= 0:
-                    live_price = self.exchange_binance.get_mainnet_mark_price(symbol)
                     if live_price and live_price > 0:
                         raw_price = live_price
-                        logger.info(f"Resolved price for {symbol}: ${raw_price}")
+                        logger.info(f"Resolved missing price for {symbol}: ${raw_price}")
                     else:
                         logger.warning(f"Cannot resolve price for {symbol}. Skipping.")
                         return True
+                elif live_price and live_price > 0:
+                    deviation = abs(raw_price - live_price) / live_price
+                    if deviation > 0.80:
+                        logger.warning(
+                            f"⚠️ Signal price ${raw_price:,.2f} deviates {deviation*100:.0f}% from "
+                            f"market ${live_price:,.2f} for {symbol}. Replacing with market price."
+                        )
+                        raw_price = live_price
                 signal_data["price"] = raw_price
                 signal_data["action"] = str(payload_raw.get("action") or event.get("action") or "BUY").upper()
 
@@ -390,9 +398,10 @@ class Orchestrator:
                     health = self.exchange_binance.get_account_health()
                     if health:
                         avail = health.get("available_balance", 0)
-                        if avail > 0 and price_signal > 0:
-                            qty = (avail * equity_pct) / price_signal
-                            logger.info(f"Equity sizing: {equity_pct*100}% of ${avail:.2f} = {qty:.6f} {symbol}")
+                        sizing_price = self.exchange_binance.get_mainnet_mark_price(symbol) or price_signal
+                        if avail > 0 and sizing_price > 0:
+                            qty = (avail * equity_pct) / sizing_price
+                            logger.info(f"Equity sizing: {equity_pct*100}% of ${avail:.2f} @ ${sizing_price:.2f} = {qty:.6f} {symbol}")
                 except Exception as e:
                     logger.warning(f"Equity sizing failed, using signal qty: {e}")
 
@@ -430,7 +439,11 @@ class Orchestrator:
             else:
                 execution_res = self.exchange_binance.execute_futures_order(symbol, side, qty, price_signal, signal_id=signal_id)
                 if execution_res.get("status") == "SUCCESS":
-                    fill_price = float(execution_res.get("avg_price") or price_signal)
+                    fill_price = float(
+                        execution_res.get("avg_price") or
+                        self.exchange_binance.get_mainnet_mark_price(symbol) or
+                        price_signal
+                    )
 
             # --- 7. LOGGING & ALERTS ---
             if execution_res.get("status") == "SUCCESS":

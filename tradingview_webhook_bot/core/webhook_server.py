@@ -352,6 +352,17 @@ class WebhookServer:
                         price_val = 0.0
                     if price_val <= 0:
                         logger.info(f"⚠️ Price missing/zero for {symbol}, orchestrator will resolve via mainnet")
+                    else:
+                        live_px = self._fetch_live_price(symbol)
+                        if live_px and live_px > 0:
+                            deviation = abs(price_val - live_px) / live_px
+                            if deviation > 0.80:
+                                logger.warning(
+                                    f"⚠️ Price sanity FAIL: signal ${price_val:,.2f} vs market ${live_px:,.2f} "
+                                    f"({deviation*100:.0f}% off) for {symbol}. "
+                                    f"Replacing with market price. Check TradingView alert template."
+                                )
+                                price_val = live_px
 
                     strategy = payload.get("strategy", "SMC")
                     indicator = payload.get("indicator", "SMC_LuxAlgo")
@@ -379,6 +390,16 @@ class WebhookServer:
                     price_val = float(parsed.get('price', 0) or 0)
                     if price_val <= 0:
                         logger.info(f"⚠️ No price in plain text for {symbol}, orchestrator will resolve")
+                    else:
+                        live_px = self._fetch_live_price(symbol)
+                        if live_px and live_px > 0:
+                            deviation = abs(price_val - live_px) / live_px
+                            if deviation > 0.80:
+                                logger.warning(
+                                    f"⚠️ Plain text price sanity FAIL: ${price_val:,.2f} vs market "
+                                    f"${live_px:,.2f} ({deviation*100:.0f}% off) for {symbol}. Using market price."
+                                )
+                                price_val = live_px
 
                 # --- COMMON: Build payload, queue, respond ---
                 signal_id = f"TV-{int(time.time() * 1000)}"
