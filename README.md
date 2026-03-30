@@ -91,6 +91,7 @@ Rankings update daily at 00:15 UTC via `strategy_tournament.py`.
 |---------|------|-------------|---------|
 | `trading_webhook` | 5000 | Gunicorn webhook receiver (4 workers, gthread) | `sudo systemctl status trading_webhook` |
 | `trading_orchestrator` | - | Signal consumer + trade executor | `sudo systemctl status trading_orchestrator` |
+| `trading_dashboard` | 8501 | Streamlit health dashboard | `sudo systemctl status trading_dashboard` |
 | `hl_mirror` | - | Hyperliquid lead trader mirror (optional) | `sudo systemctl status hl_mirror` |
 | `telegram_bot` | - | Telegram backtest bot (separate project) | `sudo systemctl status telegram_bot` |
 
@@ -227,12 +228,14 @@ sudo systemctl daemon-reload
 # Start services
 sudo systemctl enable --now trading_webhook
 sudo systemctl enable --now trading_orchestrator
+sudo systemctl enable --now trading_dashboard
 
 # Setup cron
 crontab -e  # Add entries from setup_cron.sh
 
 # Verify
 curl http://127.0.0.1:5000/health
+curl -I http://127.0.0.1:8501
 sudo journalctl -u trading_orchestrator -f
 ```
 
@@ -295,6 +298,9 @@ sudo journalctl -u trading_webhook -f
 # Orchestrator logs
 sudo journalctl -u trading_orchestrator -f
 
+# Dashboard logs
+sudo journalctl -u trading_dashboard -f
+
 # Heartbeat scan
 tail -f /home/ubuntu/tradingview_webhook_bot/auto_scan.log
 ```
@@ -311,7 +317,7 @@ curl http://127.0.0.1:5000/health
 
 ### Restart Services
 ```bash
-sudo systemctl restart trading_webhook trading_orchestrator
+sudo systemctl restart trading_webhook trading_orchestrator trading_dashboard
 ```
 
 ### Emergency Stop

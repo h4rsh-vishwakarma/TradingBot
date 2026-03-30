@@ -165,10 +165,13 @@ def run_test(df_raw, name, optimize, mult, length):
         sharpe = round((mean_ret / std_ret) * np.sqrt(35040), 2) if std_ret > 0 else 0.0
 
         # Tiering based on 2% Goal
-        if daily_roi >= 1.5: status = "🚀 ALPHA++"
-        elif daily_roi >= 0.5: status = "🎯 ALPHA"
-        elif daily_roi > 0.1: status = "⚖️ AVERAGE"
-        else: status = "💀 REJECT"
+        if net_dd >= -30.0 and daily_roi >= 0.5:
+            status = "\u2705 ALPHA"
+        else:
+            _reason = []
+            if net_dd < -30.0: _reason.append(f"NDD={net_dd:.1f}%<-30%")
+            if daily_roi < 0.5: _reason.append(f"ROI={daily_roi:.3f}%<0.5%")
+            status = "\U0001f6ab BLOCKED"
 
         return daily_roi, gross_dd, net_dd, win_rate, sharpe, total_trades, status, gross_dd_date, net_dd_date
     except:

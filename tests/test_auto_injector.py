@@ -58,7 +58,8 @@ def test_run_scan_sends_quiet_hour_confirmation(monkeypatch):
     sent_messages = []
 
     monkeypatch.setattr(auto_injector, "check_webhook_server", lambda: True)
-    monkeypatch.setattr(auto_injector, "check_process", lambda name: True)
+    monkeypatch.setattr(auto_injector, "check_systemd_service", lambda service_name, process_fallback="": True)
+    monkeypatch.setattr(auto_injector, "check_dashboard_server", lambda: True)
     monkeypatch.setattr(auto_injector, "check_data_freshness", lambda: (True, "Fresh (1.0h ago)"))
     monkeypatch.setattr(auto_injector, "check_dlq", lambda: 0)
     monkeypatch.setattr(
@@ -66,12 +67,21 @@ def test_run_scan_sends_quiet_hour_confirmation(monkeypatch):
         "check_recent_signal_activity",
         lambda lookback_minutes=60: (False, "No queued signals in last 60m"),
     )
+    monkeypatch.setattr(
+        auto_injector,
+        "assess_tradingview_feed",
+        lambda: ("warn", "Quiet market: no signals in last 60m (last 2026-03-28 11:00:00 UTC)"),
+    )
     monkeypatch.setattr(auto_injector, "send_alert", sent_messages.append)
 
     auto_injector.run_scan()
 
     assert len(sent_messages) == 1
     assert "HOURLY LIVE CONFIRMATION" in sent_messages[0]
+    assert "✅ <b>Webhook:</b> UP" in sent_messages[0]
+    assert "✅ <b>Orchestrator:</b> RUNNING" in sent_messages[0]
+    assert "✅ <b>Dashboard:</b> UP" in sent_messages[0]
+    assert "⚠️ <b>TradingView Feed:</b> Quiet market" in sent_messages[0]
     assert "No queued signals in last 60m" in sent_messages[0]
 
 
@@ -79,7 +89,8 @@ def test_run_scan_alerts_when_signal_db_is_missing(monkeypatch):
     sent_messages = []
 
     monkeypatch.setattr(auto_injector, "check_webhook_server", lambda: True)
-    monkeypatch.setattr(auto_injector, "check_process", lambda name: True)
+    monkeypatch.setattr(auto_injector, "check_systemd_service", lambda service_name, process_fallback="": True)
+    monkeypatch.setattr(auto_injector, "check_dashboard_server", lambda: True)
     monkeypatch.setattr(auto_injector, "check_data_freshness", lambda: (True, "Fresh (1.0h ago)"))
     monkeypatch.setattr(auto_injector, "check_dlq", lambda: 0)
     monkeypatch.setattr(
@@ -90,6 +101,11 @@ def test_run_scan_alerts_when_signal_db_is_missing(monkeypatch):
             "signal_queue.db missing (/tmp/missing.db)",
         ),
     )
+    monkeypatch.setattr(
+        auto_injector,
+        "assess_tradingview_feed",
+        lambda: ("down", "signal_queue.db missing (/tmp/missing.db)"),
+    )
     monkeypatch.setattr(auto_injector, "send_alert", sent_messages.append)
 
     auto_injector.run_scan()
@@ -97,3 +113,32 @@ def test_run_scan_alerts_when_signal_db_is_missing(monkeypatch):
     assert len(sent_messages) == 1
     assert "HOURLY HEARTBEAT ALERT" in sent_messages[0]
     assert "Signal activity check issue" in sent_messages[0]
+    assert "❌ <b>Signal Queue DB:</b> signal_queue.db missing (/tmp/missing.db)" in sent_messages[0]
+
+
+def test_run_scan_alerts_when_tradingview_feed_looks_stuck(monkeypatch):
+    sent_messages = []
+
+    monkeypatch.setattr(auto_injector, "check_webhook_server", lambda: True)
+    monkeypatch.setattr(auto_injector, "check_systemd_service", lambda service_name, process_fallback="": True)
+    monkeypatch.setattr(auto_injector, "check_dashboard_server", lambda: True)
+    monkeypatch.setattr(auto_injector, "check_data_freshness", lambda: (True, "Fresh (1.0h ago)"))
+    monkeypatch.setattr(auto_injector, "check_dlq", lambda: 0)
+    monkeypatch.setattr(
+        auto_injector,
+        "check_recent_signal_activity",
+        lambda lookback_minutes=60: (False, "No queued signals in last 60m"),
+    )
+    monkeypatch.setattr(
+        auto_injector,
+        "assess_tradingview_feed",
+        lambda: ("down", "TradingView feed may be stuck: no signals for 240m (last 2026-03-28 08:00:00 UTC)"),
+    )
+    monkeypatch.setattr(auto_injector, "send_alert", sent_messages.append)
+
+    auto_injector.run_scan()
+
+    assert len(sent_messages) == 1
+    assert "HOURLY HEARTBEAT ALERT" in sent_messages[0]
+    assert "TradingView feed may be stuck" in sent_messages[0]
+    assert "❌ <b>TradingView Feed:</b>" in sent_messages[0]

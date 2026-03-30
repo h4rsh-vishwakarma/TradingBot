@@ -136,6 +136,9 @@ ssh -i "$SSH_KEY" "$SERVER_USER@$SERVER_IP" "
     source venv/bin/activate
 
     sudo systemctl restart trading_orchestrator trading_webhook
+    if [ -f /etc/systemd/system/trading_dashboard.service ]; then
+        sudo systemctl restart trading_dashboard
+    fi
     echo 'Services restarted via systemd'
 "
 

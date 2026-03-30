@@ -203,11 +203,68 @@ class Orchestrator:
         return False
 
     def check_tournament_alpha(self, symbol, strategy_name) -> tuple[bool, str, str]:
-        # All USDT symbols are allowed — no leaderboard restriction
-        if symbol.upper().endswith("USDT"):
-            logger.info(f"✅ Open pass: {symbol} {strategy_name}")
-            return True, "All USDT symbols allowed", "ALPHA"
-        return False, f"Non-USDT symbol {symbol} not supported", "NONE"
+        """
+        Brain tier check: look up strategy+symbol in tournament leaderboard.
+        Criteria:
+          ALPHA   = Net_DD >= -30%  AND  Daily_ROI >= 0.5%  → allowed to trade
+          BLOCKED = anything else                            → rejected
+        Falls back to ALPHA for unknown strategies (not in CSV yet).
+        """
+        import csv as _csv
+        csv_paths = [
+            os.path.join(os.path.dirname(__file__), "..", "..", "tournament_winners.csv"),
+            "/home/ubuntu/tradingview_webhook_bot/tournament_winners.csv",
+        ]
+        leaderboard = None
+        for p in csv_paths:
+            p = os.path.abspath(p)
+            if os.path.exists(p):
+                try:
+                    with open(p, encoding="utf-8") as f:
+                        leaderboard = list(_csv.DictReader(f))
+                    break
+                except Exception:
+                    pass
+
+        if not leaderboard:
+            logger.warning(f"Leaderboard CSV not found — open pass for {symbol} {strategy_name}")
+            return True, "Leaderboard unavailable — open pass", "ALPHA"
+
+        # Normalise for fuzzy matching
+        def _norm(s):
+            return re.sub(r"[^a-z0-9]", "", str(s or "").lower())
+
+        sym_norm   = _norm(symbol)
+        strat_norm = _norm(strategy_name)
+
+        best_match = None
+        for row in leaderboard:
+            r_sym   = _norm(row.get("Symbol", ""))
+            r_strat = _norm(row.get("Strategy", ""))
+            if r_sym == sym_norm and r_strat == strat_norm:
+                best_match = row
+                break
+            # Partial match fallback
+            if best_match is None and r_sym == sym_norm and (
+                strat_norm in r_strat or r_strat in strat_norm
+            ):
+                best_match = row
+
+        if best_match is None:
+            logger.info(f"Strategy not in leaderboard — open pass: {symbol} / {strategy_name}")
+            return True, "Not in leaderboard — open pass", "ALPHA"
+
+        tier = str(best_match.get("Tier", "")).upper()
+        ndd  = float(best_match.get("Net_DD_%") or 0)
+        roi  = float(best_match.get("Daily_ROI_%") or 0)
+
+        if "BLOCKED" in tier or ndd < -30.0 or roi < 0.5:
+            reason = f"Blocked: NDD={ndd:.1f}% (need>=-30%) ROI={roi:.3f}% (need>=0.5%)"
+            logger.warning(f"🚫 Brain Blocked {symbol}/{strategy_name}: {reason}")
+            return False, reason, "BLOCKED"
+
+        logger.info(f"✅ Brain Approved [{tier.strip()}] {symbol}/{strategy_name} NDD={ndd:.1f}% ROI={roi:.3f}%")
+        return True, f"Approved [{tier.strip()}]", tier.strip()
 
     def check_safety_gate(self, symbol, qty, price, side, exchange="binance") -> tuple[bool, str]:
         if not self.allow_real: return False, "ALLOW_REAL_TRADES is disabled"
