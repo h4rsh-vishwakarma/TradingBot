@@ -372,97 +372,175 @@ def render():
     st.divider()
 
     # ══════════════════════════════════════════════════════════════════
-    # SECTION 3.5 — TRADINGVIEW SETUP (Symbol + PineScript Viewer)
+    # SECTION 3.5 — STRATEGY EXPLORER (Search by Tier + Name + PineScript)
     # ══════════════════════════════════════════════════════════════════
-    st.subheader("📡 TradingView Setup — Top Strategies per Symbol")
+    st.subheader("🔎 Strategy Explorer — Search by Tier / Name / Symbol")
 
-    STRATEGY_TV_NAMES = {
-        "Aggressive_Entry":    "10 Aggressive Entry",
-        "Full_Momentum":       "21 Full Momentum",
-        "Ichimoku_Trend_Pro":  "22 Ichimoku Trend Pro",
-        "Ichimoku_MACD_Pro":   "23 Ichimoku MACD Pro",
-        "Keltner_Breakout":    "24 Keltner Breakout",
-        "MACD_Breakout":       "07 MACD Breakout",
-        "Hybrid_SMC":          "Hybrid SMC [MarkitTick]",
-        "SMC_LuxAlgo_WH":      "SMC Strategy [LuxAlgo] + Webhook",
-        "BB_Squeeze_Break":    "BB Squeeze Break",
-        "ML_Lorentzian":       "ML Lorentzian Classification",
-        "EMA_Break_Momentum":  "03 EMA Break Momentum",
-        "VWAP_Break_Entry":    "VWAP Break Entry [Live Trading]",
+    PINE_DIR_PATH = PROJECT_ROOT / "backtesting" / "pine"
+    PINE_FILE_MAP = {
+        "Hybrid_SMC":             "Hybrid SMC [MarkitTick]",
+        "SMC_LuxAlgo_WH":         "Smart Money Concepts [LuxAlgo] - Webhook'SMC-LuxAlgo-WH'",
+        "ML_Lorentzian":          "ML Lorentzian Classification",
+        "Reverse_Liquidity_Trap": "Reverse Liquidity Trap",
+        "Reversed_BarUpDn":       "Reversed BarUpDn Strategy",
+        "BB_Squeeze_Break":       "Squeeze Momentum [LazyBear]",
+        "EMA_Break_Momentum":     "EMA-SMA Crossover",
+    }
+    TV_SCRIPT_NAME = {
+        "Aggressive_Entry":   "10 Aggressive Entry",
+        "Full_Momentum":      "21 Full Momentum",
+        "Ichimoku_Trend_Pro": "22 Ichimoku Trend Pro",
+        "Ichimoku_MACD_Pro":  "23 Ichimoku MACD Pro",
+        "Keltner_Breakout":   "24 Keltner Breakout",
+        "MACD_Breakout":      "07 MACD Breakout",
+        "Hybrid_SMC":         "Hybrid SMC [MarkitTick]",
+        "SMC_LuxAlgo_WH":     "SMC Strategy [LuxAlgo] + Webhook",
+        "BB_Squeeze_Break":   "BB Squeeze Break",
+        "ML_Lorentzian":      "ML Lorentzian Classification",
+        "EMA_Break_Momentum": "03 EMA Break Momentum",
+        "VWAP_Break_Entry":   "VWAP Break Entry [Live Trading]",
+        "PSAR_Volume_Surge":  "44 PSAR Volume Surge 4h",
     }
 
-    WEBHOOK_SECRET_VAL = "squeeze_tradingview_cluster_2026_secure"
-    WEBHOOK_URL_VAL    = "http://15.207.152.119/webhook/tradingview"
+    @st.cache_data(ttl=300)
+    def load_pine_code(strat_name):
+        fname = PINE_FILE_MAP.get(strat_name)
+        if not fname:
+            return None
+        fpath = PINE_DIR_PATH / fname
+        if fpath.exists():
+            return fpath.read_text(errors="replace")
+        return None
 
-    def get_alert_msg(strat, sym):
-        tv = STRATEGY_TV_NAMES.get(strat, strat.replace("_"," "))
-        return (
-            f"{tv} | {sym} - Webhook ({WEBHOOK_SECRET_VAL}): "
-            "order {{strategy.order.action}} @ {{strategy.order.contracts}} "
-            f"filled on BINANCE:{sym}.P. New strategy position is {{{{strategy.position_size}}}}"
-        )
+    all_rows_ex = load_tournament()
+    if all_rows_ex:
+        fc1, fc2, fc3, fc4 = st.columns([2, 2, 2, 1])
+        with fc1:
+            tier_opts = ["ALL", "ALPHA++", "ALPHA", "AVERAGE", "REJECT"]
+            sel_tier  = st.selectbox("🎯 Filter by Tier", tier_opts, index=0)
+        with fc2:
+            all_strats_ex = sorted(set(r.get("Strategy","") for r in all_rows_ex))
+            sel_strat_ex  = st.selectbox("📋 Filter by Strategy", ["ALL"] + all_strats_ex, index=0)
+        with fc3:
+            all_syms_ex = sorted(set(r.get("Symbol","") for r in all_rows_ex))
+            sel_sym_ex  = st.selectbox("🪙 Filter by Symbol", ["ALL"] + all_syms_ex, index=0)
+        with fc4:
+            min_oos_ex = st.number_input("Min OOS%", value=0.0, step=0.05, format="%.2f")
 
-    tv_rows = load_tournament()
-    if tv_rows:
-        # Symbol filter
-        all_syms = sorted(set(r.get("Symbol","") for r in tv_rows))
-        priority_syms = ["FILUSDT","LDOUSDT","UNIUSDT","SOLUSDT","ETHUSDT","AVAXUSDT"]
-        default_syms = [s for s in priority_syms if s in all_syms]
+        filtered_ex = []
+        for r in all_rows_ex:
+            if sel_tier != "ALL" and r.get("Tier","") != sel_tier:
+                continue
+            if sel_strat_ex != "ALL" and r.get("Strategy","") != sel_strat_ex:
+                continue
+            if sel_sym_ex != "ALL" and r.get("Symbol","") != sel_sym_ex:
+                continue
+            if safe_f(r.get("OOS_Daily_ROI_%")) < min_oos_ex:
+                continue
+            filtered_ex.append(r)
 
-        sel_syms = st.multiselect(
-            "🔍 Select symbols to view strategies:",
-            options=all_syms,
-            default=default_syms,
-            help="Choose which symbols to show top strategies for"
-        )
-        min_oos_filter = st.slider("Minimum OOS ROI (%/day)", 0.05, 0.50, 0.20, 0.01)
+        filtered_ex = sorted(filtered_ex, key=lambda x: -safe_f(x.get("OOS_Daily_ROI_%")))
+        st.caption("Showing **%d** strategies out of **%d** total" % (len(filtered_ex), len(all_rows_ex)))
 
-        if sel_syms:
-            for sym in sel_syms:
-                sym_rows = [r for r in tv_rows
-                            if r.get("Symbol") == sym
-                            and r.get("Tier") in ("ALPHA++","ALPHA")
-                            and safe_f(r.get("OOS_Daily_ROI_%")) >= min_oos_filter]
-                sym_rows = sorted(sym_rows, key=lambda x: -safe_f(x.get("OOS_Daily_ROI_%")))
+        if filtered_ex:
+            tbl_data = []
+            for i, r in enumerate(filtered_ex, 1):
+                tier   = r.get("Tier","?")
+                oos    = safe_f(r.get("OOS_Daily_ROI_%"))
+                is_roi = safe_f(r.get("Daily_ROI_%"))
+                ret    = round(oos/is_roi*100, 1) if is_roi > 0 else 0
+                tier_icon = {"ALPHA++":"🟢","ALPHA":"🔵","AVERAGE":"🟡","REJECT":"🔴"}.get(tier,"⚪")
+                pine_icon = "✅ Code" if r.get("Strategy","") in PINE_FILE_MAP else "📺 TV"
+                tbl_data.append({
+                    "#":          i,
+                    "Symbol":     r.get("Symbol","?"),
+                    "Strategy":   r.get("Strategy","?"),
+                    "Tier":       tier_icon + " " + tier,
+                    "OOS %/day":  "%.3f%%" % oos,
+                    "IS %/day":   "%.3f%%" % is_roi,
+                    "Retention":  "%.0f%%" % ret,
+                    "Win%":       str(r.get("Win_Rate_%","?")) + "%",
+                    "GDD%":       str(r.get("Gross_DD_%","?")) + "%",
+                    "OOS Sharpe": r.get("OOS_Sharpe","?"),
+                    "Pine":       pine_icon,
+                })
+            st.dataframe(pd.DataFrame(tbl_data), hide_index=True, use_container_width=True)
+            st.caption("Pine: **✅ Code** = PineScript code stored locally (viewable below)  |  **📺 TV** = Search by script name on TradingView")
 
-                if not sym_rows:
-                    continue
+            st.markdown("---")
+            st.markdown("#### 📄 Strategy Detail + PineScript Viewer")
+            detail_labels = [
+                "#%d  %s — %s  [OOS: %.3f%%/day]  %s" % (
+                    i, r.get("Symbol","?"), r.get("Strategy","?"),
+                    safe_f(r.get("OOS_Daily_ROI_%")), r.get("Tier","?")
+                )
+                for i, r in enumerate(filtered_ex, 1)
+            ]
+            sel_detail = st.selectbox("Select a strategy to view details + PineScript:", detail_labels)
 
-                best_oos = safe_f(sym_rows[0].get("OOS_Daily_ROI_%")) if sym_rows else 0
-                label = f"📊 {sym} — {len(sym_rows)} strategies  |  Best OOS: {best_oos:.3f}%/day"
-                with st.expander(label, expanded=(sym in ["FILUSDT","LDOUSDT","UNIUSDT"])):
-                    st.caption(f"**Webhook URL:** `{WEBHOOK_URL_VAL}`")
-                    for r in sym_rows:
-                        strat  = r.get("Strategy","?")
-                        tier   = r.get("Tier","?")
-                        oos    = safe_f(r.get("OOS_Daily_ROI_%"))
-                        is_roi = safe_f(r.get("Daily_ROI_%"))
-                        wr     = r.get("Win_Rate_%","?")
-                        gdd    = r.get("Gross_DD_%","?")
-                        oos_sh = r.get("OOS_Sharpe","?")
-                        tv_nm  = STRATEGY_TV_NAMES.get(strat, strat.replace("_"," "))
-                        alert  = get_alert_msg(strat, sym)
-                        ret    = oos/is_roi*100 if is_roi > 0 else 0
+            if sel_detail:
+                idx_d  = detail_labels.index(sel_detail)
+                r      = filtered_ex[idx_d]
+                strat  = r.get("Strategy","?")
+                sym    = r.get("Symbol","?")
+                tier   = r.get("Tier","?")
+                oos    = safe_f(r.get("OOS_Daily_ROI_%"))
+                is_roi = safe_f(r.get("Daily_ROI_%"))
+                wr     = r.get("Win_Rate_%","?")
+                gdd    = r.get("Gross_DD_%","?")
+                ndd    = r.get("Net_DD_%","?")
+                maxdd  = r.get("Max_DD_%","?")
+                oos_sh = r.get("OOS_Sharpe","?")
+                sharpe = r.get("Sharpe_Ratio","?")
+                trades = r.get("Total_Trades","?")
+                opt_m  = r.get("Optimal_Mult","?")
+                opt_l  = r.get("Optimal_Len","?")
+                ret    = round(oos/is_roi*100, 1) if is_roi > 0 else 0
+                tv_nm  = TV_SCRIPT_NAME.get(strat, strat.replace("_"," "))
+                tier_icon = {"ALPHA++":"🟢","ALPHA":"🔵","AVERAGE":"🟡","REJECT":"🔴"}.get(tier,"⚪")
+                pine_code = load_pine_code(strat)
 
-                        tier_color = "🟢" if tier == "ALPHA++" else "🔵"
-                        header = f"{tier_color} **{strat}** — OOS `{oos:.3f}%%/day` | IS `{is_roi:.3f}%%/day` | Ret `{ret:.0f}%%` | WR `{wr}%%` | GDD `{gdd}%%` | Sharpe `{oos_sh}`"
+                # Metrics row
+                m1, m2, m3, m4, m5, m6 = st.columns(6)
+                m1.metric("OOS ROI/day",  "%.3f%%" % oos,   "IS: %.3f%%" % is_roi)
+                m2.metric("Tier",          tier_icon + " " + tier)
+                m3.metric("OOS Sharpe",    str(oos_sh),       "IS: " + str(sharpe))
+                m4.metric("Win Rate",      str(wr) + "%")
+                m5.metric("IS→OOS Ret.",   "%.0f%%" % ret,   "⚠️ Overfit" if ret < 30 else "✅ OK")
+                m6.metric("Gross DD",      str(gdd) + "%")
 
-                        with st.expander(header, expanded=False):
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                st.markdown(f"**TradingView Script Name:**")
-                                st.code(tv_nm, language=None)
-                            with c2:
-                                st.markdown(f"**Tier:** `{tier}`  |  **OOS Sharpe:** `{oos_sh}`")
-                                st.markdown(f"**Win Rate:** `{wr}%%`  |  **GDD:** `{gdd}%%`")
+                st.markdown("---")
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.markdown("**Full Stats:**")
+                    rows_md = [
+                        ("Symbol",       "`%s`" % sym),
+                        ("Strategy",     "`%s`" % strat),
+                        ("Net DD",       "`%s%%`" % ndd),
+                        ("Max DD",       "`%s%%`" % maxdd),
+                        ("Total Bars",   "`%s`" % trades),
+                        ("Optimal Mult", "`%s`" % opt_m),
+                        ("Optimal Len",  "`%s`" % opt_l),
+                    ]
+                    md_table = "| Field | Value |\n|---|---|\n"
+                    for k, v in rows_md:
+                        md_table += "| **%s** | %s |\n" % (k, v)
+                    st.markdown(md_table)
+                with col_b:
+                    st.markdown("**TradingView Script Name** — search this in TV Indicators / Pine Editor:")
+                    st.code(tv_nm, language=None)
+                    if pine_code:
+                        st.success("✅ PineScript code available locally — %d lines" % len(pine_code.splitlines()))
+                    else:
+                        st.info("📺 No local code stored — search **`%s`** on TradingView" % tv_nm)
 
-                            st.markdown("**📋 TradingView Alert Message** — Copy this into TradingView Alert → Message box:")
-                            st.code(alert, language=None)
-                            st.caption("⚠️ In TradingView: Strategy Settings → Add Alert → paste above in Message field. Webhook URL goes in the URL field.")
+                if pine_code:
+                    with st.expander("📜 View PineScript Code — %s  (%d lines)" % (strat, len(pine_code.splitlines())), expanded=True):
+                        st.code(pine_code, language="javascript")
         else:
-            st.info("Select at least one symbol above to see strategies.")
+            st.info("No strategies match the current filters. Try broadening the search.")
     else:
-        st.warning("Tournament data not loaded — run the tournament first.")
+        st.warning("Tournament data not loaded.")
     st.divider()
 
     # ══════════════════════════════════════════════════════════════════
