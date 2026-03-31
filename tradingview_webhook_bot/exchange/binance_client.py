@@ -115,6 +115,61 @@ class BinanceClient:
             logger.error(f"Failed to fetch audit data: {e}")
             return {}
 
+    def set_leverage(self, symbol: str, leverage: int) -> bool:
+        """Set futures leverage for a symbol. Returns True on success."""
+        if not self.allow_real:
+            return True
+        try:
+            self.client.futures_change_leverage(symbol=symbol, leverage=leverage)
+            logger.info(f"⚙️ Leverage set: {symbol} → {leverage}x")
+            return True
+        except BinanceAPIException as e:
+            # -4028 = leverage already set to this value — not a real error
+            if e.code == -4028:
+                return True
+            logger.warning(f"⚠️ set_leverage failed for {symbol}: {e.message}")
+            return False
+        except Exception as e:
+            logger.warning(f"⚠️ set_leverage error for {symbol}: {e}")
+            return False
+
+    def cancel_open_orders(self, symbol: str) -> bool:
+        """Cancel ALL open orders (SL/TP) for a symbol. Call before placing a close/exit order."""
+        if not self.allow_real:
+            return True
+        try:
+            self.client.futures_cancel_all_open_orders(symbol=symbol)
+            logger.info(f"🗑️ Cancelled all open orders for {symbol}")
+            return True
+        except BinanceAPIException as e:
+            # -2011 means no open orders — not an error
+            if e.code == -2011:
+                return True
+            logger.warning(f"⚠️ cancel_open_orders failed for {symbol}: {e.message}")
+            return False
+        except Exception as e:
+            logger.warning(f"⚠️ cancel_open_orders error for {symbol}: {e}")
+            return False
+
+    def get_order_status(self, symbol: str, client_order_id: str) -> dict:
+        """Query order status by clientOrderId — used after timeout to check if order filled."""
+        try:
+            resp = self.client.futures_get_order(symbol=symbol, origClientOrderId=client_order_id)
+            return {
+                "status": resp.get("status", "UNKNOWN"),  # NEW, FILLED, CANCELED, PARTIALLY_FILLED…
+                "orderId": resp.get("orderId"),
+                "avgPrice": float(resp.get("avgPrice", 0) or 0),
+                "executedQty": float(resp.get("executedQty", 0) or 0),
+            }
+        except BinanceAPIException as e:
+            if e.code == -2013:  # Order does not exist
+                return {"status": "NOT_FOUND"}
+            logger.warning(f"⚠️ get_order_status error for {symbol}/{client_order_id}: {e.message}")
+            return {"status": "UNKNOWN"}
+        except Exception as e:
+            logger.warning(f"⚠️ get_order_status error: {e}")
+            return {"status": "UNKNOWN"}
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
@@ -124,12 +179,21 @@ class BinanceClient:
     def execute_futures_order(self, symbol, side, quantity, price=None, order_type='MARKET', signal_id=None):
         """
         Execute order with MAINNET PRICE SUBSTITUTION.
+        Sets leverage before every real trade.
+        USE_LIMIT_ORDERS=true → Post-only limit at mark price (maker fee 0.02% vs taker 0.04%).
+        Falls back to MARKET if GTX rejected (price already crossed).
+        On timeout, returns status=TIMEOUT with client_order_id so caller can verify fill.
         """
-        # --- SUB-TASK 1.1: PRICE SUBSTITUTION (always, even paper mode) ---
+        # --- PRICE SUBSTITUTION (always, even paper mode) ---
         mainnet_price = self.get_mainnet_mark_price(symbol)
         if mainnet_price:
             logger.info(f"⚖️ Substituting Signal Price {price} with Mainnet Price {mainnet_price}")
             price = mainnet_price
+
+        # --- AUTO LIMIT ORDER: saves ~0.02%/side vs market orders ---
+        use_limit = os.getenv("USE_LIMIT_ORDERS", "false").lower() == "true"
+        if use_limit and order_type == 'MARKET' and price:
+            order_type = 'LIMIT_MAKER'   # will be converted to GTX below
 
         if not self.allow_real:
             # Paper trading: simulate fill at current mainnet price
@@ -148,7 +212,39 @@ class BinanceClient:
             # Fix quantity precision and minimum notional for this symbol
             quantity = fix_quantity(symbol, quantity, price=price)
 
+            # --- SET LEVERAGE before every entry ---
+            leverage = int(os.getenv("TRADE_LEVERAGE", "1"))
+            self.set_leverage(symbol, leverage)
+
             client_order_id = signal_id if signal_id else f"bot_{int(time.time())}"
+
+            # --- BUILD ORDER PARAMS ---
+            if order_type == 'LIMIT_MAKER':
+                # Post-only limit at mark price → guaranteed maker fee (0.02%/side)
+                # GTX = Good-Till-Crossing (post-only), rejected if it would cross book
+                # Round price to symbol precision (8 decimal places max)
+                price_str = str(round(float(price), 8)) if price else None
+                if price_str:
+                    params = {
+                        "symbol": symbol, "side": side, "type": "LIMIT",
+                        "quantity": quantity, "price": price_str,
+                        "timeInForce": "GTX",   # Post-only
+                        "newClientOrderId": client_order_id
+                    }
+                    logger.info(f"📌 POST-ONLY LIMIT {side} {symbol} @ {price_str} (maker fee)...")
+                    try:
+                        response = self.client.futures_create_order(**params)
+                        response["status"] = "SUCCESS"
+                        response["order_type_used"] = "LIMIT_GTX"
+                        logger.info(f"✅ Post-only limit filled: {response.get('orderId')}")
+                        return response
+                    except BinanceAPIException as gtx_err:
+                        # GTX rejected (would cross book) → fall back to market
+                        logger.warning(f"⚠️ GTX rejected ({gtx_err.message}) → falling back to MARKET")
+                        order_type = 'MARKET'
+                else:
+                    order_type = 'MARKET'
+
             params = {
                 "symbol": symbol,
                 "side": side,
@@ -175,6 +271,11 @@ class BinanceClient:
             if status_code in [429, 500, 502, 503, 504]:
                 raise RuntimeError(f"Transient Binance Failure: {e.message}")
             return {"status": "FAILED", "reason": "permanent", "msg": e.message}
+        except requests.exceptions.Timeout:
+            # Order may or may not have been submitted — caller must verify via get_order_status()
+            client_order_id = signal_id if signal_id else f"bot_{int(time.time())}"
+            logger.warning(f"⏱️ Timeout placing order for {symbol} (ID: {client_order_id}) — status unknown")
+            return {"status": "TIMEOUT", "client_order_id": client_order_id, "symbol": symbol}
         except Exception as e:
             if isinstance(e, RuntimeError):
                 raise e

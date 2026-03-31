@@ -11,25 +11,29 @@ class Reconciler:
     def reconcile_with_exchange(self, exchange_data: Dict[str, Any]) -> List[str]:
         """
         Automated Reconciliation: Compares Ledger vs Exchange and AUTO-FIXES drift.
-        """
-        # Ledger positions extraction
-        ledger_positions = {
-            sym: float(pos_obj.quantity)
-            for sym, pos_obj in getattr(self.ledger, 'positions', {}).items()
-        }
 
-        incidents = self.reconcile_portfolio(ledger_positions, exchange_data)
+        KEY FORMAT NOTE:
+        - Ledger keys:   "binance:BTCUSDT:strategy_name"  (exchange:symbol:strategy)
+        - Exchange keys: "binance:BTCUSDT"                (exchange:symbol only)
+        We aggregate all ledger positions for the same exchange:symbol before comparing.
+        """
+        # Aggregate ledger positions by "exchange:symbol" prefix (strip :strategy suffix)
+        ledger_by_symbol: Dict[str, float] = {}
+        for key, pos_obj in getattr(self.ledger, 'positions', {}).items():
+            parts = key.split(':')
+            # key format: exchange:symbol[:strategy] — take first two parts as base key
+            base_key = ':'.join(parts[:2]) if len(parts) >= 2 else key
+            ledger_by_symbol[base_key] = ledger_by_symbol.get(base_key, 0.0) + float(pos_obj.quantity)
+
+        incidents = self.reconcile_portfolio(ledger_by_symbol, exchange_data)
         alert_messages = []
 
         for incident in incidents:
             symbol = incident['symbol']
-            # --- AUTO-CORRECTION LOGIC ---
-            # Ledger ko Exchange (Source of Truth) ke mutabiq update karein
             try:
-                # Assuming exchange_data[symbol] contains 'side' (LONG/SHORT)
-                side = exchange_data.get(symbol, {}).get('side', 'BOTH')
-                self.ledger.update_position_manually(symbol, incident['exchange_qty'])
-                logger.info(f"🔧 Auto-synced Ledger for {symbol} to {incident['exchange_qty']}")
+                entry_price = incident.get('entry_price')
+                self.ledger.update_position_manually(symbol, incident['exchange_qty'], avg_price=entry_price)
+                logger.info(f"🔧 Auto-synced Ledger for {symbol} to {incident['exchange_qty']} entry={entry_price}")
             except Exception as e:
                 logger.error(f"❌ Failed to auto-fix drift for {symbol}: {e}")
 
@@ -46,6 +50,8 @@ class Reconciler:
             report = self.detect_qty_drift(expected_qty, actual_qty)
             if not report["is_synced"]:
                 report["symbol"] = symbol
+                # Carry entry_price from exchange_data so reconciler can sync it
+                report["entry_price"] = exchange_data.get(symbol, {}).get("entry_price")
                 incidents.append(report)
             if symbol in actual_map:
                 del actual_map[symbol]
@@ -54,6 +60,7 @@ class Reconciler:
             if abs(actual_qty) > self.tolerance:
                 report = self.detect_qty_drift(0.0, actual_qty)
                 report["symbol"] = symbol
+                report["entry_price"] = exchange_data.get(symbol, {}).get("entry_price")
                 incidents.append(report)
         return incidents
 

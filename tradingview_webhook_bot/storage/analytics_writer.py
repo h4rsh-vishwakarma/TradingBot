@@ -19,7 +19,9 @@ class AnalyticsWriter:
         "Win Rate %", "Gross Profit", "Gross Loss", "Net PnL",
         "Running Capital", "Net DD %", "Worst DD %", "Notes"
     ]
-    STARTING_CAPITAL = 10000.0
+    # Read from env so you can change without touching code.
+    # Set STARTING_CAPITAL=5000 in /etc/tradingbot/env_vars for your actual capital.
+    STARTING_CAPITAL = float(os.getenv("STARTING_CAPITAL", "10000.0"))
 
     def __init__(self, sheet_name=None, json_key=None):
         self.json_key = json_key or os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE") or "/etc/tradingbot/service_account.json"
@@ -122,9 +124,10 @@ class AnalyticsWriter:
                 if running_capital > peak_capital:
                     peak_capital = running_capital
 
+                # Net DD from peak (not just from starting capital — correctly tracks peak-to-trough)
                 net_dd = 0.0
-                if running_capital < self.STARTING_CAPITAL:
-                    net_dd = (self.STARTING_CAPITAL - running_capital) / self.STARTING_CAPITAL * 100
+                if peak_capital > 0 and running_capital < peak_capital:
+                    net_dd = (peak_capital - running_capital) / peak_capital * 100
 
                 if peak_capital > 0:
                     dd_fp = (peak_capital - running_capital) / peak_capital * 100
@@ -150,8 +153,8 @@ class AnalyticsWriter:
                 round(sum(r[7] for r in output_rows), 2),
                 round(sum(r[8] for r in output_rows), 2),
                 round(running_capital, 2),
-                round(net_dd, 2) if running_capital < self.STARTING_CAPITAL else 0,
-                round(worst_dd_pct, 2), "Start: $10,000"
+                round(net_dd, 2) if running_capital < peak_capital else 0,
+                round(worst_dd_pct, 2), f"Start: ${self.STARTING_CAPITAL:,.0f}"
             ]
             self.analytics_ws.append_row(summary)
             self.analytics_ws.append_row([""] * 13)

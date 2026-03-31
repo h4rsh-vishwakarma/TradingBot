@@ -21,8 +21,51 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 DB_PATH = os.path.join(PROJECT_ROOT, "tradingview_webhook_bot/storage/idempotency.db")
 REPORT_PATH = os.path.join(PROJECT_ROOT, "storage/reports/tournament_winners.csv")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://127.0.0.1:5000/webhook/tradingview")
+STOP_FLAG_FILE = os.path.join(PROJECT_ROOT, "tradingview_webhook_bot/storage/STOP_DISPATCH")
 
 bot = telebot.TeleBot(TOKEN)
+
+# ── Active subprocess tracker ─────────────────────────────────────────────────
+# Stores running Popen objects keyed by command name (e.g. "alpha", "average")
+_active_processes: dict = {}
+
+def _kill_active(name: str) -> bool:
+    """Kill a tracked subprocess + any OS-level script_vault.py process.
+    Returns True if something was killed.
+    Works even if telegram_listener was restarted (proc ref lost)."""
+    killed = False
+    proc = _active_processes.pop(name, None)
+    if proc and proc.poll() is None:
+        try:
+            proc.kill()
+            killed = True
+        except Exception:
+            pass
+    # OS-level fallback: pkill finds the process even without a stored reference
+    try:
+        result = subprocess.run(
+            ["pkill", "-f", "script_vault.py"],
+            capture_output=True, timeout=3
+        )
+        if result.returncode == 0:
+            killed = True
+    except Exception:
+        pass
+    return killed
+
+def _stop_all() -> list:
+    """Kill all active subprocesses and set the stop flag. Returns list of stopped names."""
+    stopped = []
+    # Create stop flag file so script_vault exits cleanly between messages
+    try:
+        with open(STOP_FLAG_FILE, "w") as _f:
+            _f.write("stop")
+    except Exception:
+        pass
+    for name in list(_active_processes.keys()):
+        if _kill_active(name):
+            stopped.append(name)
+    return stopped
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # /help — Full Command Reference
@@ -37,42 +80,31 @@ def cmd_help(message):
         "📊 <b>/winners</b> — Quick leaderboard summary (all tiers)\n"
         "🏆 <b>/top5</b> — Top 5 strategies with full details\n"
         "⚖️ <b>/average</b> — AVERAGE tier strategies\n"
+        "⚖️ <b>/average_scripts</b> — Deploy AVERAGE tier Pine scripts\n"
         "🔍 <b>/strategy</b> &lt;name&gt; — Search strategy by name\n"
         "💵 <b>/pnl</b> — Today's P&amp;L and open positions\n"
         "📊 <b>/categories</b> — Strategy risk categories (High vs Safe)\n"
-        "   Deploy top Alpha++ strategies to Telegram.\n"
-        "   Pine Script + Stats (ROI, Gross DD, Net DD).\n"
-        "   Auto-runs daily 9 AM UTC via cron.\n\n"
-
-        "📊 <b>/status</b>\n"
-        "   Live system health: Net Profit, Trade Count,\n"
-        "   Active Strategy, Node IP.\n\n"
-
-        "🔍 <b>/audit</b>\n"
-        "   Tournament Leaderboard — Top 10 strategies\n"
-        "   with Daily ROI%, Gross DD, Net DD, Tier.\n\n"
-
-        "💹 <b>/buy SYMBOL</b>\n"
-        "   Manual BUY signal. Example: <code>/buy SOLUSDT</code>\n"
-        "   Sends to orchestrator for execution.\n\n"
-
-        "💹 <b>/sell SYMBOL</b>\n"
-        "   Manual SELL signal. Example: <code>/sell ETHUSDT</code>\n\n"
-
-        "⚡ <b>/override SYMBOL</b>\n"
-        "   Force BUY override (bypasses tier check).\n"
-        "   Example: <code>/override BTCUSDT</code>\n\n"
-
-        "🛡️ <b>/help</b>\n"
-        "   Show this command reference.\n\n"
+        "📊 <b>/status</b> — Live system health\n"
+        "🔍 <b>/audit</b> — Tournament Leaderboard Top 10\n\n"
 
         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "<b>Institutional Updates v10.0:</b>\n"
-        "• <b>DD Split:</b> Gross DD (compounding) + Net DD (fixed size).\n"
-        "• <b>DD Reduction:</b> ADX &gt; 25 Filter + 4% Trailing Stop.\n"
-        "• <b>God Mode:</b> $100M buffer (No TV Crashes).\n"
-        "• <b>Blocked Trades:</b> Auto-logged to Google Sheets.\n"
-        "• <b>Data Sync:</b> Trade files synced to GitHub daily."
+        "🛑 <b>STOP COMMANDS</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🛑 <b>/stop</b> — Cancel ALL running deployments immediately\n"
+        "🛑 <b>/stop_alpha</b> — Stop only /alpha deployment\n"
+        "🛑 <b>/stop_average_scripts</b> — Stop only /average_scripts deployment\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "💹 <b>/buy SYMBOL</b> — Manual BUY. Example: <code>/buy SOLUSDT</code>\n"
+        "💹 <b>/sell SYMBOL</b> — Manual SELL. Example: <code>/sell ETHUSDT</code>\n"
+        "⚡ <b>/override SYMBOL</b> — Force BUY (bypasses tier check)\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "<b>Engine v11.0:</b>\n"
+        "• Pine scripts = only verified ALPHA (same condition as live trades)\n"
+        "• REVERSE_ALPHA excluded from Pine (signal flip handled server-side)\n"
+        "• ADX &gt; 20 + ATR Vol Filter + 2% Trail Stop + Daily Circuit Breaker\n"
+        "• /stop works mid-deployment — sends confirmation when halted"
     )
     bot.reply_to(message, help_text, parse_mode='HTML')
 
@@ -109,11 +141,15 @@ def cmd_status(message):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 @bot.message_handler(commands=['alpha'])
 def cmd_alpha(message):
-    bot.reply_to(message, "🚀 <b>Deploying Alpha Strategies...</b>\nPine Scripts incoming.", parse_mode='HTML')
-    subprocess.Popen(
+    # Kill any existing alpha deployment first
+    if _kill_active("alpha"):
+        bot.reply_to(message, "⚠️ Previous /alpha deployment was running — killed it. Starting fresh.", parse_mode='HTML')
+    bot.reply_to(message, "🚀 <b>Deploying Alpha Strategies...</b>\nPine Scripts incoming.\n\n<i>Send /stop or /stop_alpha to cancel.</i>", parse_mode='HTML')
+    proc = subprocess.Popen(
         [sys.executable, str(PROJECT_ROOT / "tradingview_webhook_bot/core/script_vault.py")],
         cwd=str(PROJECT_ROOT)
     )
+    _active_processes["alpha"] = proc
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # /winners — Quick Summary of ALL strategies (no scripts)
@@ -217,11 +253,58 @@ def cmd_average(message):
 
 @bot.message_handler(commands=['average_scripts'])
 def cmd_average_scripts(message):
-    bot.reply_to(message, "⚖️ <b>Deploying AVERAGE tier scripts...</b>\nTop 15 incoming.", parse_mode='HTML')
-    subprocess.Popen(
+    if _kill_active("average"):
+        bot.reply_to(message, "⚠️ Previous /average_scripts deployment was running — killed it. Starting fresh.", parse_mode='HTML')
+    bot.reply_to(message, "⚖️ <b>Deploying AVERAGE tier scripts...</b>\nTop 15 incoming.\n\n<i>Send /stop or /stop_average_scripts to cancel.</i>", parse_mode='HTML')
+    proc = subprocess.Popen(
         [sys.executable, str(PROJECT_ROOT / "tradingview_webhook_bot/core/script_vault.py"), "--average"],
         cwd=str(PROJECT_ROOT)
     )
+    _active_processes["average"] = proc
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# /stop — Cancel any running deployment
+# /stop_alpha, /stop_average_scripts — Specific stop commands
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@bot.message_handler(commands=['stop', 'stop_alpha', 'stop_average_scripts', 'stop_buy', 'stop_sell'])
+def cmd_stop(message):
+    cmd = message.text.split()[0].replace('/', '').lower()
+
+    if cmd == 'stop':
+        # Stop EVERYTHING currently running
+        stopped = _stop_all()
+        if stopped:
+            bot.reply_to(message, f"🛑 <b>STOPPED</b>\n\nKilled: {', '.join(stopped)}\nStop flag set — script_vault will halt after current message.", parse_mode='HTML')
+        else:
+            # Still set stop flag in case a subprocess is mid-sleep
+            try:
+                with open(STOP_FLAG_FILE, "w") as _f:
+                    _f.write("stop")
+            except Exception:
+                pass
+            bot.reply_to(message, "🛑 <b>Stop flag set.</b>\nNo active deployment found, but flag is active for 60s.", parse_mode='HTML')
+
+    elif cmd == 'stop_alpha':
+        killed = _kill_active("alpha")
+        try:
+            with open(STOP_FLAG_FILE, "w") as _f:
+                _f.write("stop")
+        except Exception:
+            pass
+        bot.reply_to(message, f"🛑 <b>/alpha deployment {'stopped ✅' if killed else 'was not running.'}</b>", parse_mode='HTML')
+
+    elif cmd == 'stop_average_scripts':
+        killed = _kill_active("average")
+        try:
+            with open(STOP_FLAG_FILE, "w") as _f:
+                _f.write("stop")
+        except Exception:
+            pass
+        bot.reply_to(message, f"🛑 <b>/average_scripts deployment {'stopped ✅' if killed else 'was not running.'}</b>", parse_mode='HTML')
+
+    else:
+        # stop_buy / stop_sell — nothing async to kill, just ack
+        bot.reply_to(message, f"ℹ️ <code>/{cmd}</code>: Manual trade commands are instant — nothing to stop.", parse_mode='HTML')
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # /strategy <name> — Search specific strategy
@@ -255,8 +338,6 @@ def cmd_strategy_search(message):
         bot.reply_to(message, f"❌ Error: {e}")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        "💵 <b>/pnl</b> — Today's P&amp;L and open positions\n"
-        "📊 <b>/categories</b> — Strategy risk categories (High vs Safe)\n"
 @bot.message_handler(commands=['pnl'])
 def cmd_pnl(message):
     try:

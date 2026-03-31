@@ -40,6 +40,55 @@ PLAIN_TEXT_PATTERN = re.compile(
     re.IGNORECASE
 )
 
+# TradingView default order-fill alert (no secret in message):
+# "StrategyName (params): order buy @ 12345 filled on SOLUSDT. New strategy position is 1"
+# "VWAP_Break [Live Trading]: order buy @ 424 filled on AVAXUSDT. New strategy position is 424"
+TV_ORDER_FILL_PATTERN = re.compile(
+    r'^(?P<strategy>[^:(]+?)(?:\s*[\(\[].*?[\)\]])?\s*:\s*'
+    r'order\s+(?P<action>buy|sell)\s+@\s+(?P<price>[\d.]+)\s+filled\s+on\s+(?P<ticker>\w+)\.'
+    r'.*?position\s+is\s+(?P<position>[+-]?[\d.]+)',
+    re.IGNORECASE | re.DOTALL
+)
+
+
+def parse_tv_order_fill_alert(text, webhook_secret):
+    """Parse TradingView default strategy order-fill plain-text alert (no secret field)."""
+    text = text.strip()
+    m = TV_ORDER_FILL_PATTERN.match(text)
+    if not m:
+        return None
+
+    strategy   = m.group('strategy').strip().replace(' ', '_')
+    action_raw = m.group('action').strip().upper()
+    price_str  = m.group('price').strip()
+    ticker_raw = m.group('ticker').strip().upper()
+    position   = float(m.group('position'))
+
+    # Clean symbol
+    symbol = ticker_raw.split(':')[-1].split('.')[0].split('_')[0]
+    if 'USDT' not in symbol:
+        symbol = f"{symbol.replace('USD', '')}USDT"
+
+    # Determine side from action word
+    is_exit = False
+    if action_raw == 'BUY':
+        side = 'BUY'
+    elif action_raw == 'SELL':
+        side = 'SELL'
+    else:
+        side = 'BUY'
+
+    return {
+        "secret":    webhook_secret,   # Inject bot secret — URL knowledge is auth enough
+        "strategy":  strategy,
+        "symbol":    symbol,
+        "side":      side,
+        "price":     float(price_str),
+        "quantity":  0.003,            # Default qty; live price override corrects price
+        "indicator": strategy,
+        "is_exit":   is_exit,
+    }
+
 
 def parse_plain_text_alert(text):
     """Parse TradingView default plain text alert into structured data."""
@@ -317,6 +366,16 @@ class WebhookServer:
                 else:
                     # === PLAIN TEXT FORMAT (TradingView default alerts) ===
                     parsed = parse_plain_text_alert(raw_body)
+
+                    # Fallback: try TradingView built-in order-fill format
+                    # e.g. "10_Aggressive_Entry: order buy @ 12345 filled on SOLUSDT..."
+                    _is_tv_order_fill = False
+                    if not parsed:
+                        parsed = parse_tv_order_fill_alert(raw_body, self.webhook_secret)
+                        if parsed:
+                            _is_tv_order_fill = True
+                            logger.info(f"📋 Parsed as TV order-fill alert: {parsed['strategy']} / {parsed['symbol']}")
+
                     if not parsed:
                         logger.warning(f"❌ Could not parse alert: {raw_body[:200]}")
                         logger.info(f'Ignoring unrecognized alert format')
@@ -334,14 +393,20 @@ class WebhookServer:
                     quantity = parsed['quantity']
                     exchange = "binance"
 
-                    # Plain text alerts may not include price — orchestrator resolves via mainnet
-                    price_val = parsed.get('price', 0)
-                    try:
-                        price_val = float(price_val) if price_val else 0.0
-                    except (ValueError, TypeError):
+                    # Plain text alerts may not include price — orchestrator resolves via mainnet.
+                    # TV order-fill format sends TradingView's internal simulation price (not live market price),
+                    # so we always discard it and let orchestrator fetch the real mainnet price.
+                    if _is_tv_order_fill:
                         price_val = 0.0
-                    if price_val <= 0:
-                        logger.info(f"⚠️ No price in plain text for {symbol}, orchestrator will resolve")
+                        logger.info(f"⚠️ TV order-fill price discarded for {symbol} — orchestrator will use mainnet price")
+                    else:
+                        price_val = parsed.get('price', 0)
+                        try:
+                            price_val = float(price_val) if price_val else 0.0
+                        except (ValueError, TypeError):
+                            price_val = 0.0
+                        if price_val <= 0:
+                            logger.info(f"⚠️ No price in plain text for {symbol}, orchestrator will resolve")
 
                 # --- COMMON: Build payload, queue, respond ---
                 signal_id = f"TV-{int(time.time() * 1000)}"
@@ -352,6 +417,11 @@ class WebhookServer:
                 is_exit_signal = False
                 if not is_json and parsed and parsed.get("is_exit", False):
                     is_exit_signal = True
+
+                # Extract SL/TP/TS from signal if provided by Pine script
+                sig_sl_pct = float(payload.get("sl_pct", 0) or 0) if is_json else 0.0
+                sig_tp_pct = float(payload.get("tp_pct", 0) or 0) if is_json else 0.0
+                sig_ts_pct = float(payload.get("ts_pct", 0) or 0) if is_json else 0.0
 
                 clean_payload = {
                     "signal_id": signal_id,
@@ -365,6 +435,9 @@ class WebhookServer:
                         "exchange": exchange,
                         "indicator": indicator,
                         "is_exit": is_exit_signal,
+                        "sl_pct": sig_sl_pct,
+                        "tp_pct": sig_tp_pct,
+                        "ts_pct": sig_ts_pct,
                     }
                 }
 
@@ -380,7 +453,13 @@ class WebhookServer:
                 _sym, _side, _price, _sig, _strat = symbol, side, price_val, signal_id, strategy
                 def _notify_telegram():
                     try:
-                        price_display = f"${_price:,.2f}" if _price and _price > 0 else "Resolving..."
+                        live_p = self._fetch_live_price(_sym)
+                        if live_p and live_p > 0:
+                            price_display = "Live: ${:,.4f}".format(live_p)
+                        elif _price and _price > 0:
+                            price_display = "${:,.4f} (stale signal price)".format(_price)
+                        else:
+                            price_display = "Resolving..."
                         self.telegram.send(
                             severity=AlertSeverity.INFO,
                             title=f"📥 Signal Received: {_sym}",

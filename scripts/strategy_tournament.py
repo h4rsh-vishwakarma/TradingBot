@@ -62,31 +62,54 @@ def strategy_tournament():
                 except Exception:
                     pass
 
-                # Check uniqueness
-                sig = (round(daily_roi, 5), round(gross_dd, 2))
-                if sig not in seen_signatures:
-                    seen_signatures.add(sig)
-                    results.append({
-                        "Symbol": symbol,
-                        "Strategy": clean_name,
-                        "Daily_ROI_%": round(daily_roi, 3),
-                        "Gross_DD_%": round(gross_dd, 2),
-                        "Net_DD_%": round(net_dd, 2),
-                        "Max_DD_%": round(gross_dd, 2),
-                        "GDD_Date": gdd_date,
-                        "GDD_Capital_Left": int(gdd_cap),
-                        "NDD_Date": ndd_date,
-                        "NDD_Capital_Left": int(ndd_cap),
-                        "Win_Rate_%": win_rate,
-                        "Sharpe_Ratio": sharpe,
-                        "Total_Trades": trades,
-                        "Tier": tier,
-                        "Optimal_Mult": round(opt_p['mult'], 2),
-                        "Optimal_Len": int(opt_p['len']),
-                        "OOS_Daily_ROI_%": round(oos_roi, 3),
-                        "OOS_Gross_DD_%": round(oos_dd, 2),
-                        "OOS_Sharpe": round(oos_sharpe, 2),
-                    })
+                # ── OOS-BASED TIER DOWNGRADE ─────────────────────────────────
+                # IS metrics determine entry tier; OOS metrics enforce reality.
+                # A strategy with great IS but terrible OOS is overfit — downgrade it.
+                if "ALPHA" in tier:
+                    if oos_roi < 0.05:
+                        # OOS is near-zero — pure overfit, no live edge
+                        tier = "💀 REJECT"
+                    elif oos_roi < 0.10:
+                        # Weak OOS — cap at AVERAGE, needs manual review
+                        tier = "⚖️ AVERAGE"
+                    elif oos_roi < 0.15 and "ALPHA++" in tier:
+                        # ALPHA++ headline but OOS < 0.15% → demote to ALPHA
+                        tier = "🎯 ALPHA"
+
+                # ── UNIQUENESS: keep best-OOS per (symbol, strategy) pair ─────
+                # Old method: unique by (IS_roi, IS_gdd) → same strategy with
+                # slightly different params could appear multiple times.
+                # New method: one entry per (symbol, strategy), kept by best OOS.
+                pair_key = (symbol, clean_name)
+                existing_idx = seen_signatures.get(pair_key)
+                row = {
+                    "Symbol": symbol,
+                    "Strategy": clean_name,
+                    "Daily_ROI_%": round(daily_roi, 3),
+                    "Gross_DD_%": round(gross_dd, 2),
+                    "Net_DD_%": round(net_dd, 2),
+                    "Max_DD_%": round(gross_dd, 2),
+                    "GDD_Date": gdd_date,
+                    "GDD_Capital_Left": int(gdd_cap),
+                    "NDD_Date": ndd_date,
+                    "NDD_Capital_Left": int(ndd_cap),
+                    "Win_Rate_%": win_rate,
+                    "Sharpe_Ratio": sharpe,
+                    "Total_Trades": trades,
+                    "Tier": tier,
+                    "Optimal_Mult": round(opt_p['mult'], 2),
+                    "Optimal_Len": int(opt_p['len']),
+                    "OOS_Daily_ROI_%": round(oos_roi, 3),
+                    "OOS_Gross_DD_%": round(oos_dd, 2),
+                    "OOS_Sharpe": round(oos_sharpe, 2),
+                }
+                if existing_idx is None:
+                    seen_signatures[pair_key] = len(results)
+                    results.append(row)
+                else:
+                    # Replace only if this param combo has better OOS
+                    if oos_roi > results[existing_idx].get("OOS_Daily_ROI_%", 0):
+                        results[existing_idx] = row
             gc.collect()
 
     final_df = pd.DataFrame(results).sort_values(by=["Daily_ROI_%"], ascending=False)
@@ -95,7 +118,7 @@ def strategy_tournament():
     print("\n🚀 --- TOP ALPHA STRATEGIES (TARGET 2% DAILY) --- 🚀")
     print(final_df.head(15).to_string(index=False))
 
-def run_test_oos(df_raw, name, mult, length, train_pct=0.8):
+def run_test_oos(df_raw, name, mult, length, train_pct=0.8, reverse=False):
     """Run test with train/test split for out-of-sample validation."""
     split_idx = int(len(df_raw) * train_pct)
     df_train = df_raw.iloc[:split_idx].copy()
@@ -104,27 +127,30 @@ def run_test_oos(df_raw, name, mult, length, train_pct=0.8):
     df_test['pct'] = df_test['close'].pct_change()
 
     # Optimize on train set
-    train_result = run_test(df_train, name, True, mult, length)[:7]
+    train_result = run_test(df_train, name, True, mult, length, reverse=reverse)[:7]
     # Validate on test set (same params, no re-optimization)
-    test_result = run_test(df_test, name, True, mult, length)[:7]
+    test_result = run_test(df_test, name, True, mult, length, reverse=reverse)[:7]
     return train_result, test_result
 
 
-def run_test(df_raw, name, optimize, mult, length):
+def run_test(df_raw, name, optimize, mult, length, reverse=False):
     df = df_raw.copy()
 
     # 🛡️ OPTIMIZED RISK PARAMETERS — Target NDD < -50%
     LEVERAGE = 1.0              # No leverage (was 2.5x — #1 cause of -96% DD)
-    STOP_LOSS = 0.01            # 1% SL per bar (was 2%)
-    TAKE_PROFIT = 0.03          # 3% TP per bar (was 6%) — maintains 1:3 RR
+    STOP_LOSS = 0.015           # 1.5% SL per bar (wider = fewer SL hits = fewer trades)
+    TAKE_PROFIT = 0.045         # 4.5% TP per bar (3:1 RR maintained, bigger wins)
     MAX_DAILY_LOSS = -0.03      # Circuit breaker: -3% max loss per day
     COOLDOWN_TRIGGER = 3        # Go flat after 3 consecutive losses
     COOLDOWN_BARS = 4           # Skip 4 bars (1 hour on 15m data)
+    MIN_HOLD_BARS = 4           # Minimum hold: 4 bars = 1 hour (prevents flip-flop fee bleed)
 
     try:
         df['sig'] = apply_strategy(df, name, optimize, mult, length)
+        if reverse:
+            df['sig'] = -df['sig']   # Flip all signals: BUY→SELL, SELL→BUY
 
-        # 🛡️ FILTER 1: ADX > 20 (relaxed from 25 to capture moderate trends)
+        # 🛡️ FILTER 1: ADX > 20 — require confirmed trend before entry
         from my_strategies import calculate_adx
         adx = calculate_adx(df, n=14)
         df['sig'] = np.where(adx > 20, df['sig'], 0)
@@ -137,6 +163,42 @@ def run_test(df_raw, name, optimize, mult, length):
         # Calculate daily returns
         df['daily_ret'] = df['sig'].shift(1) * df['pct'] * LEVERAGE
         df['daily_ret'] = df['daily_ret'].clip(lower=-STOP_LOSS, upper=TAKE_PROFIT)
+
+        # 🔒 MINIMUM HOLD FILTER — enforce MIN_HOLD_BARS before allowing exit/reversal
+        # Prevents flip-flopping (enter→exit→enter in same hour = 3x fees)
+        # Any signal that reverses within MIN_HOLD_BARS of entry is held until min hold expires
+        sig_arr = df['sig'].values.copy()
+        hold_count = 0
+        current_sig = 0
+        for i in range(len(sig_arr)):
+            if sig_arr[i] != current_sig and current_sig != 0:
+                # Trying to exit/reverse mid-hold — block it
+                if hold_count < MIN_HOLD_BARS:
+                    sig_arr[i] = current_sig   # force hold
+                    hold_count += 1
+                else:
+                    current_sig = sig_arr[i]
+                    hold_count = 0
+            elif sig_arr[i] != 0 and current_sig == 0:
+                current_sig = sig_arr[i]
+                hold_count = 1
+            else:
+                if current_sig != 0:
+                    hold_count += 1
+                if sig_arr[i] == 0 and current_sig != 0 and hold_count >= MIN_HOLD_BARS:
+                    current_sig = 0
+                    hold_count = 0
+        df['sig'] = sig_arr
+
+        # 💰 FEE MODEL — deduct TAKER fee at each actual entry/exit
+        # Binance Futures taker: 0.04%/side = 0.08% round trip
+        FEE_PER_SIDE = 0.0004
+        sa       = df['sig'].values
+        prev_s   = np.empty_like(sa); prev_s[0] = 0; prev_s[1:] = sa[:-1]
+        next_s   = np.empty_like(sa); next_s[-1] = 0; next_s[:-1] = sa[1:]
+        is_entry = (sa != 0) & (sa != prev_s)
+        is_exit  = (sa != 0) & (sa != next_s)
+        df['daily_ret'] -= (is_entry.astype(float) + is_exit.astype(float)) * FEE_PER_SIDE
 
         # 🛡️ FILTER 3: Consecutive loss cooldown
         # After COOLDOWN_TRIGGER consecutive losses, skip COOLDOWN_BARS bars
@@ -164,8 +226,10 @@ def run_test(df_raw, name, optimize, mult, length):
             df.loc[df['_daily_cum'] < MAX_DAILY_LOSS, 'daily_ret'] = 0.0
             df.drop(columns=['_date', '_daily_cum'], inplace=True)
 
-        # 📊 ROI Calculation
-        total_days = 1095
+        # 📊 ROI Calculation — use actual data span, not hardcoded 1095 days
+        # 96 bars/day on 15m data; guard against empty df
+        total_bars = max(len(df), 1)
+        total_days = max(total_bars / 96, 1)
         total_return_sum = df['daily_ret'].sum() * 100
         daily_roi = total_return_sum / total_days
 

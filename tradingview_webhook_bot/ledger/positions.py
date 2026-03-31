@@ -148,12 +148,16 @@ class PositionLedger:
         self._save_state()
         return pos
 
-    def update_position_manually(self, symbol: str, quantity: float):
-        """Force update position (Reconciliation fallback)."""
+    def update_position_manually(self, symbol: str, quantity: float, avg_price: float = None):
+        """Force update position (Reconciliation fallback). Optionally sync entry price."""
         if symbol not in self.positions:
             self.positions[symbol] = PositionSnapshot(symbol=symbol)
         pos = self.positions[symbol]
         pos.quantity = float(quantity)
         if abs(pos.quantity) < 1e-10:
             pos.avg_price = 0.0
+        elif avg_price is not None and float(avg_price) > 0:
+            # Only overwrite if current avg_price is unknown (0) or entry price provided
+            if pos.avg_price == 0.0:
+                pos.avg_price = float(avg_price)
         self._save_state()

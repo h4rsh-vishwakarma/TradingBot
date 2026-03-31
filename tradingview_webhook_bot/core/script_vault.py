@@ -9,6 +9,29 @@ PROJECT_ROOT = FILE_PATH.parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Stop flag file — created by /stop command in telegram_listener
+STOP_FLAG_FILE = os.path.join(PROJECT_ROOT, "tradingview_webhook_bot/storage/STOP_DISPATCH")
+
+def _should_stop():
+    """Returns True and cleans up flag if a stop was requested."""
+    if os.path.exists(STOP_FLAG_FILE):
+        try:
+            os.remove(STOP_FLAG_FILE)
+        except Exception:
+            pass
+        return True
+    return False
+
+def _interruptible_sleep(seconds):
+    """Sleep in 0.5s chunks. Returns True immediately if stop flag appears.
+    Does NOT consume the flag — caller should check _should_stop() after."""
+    end = time.time() + seconds
+    while time.time() < end:
+        time.sleep(min(0.5, end - time.time()))
+        if os.path.exists(STOP_FLAG_FILE):
+            return True
+    return False
+
 # Load Env Vars
 ENV_VARS_PATH = "/etc/tradingbot/env_vars"
 if os.path.exists(ENV_VARS_PATH):
@@ -22,14 +45,32 @@ def dispatch_top_strategies(force=False):
 
     try:
         df = pd.read_csv(report_path)
-        targets = df[df['Tier'].str.contains('ALPHA', na=False)].sort_values(by='Daily_ROI_%', ascending=False)
+        # Match EXACTLY what the orchestrator allows:
+        # - Tier contains "ALPHA" (same check as check_tournament_alpha line 489)
+        # - Exclude REVERSE_ strategies (they don't have independent Pine scripts)
+        # - Exclude BLOCKED
+        # - Drop duplicates: keep best ROI per Symbol+Strategy pair
+        _tier = df['Tier'].astype(str)
+        targets = (
+            df[
+                _tier.str.contains('ALPHA', na=False) &
+                ~_tier.str.contains('REVERSE', na=False) &
+                ~_tier.str.contains('BLOCKED', na=False)
+            ]
+            .drop_duplicates(subset=['Symbol', 'Strategy'])
+            .sort_values(by='Daily_ROI_%', ascending=False)
+        )
     except Exception as e:
         print(f"❌ Error: {e}")
         return
 
+    # Clear any leftover stop flag from previous run
+    if os.path.exists(STOP_FLAG_FILE):
+        os.remove(STOP_FLAG_FILE)
+
     # Header Message
     telegram.send(severity=AlertSeverity.INFO, title="Alpha Engine v11.0 [LOW DD MODE]",
-                  message=f"🛡️ <b>DD SHIELD v2 ACTIVE</b>\nDeploying {len(targets)} scripts — 1x Leverage, NDD &lt; -50% target.\n🛡️ <b>Filters:</b> ADX &gt; 20 + ATR Vol Filter + 2% Trail Stop + Daily Circuit Breaker.")
+                  message=f"🛡️ <b>DD SHIELD v2 ACTIVE</b>\nDeploying {len(targets)} scripts — 1x Leverage, NDD &lt; -50% target.\n🛡️ <b>Filters:</b> ADX &gt; 20 + ATR Vol Filter + 2% Trail Stop + Daily Circuit Breaker.\n\n<i>Send /stop to cancel at any time.</i>")
     time.sleep(3)
 
     for i, (_, winner) in enumerate(targets.iterrows()):
@@ -116,6 +157,13 @@ if (time >= start_time)
 """
         safe_code = html.escape(pine_code)
         
+        # Check for stop command between each strategy
+        if _should_stop():
+            telegram.send(severity=AlertSeverity.INFO, title="Deployment Stopped",
+                          message=f"🛑 <b>/stop received</b> — Deployment halted after {i} of {len(targets)} scripts.")
+            print(f"[script_vault] Stop flag detected — exiting after {i} strategies.")
+            return
+
         # Telegram Dispatch
         tier_display = str(winner.get('Tier', 'ALPHA'))
         tier_emoji = "🚀" if "ALPHA++" in tier_display else "🎯" if "ALPHA" in tier_display else "⚖️"
@@ -133,11 +181,19 @@ if (time >= start_time)
                f"🛡️ ADX &gt; 20 + ATR Vol Filter: ON | Trailing Stop: 2%")
 
         telegram.send(severity=AlertSeverity.INFO, title=f"Rank #{i+1} Stats", message=msg)
-        time.sleep(3)  # 3s between stats and code to avoid 429
+        if _interruptible_sleep(3):
+            if _should_stop():
+                telegram.send(severity=AlertSeverity.INFO, title="Deployment Stopped",
+                              message=f"🛑 <b>/stop received</b> — Deployment halted after {i} of {len(targets)} scripts.")
+            return
         telegram.send(severity=AlertSeverity.INFO, title=f"Rank #{i+1} [SECURE] Code", message=f"<code>{safe_code}</code>")
 
         print(f"Dispatched {symbol} Rank #{i+1} in God Mode.")
-        time.sleep(4)  # 4s between strategies (Telegram allows ~20 msg/min to same chat)
+        if _interruptible_sleep(4):
+            if _should_stop():
+                telegram.send(severity=AlertSeverity.INFO, title="Deployment Stopped",
+                              message=f"🛑 <b>/stop received</b> — Deployment halted after {i+1} of {len(targets)} scripts.")
+            return
 
 def dispatch_average_strategies():
     """Send AVERAGE tier strategies with Pine scripts."""
@@ -151,8 +207,11 @@ def dispatch_average_strategies():
         print(f"Error: {e}")
         return
 
+    if os.path.exists(STOP_FLAG_FILE):
+        os.remove(STOP_FLAG_FILE)
+
     telegram.send(severity=AlertSeverity.INFO, title="Average Tier Deployment",
-                  message=f"⚖️ <b>Deploying {len(targets)} AVERAGE strategies</b>\nThese require manual approval before live trading.")
+                  message=f"⚖️ <b>Deploying {len(targets)} AVERAGE strategies</b>\nThese require manual approval before live trading.\n\n<i>Send /stop to cancel at any time.</i>")
     time.sleep(3)
 
     for i, (_, winner) in enumerate(targets.iterrows()):
@@ -219,10 +278,23 @@ if (time >= start_time)
                f"🔄 Trades: {total_trades}\n"
                f"⚙️ Params: Len={length}, Mult={mult}")
 
+        if _should_stop():
+            telegram.send(severity=AlertSeverity.INFO, title="Deployment Stopped",
+                          message=f"🛑 <b>/stop received</b> — Average deployment halted after {i} of {len(targets)} scripts.")
+            return
+
         telegram.send(severity=AlertSeverity.INFO, title=f"Average #{i+1}", message=msg)
-        time.sleep(2)
+        if _interruptible_sleep(2):
+            if _should_stop():
+                telegram.send(severity=AlertSeverity.INFO, title="Deployment Stopped",
+                              message=f"🛑 <b>/stop received</b> — Average deployment halted after {i} of {len(targets)} scripts.")
+            return
         telegram.send(severity=AlertSeverity.INFO, title=f"Average #{i+1} Code", message=f"<code>{safe_code}</code>")
-        time.sleep(3)
+        if _interruptible_sleep(3):
+            if _should_stop():
+                telegram.send(severity=AlertSeverity.INFO, title="Deployment Stopped",
+                              message=f"🛑 <b>/stop received</b> — Average deployment halted after {i+1} of {len(targets)} scripts.")
+            return
 
     print(f"Dispatched {len(targets)} AVERAGE strategies.")
 
