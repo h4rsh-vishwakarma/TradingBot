@@ -542,6 +542,22 @@ def render():
 
                 if pine_code:
                     with st.expander("📜 View PineScript Code — %s  (%d lines)" % (strat, len(pine_code.splitlines())), expanded=True):
+                        # Download button (most reliable way to get the code)
+                        st.download_button(
+                            label="⬇️ Download PineScript — %s.pine" % strat,
+                            data=pine_code,
+                            file_name="%s.pine" % strat,
+                            mime="text/plain",
+                            use_container_width=True,
+                        )
+                        # Selectable text area — easy to select-all + copy
+                        st.text_area(
+                            "📋 Select All → Ctrl+A then Ctrl+C to copy:",
+                            value=pine_code,
+                            height=400,
+                            key="pine_ta_%s" % strat,
+                        )
+                        # Syntax-highlighted view
                         st.code(pine_code, language="javascript")
         else:
             st.info("No strategies match the current filters. Try broadening the search.")
