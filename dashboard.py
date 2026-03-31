@@ -17,7 +17,7 @@ STORAGE       = PROJECT_ROOT / "tradingview_webhook_bot" / "storage"
 LEDGER_PATH   = STORAGE / "ledger_state.json"
 CB_PATH       = STORAGE / "circuit_breaker_state.json"
 SIGNALS_PATH  = STORAGE / "signals.jsonl"
-TOURNAMENT    = PROJECT_ROOT / "tournament_winners.csv"
+TOURNAMENT    = PROJECT_ROOT / "storage/reports/tournament_winners.csv"
 ENV_FILE      = Path("/etc/tradingbot/env_vars")
 SYSTEMCTL     = shutil.which("systemctl") or "/usr/bin/systemctl"
 JOURNALCTL    = shutil.which("journalctl") or "/usr/bin/journalctl"
@@ -53,7 +53,12 @@ def load_json(path):
         return {}
 
 def clean_tier(t):
-    return re.sub(r"[^\w\s\+\-]", "", str(t or "")).strip().upper()
+    t = re.sub(r"[^\w\s\+\-]", "", str(t or "")).strip().upper()
+    if "ALPHA" in t and "++" in t:  return "ALPHA++"
+    if t in ("ALPHA",):             return "ALPHA"
+    if t in ("AVERAGE", "SUB-ALPHA", "SUB ALPHA"): return "AVERAGE"
+    if t in ("REJECT", "BLOCKED"):  return "REJECT"
+    return t
 
 def tail_lines(path, n=200):
     try:
@@ -259,65 +264,205 @@ def render():
     rows = load_tournament()
 
     if rows:
+        def safe_f(v):
+            try: return float(v or 0)
+            except: return 0.0
+
         tiers = defaultdict(list)
         for r in rows:
             tiers[clean_tier(r.get("Tier", ""))].append(r)
 
+        # IS→OOS Retention Banner
+        alpha_pp_rows = tiers.get("ALPHA++", [])
+        oos_vals = [safe_f(r.get("OOS_Daily_ROI_%")) for r in alpha_pp_rows if safe_f(r.get("OOS_Daily_ROI_%")) > 0]
+        is_vals  = [safe_f(r.get("Daily_ROI_%"))     for r in alpha_pp_rows if safe_f(r.get("Daily_ROI_%")) > 0]
+        avg_oos  = sum(oos_vals)/len(oos_vals) if oos_vals else 0
+        avg_is   = sum(is_vals)/len(is_vals)   if is_vals  else 0
+        retention = (avg_oos/avg_is*100) if avg_is > 0 else 0
+        oos_gt25 = sum(1 for v in oos_vals if v > 0.25)
+        oos_gt15 = sum(1 for v in oos_vals if v > 0.15)
+        st.info(
+            "📊 **IS→OOS Retention: %.1f%%** | "
+            "Avg IS: %.3f%%/day → Avg OOS: %.3f%%/day | "
+            "Top candidates (OOS>0.25%%): **%d** | OOS>0.15%%: **%d** | "
+            "⚠️ Realistic live expectation: **0.20–0.27%%/day**"
+            % (retention, avg_is, avg_oos, oos_gt25, oos_gt15)
+        )
+
         t_cols = st.columns(4)
-        tier_info = [
-            ("ALPHA++", "#ffd700", "🏆", "Free trading — best performers"),
-            ("ALPHA",   "#00c853", "✅", "Free trading — strong performers"),
-            ("AVERAGE", "#ff9800", "⚠️", "Size-capped trading"),
-            ("BLOCKED", "#f44336", "🚫", "No trading allowed"),
+        tier_data = [
+            ("ALPHA++", "#ffd700", "🏆", "OOS-validated top performers"),
+            ("ALPHA",   "#00c853", "✅", "OOS 0.10–0.25%/day"),
+            ("AVERAGE", "#ff9800", "⚠️", "OOS < 0.10% — watch only"),
+            ("REJECT",  "#f44336", "🚫", "Overfit / no live edge"),
         ]
-        for i, (tier, color, icon, desc) in enumerate(tier_info):
+        for i, (tier, color, icon, desc) in enumerate(tier_data):
             count = len(tiers.get(tier, []))
             with t_cols[i]:
-                st.markdown(f"""
-                    <div style='background:#1e1e2e; border:2px solid {color};
-                                padding:14px; border-radius:8px; text-align:center;'>
-                        <div style='font-size:28px;'>{icon}</div>
-                        <div style='color:{color}; font-size:22px; font-weight:bold;'>{count}</div>
-                        <div style='font-weight:bold;'>{tier}</div>
-                        <div style='color:#888; font-size:11px;'>{desc}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown(
+                    "<div style='background:#1e1e2e; border:2px solid %s;"
+                    "padding:14px; border-radius:8px; text-align:center;'>"
+                    "<div style='font-size:28px;'>%s</div>"
+                    "<div style='color:%s; font-size:22px; font-weight:bold;'>%d</div>"
+                    "<div style='font-weight:bold;'>%s</div>"
+                    "<div style='color:#888; font-size:11px;'>%s</div></div>"
+                    % (color, icon, color, count, tier, desc),
+                    unsafe_allow_html=True
+                )
 
-        st.markdown(f"**Total strategies evaluated: {len(rows)}**")
+        st.markdown("**Total evaluated: %d** | OOS-based tiers (overfit downgraded)" % len(rows))
 
-        with st.expander("🏆 View ALPHA++ Strategies (Top Performers)", expanded=True):
-            alpha_pp = tiers.get("ALPHA++", [])
-            if alpha_pp:
-                df_rows = []
-                for r in alpha_pp:
-                    df_rows.append({
-                        "Symbol":    r.get("Symbol", "?"),
-                        "Strategy":  r.get("Strategy", "?")[:50],
-                        "Win Rate":  r.get("Win_Rate_%", "?") + "%",
-                        "Daily ROI": r.get("Daily_ROI_%", "?") + "%",
-                        "Net DD":    r.get("Net_DD_%", "?") + "%",
-                        "Sharpe":    r.get("Sharpe_Ratio", "?"),
+        # Top Testnet Candidates (OOS > 0.25)
+        top_cands = sorted([r for r in alpha_pp_rows if safe_f(r.get("OOS_Daily_ROI_%")) > 0.25],
+                           key=lambda x: -safe_f(x.get("OOS_Daily_ROI_%")))
+        if top_cands:
+            with st.expander("🚀 TOP %d TESTNET CANDIDATES (OOS > 0.25%%/day)" % len(top_cands), expanded=True):
+                st.success("These %d strategies are OOS-validated. Deploy on testnet for 2-4 weeks." % len(top_cands))
+                df_top = []
+                for r in top_cands:
+                    oos = safe_f(r.get("OOS_Daily_ROI_%"))
+                    is_ = safe_f(r.get("Daily_ROI_%"))
+                    ret = oos/is_*100 if is_ > 0 else 0
+                    df_top.append({
+                        "Symbol":      r.get("Symbol","?"),
+                        "Strategy":    r.get("Strategy","?")[:40],
+                        "OOS ROI/day": "%.3f%%" % oos,
+                        "IS ROI/day":  "%.3f%%" % is_,
+                        "Retention":   "%.0f%%" % ret,
+                        "Sharpe":      r.get("Sharpe_Ratio","?"),
+                        "Win Rate":    str(r.get("Win_Rate_%","?")) + "%",
+                        "GDD":         str(r.get("Gross_DD_%","?")) + "%",
                     })
-                st.dataframe(pd.DataFrame(df_rows), hide_index=True, use_container_width=True)
-            else:
-                st.info("No ALPHA++ strategies")
+                st.dataframe(pd.DataFrame(df_top), hide_index=True, use_container_width=True)
 
-        with st.expander("✅ View ALPHA Strategies"):
-            alpha = tiers.get("ALPHA", [])
-            if alpha:
-                df_rows = []
-                for r in alpha:
-                    df_rows.append({
-                        "Symbol":    r.get("Symbol", "?"),
-                        "Strategy":  r.get("Strategy", "?")[:50],
-                        "Win Rate":  r.get("Win_Rate_%", "?") + "%",
-                        "Daily ROI": r.get("Daily_ROI_%", "?") + "%",
-                        "Net DD":    r.get("Net_DD_%", "?") + "%",
-                    })
-                st.dataframe(pd.DataFrame(df_rows), hide_index=True, use_container_width=True)
+        # Full ALPHA++ sorted by OOS
+        with st.expander("🏆 All %d ALPHA++ Strategies (sorted by OOS)" % len(alpha_pp_rows), expanded=False):
+            alpha_sorted = sorted(alpha_pp_rows, key=lambda x: -safe_f(x.get("OOS_Daily_ROI_%")))
+            df_rows2 = []
+            for r in alpha_sorted:
+                oos = safe_f(r.get("OOS_Daily_ROI_%"))
+                is_ = safe_f(r.get("Daily_ROI_%"))
+                df_rows2.append({
+                    "Symbol":      r.get("Symbol","?"),
+                    "Strategy":    r.get("Strategy","?")[:45],
+                    "OOS ROI/day": "%.3f%%" % oos,
+                    "IS ROI/day":  "%.3f%%" % is_,
+                    "OOS Sharpe":  r.get("OOS_Sharpe","?"),
+                    "Sharpe":      r.get("Sharpe_Ratio","?"),
+                    "Win Rate":    str(r.get("Win_Rate_%","?")) + "%",
+                    "GDD":         str(r.get("Gross_DD_%","?")) + "%",
+                })
+            st.dataframe(pd.DataFrame(df_rows2), hide_index=True, use_container_width=True)
+
+        with st.expander("✅ ALPHA Strategies (%d — OOS 0.10–0.25%%/day)" % len(tiers.get("ALPHA",[]))):
+            alpha_s = sorted(tiers.get("ALPHA",[]), key=lambda x: -safe_f(x.get("OOS_Daily_ROI_%")))
+            df_a = []
+            for r in alpha_s:
+                df_a.append({
+                    "Symbol":      r.get("Symbol","?"),
+                    "Strategy":    r.get("Strategy","?")[:45],
+                    "OOS ROI/day": "%.3f%%" % safe_f(r.get("OOS_Daily_ROI_%")),
+                    "IS ROI/day":  "%.3f%%" % safe_f(r.get("Daily_ROI_%")),
+                    "Win Rate":    str(r.get("Win_Rate_%","?")) + "%",
+                    "GDD":         str(r.get("Gross_DD_%","?")) + "%",
+                })
+            st.dataframe(pd.DataFrame(df_a), hide_index=True, use_container_width=True)
     else:
         st.error("Tournament leaderboard not found")
+    st.divider()
 
+    # ══════════════════════════════════════════════════════════════════
+    # SECTION 3.5 — TRADINGVIEW SETUP (Symbol + PineScript Viewer)
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("📡 TradingView Setup — Top Strategies per Symbol")
+
+    STRATEGY_TV_NAMES = {
+        "Aggressive_Entry":    "10 Aggressive Entry",
+        "Full_Momentum":       "21 Full Momentum",
+        "Ichimoku_Trend_Pro":  "22 Ichimoku Trend Pro",
+        "Ichimoku_MACD_Pro":   "23 Ichimoku MACD Pro",
+        "Keltner_Breakout":    "24 Keltner Breakout",
+        "MACD_Breakout":       "07 MACD Breakout",
+        "Hybrid_SMC":          "Hybrid SMC [MarkitTick]",
+        "SMC_LuxAlgo_WH":      "SMC Strategy [LuxAlgo] + Webhook",
+        "BB_Squeeze_Break":    "BB Squeeze Break",
+        "ML_Lorentzian":       "ML Lorentzian Classification",
+        "EMA_Break_Momentum":  "03 EMA Break Momentum",
+        "VWAP_Break_Entry":    "VWAP Break Entry [Live Trading]",
+    }
+
+    WEBHOOK_SECRET_VAL = "squeeze_tradingview_cluster_2026_secure"
+    WEBHOOK_URL_VAL    = "http://15.207.152.119/webhook/tradingview"
+
+    def get_alert_msg(strat, sym):
+        tv = STRATEGY_TV_NAMES.get(strat, strat.replace("_"," "))
+        return (
+            f"{tv} | {sym} - Webhook ({WEBHOOK_SECRET_VAL}): "
+            "order {{strategy.order.action}} @ {{strategy.order.contracts}} "
+            f"filled on BINANCE:{sym}.P. New strategy position is {{{{strategy.position_size}}}}"
+        )
+
+    tv_rows = load_tournament()
+    if tv_rows:
+        # Symbol filter
+        all_syms = sorted(set(r.get("Symbol","") for r in tv_rows))
+        priority_syms = ["FILUSDT","LDOUSDT","UNIUSDT","SOLUSDT","ETHUSDT","AVAXUSDT"]
+        default_syms = [s for s in priority_syms if s in all_syms]
+
+        sel_syms = st.multiselect(
+            "🔍 Select symbols to view strategies:",
+            options=all_syms,
+            default=default_syms,
+            help="Choose which symbols to show top strategies for"
+        )
+        min_oos_filter = st.slider("Minimum OOS ROI (%/day)", 0.05, 0.50, 0.20, 0.01)
+
+        if sel_syms:
+            for sym in sel_syms:
+                sym_rows = [r for r in tv_rows
+                            if r.get("Symbol") == sym
+                            and r.get("Tier") in ("ALPHA++","ALPHA")
+                            and safe_f(r.get("OOS_Daily_ROI_%")) >= min_oos_filter]
+                sym_rows = sorted(sym_rows, key=lambda x: -safe_f(x.get("OOS_Daily_ROI_%")))
+
+                if not sym_rows:
+                    continue
+
+                best_oos = safe_f(sym_rows[0].get("OOS_Daily_ROI_%")) if sym_rows else 0
+                label = f"📊 {sym} — {len(sym_rows)} strategies  |  Best OOS: {best_oos:.3f}%/day"
+                with st.expander(label, expanded=(sym in ["FILUSDT","LDOUSDT","UNIUSDT"])):
+                    st.caption(f"**Webhook URL:** `{WEBHOOK_URL_VAL}`")
+                    for r in sym_rows:
+                        strat  = r.get("Strategy","?")
+                        tier   = r.get("Tier","?")
+                        oos    = safe_f(r.get("OOS_Daily_ROI_%"))
+                        is_roi = safe_f(r.get("Daily_ROI_%"))
+                        wr     = r.get("Win_Rate_%","?")
+                        gdd    = r.get("Gross_DD_%","?")
+                        oos_sh = r.get("OOS_Sharpe","?")
+                        tv_nm  = STRATEGY_TV_NAMES.get(strat, strat.replace("_"," "))
+                        alert  = get_alert_msg(strat, sym)
+                        ret    = oos/is_roi*100 if is_roi > 0 else 0
+
+                        tier_color = "🟢" if tier == "ALPHA++" else "🔵"
+                        header = f"{tier_color} **{strat}** — OOS `{oos:.3f}%%/day` | IS `{is_roi:.3f}%%/day` | Ret `{ret:.0f}%%` | WR `{wr}%%` | GDD `{gdd}%%` | Sharpe `{oos_sh}`"
+
+                        with st.expander(header, expanded=False):
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                st.markdown(f"**TradingView Script Name:**")
+                                st.code(tv_nm, language=None)
+                            with c2:
+                                st.markdown(f"**Tier:** `{tier}`  |  **OOS Sharpe:** `{oos_sh}`")
+                                st.markdown(f"**Win Rate:** `{wr}%%`  |  **GDD:** `{gdd}%%`")
+
+                            st.markdown("**📋 TradingView Alert Message** — Copy this into TradingView Alert → Message box:")
+                            st.code(alert, language=None)
+                            st.caption("⚠️ In TradingView: Strategy Settings → Add Alert → paste above in Message field. Webhook URL goes in the URL field.")
+        else:
+            st.info("Select at least one symbol above to see strategies.")
+    else:
+        st.warning("Tournament data not loaded — run the tournament first.")
     st.divider()
 
     # ══════════════════════════════════════════════════════════════════
