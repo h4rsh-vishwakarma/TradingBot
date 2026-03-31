@@ -1,0 +1,57 @@
+//@version=5
+strategy("21 Full Momentum [Webhook]", overlay=true, commission_type=strategy.commission.percent, commission_value=0.1, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Inputs
+macd_fast   = input.int(12, title="MACD Fast Length")
+macd_slow   = input.int(26, title="MACD Slow Length")
+macd_signal = input.int(9,  title="MACD Signal Length")
+rsi_len     = input.int(14, title="RSI Length")
+ema_len     = input.int(50, title="EMA Trend Length")
+rsi_long_thresh  = input.int(52, title="RSI Long Threshold")
+rsi_short_thresh = input.int(48, title="RSI Short Threshold")
+
+// Indicators
+[macd_line, signal_line, hist] = ta.macd(close, macd_fast, macd_slow, macd_signal)
+rsi  = ta.rsi(close, rsi_len)
+ema50 = ta.ema(close, ema_len)
+
+// Conditions
+hist_positive = hist > 0
+hist_negative = hist < 0
+rsi_long      = rsi > rsi_long_thresh
+rsi_short     = rsi < rsi_short_thresh
+price_above_ema = close > ema50
+price_below_ema = close < ema50
+
+// Entry Conditions
+long_entry  = hist_positive and rsi_long  and price_above_ema
+short_entry = hist_negative and rsi_short and price_below_ema
+
+// Exit Conditions: MACD histogram flips OR RSI crosses 50
+hist_flip_down = ta.crossunder(hist, 0)
+hist_flip_up   = ta.crossover(hist,  0)
+rsi_cross_50_down = ta.crossunder(rsi, 50)
+rsi_cross_50_up   = ta.crossover(rsi,  50)
+
+long_exit  = hist_flip_down or rsi_cross_50_down
+short_exit = hist_flip_up   or rsi_cross_50_up
+
+// Plots
+plot(ema50, "EMA50", color=color.purple)
+
+// Strategy Execution
+if long_entry and strategy.position_size <= 0
+    strategy.entry("Long", strategy.long)
+    alert("action=buy symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if short_entry and strategy.position_size >= 0
+    strategy.entry("Short", strategy.short)
+    alert("action=sell symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if long_exit and strategy.position_size > 0
+    strategy.close("Long")
+    alert("action=close symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if short_exit and strategy.position_size < 0
+    strategy.close("Short")
+    alert("action=close symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)

@@ -1,0 +1,60 @@
+//@version=5
+strategy("22 Ichimoku Trend Pro [Webhook]", overlay=true, commission_type=strategy.commission.percent, commission_value=0.1, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Ichimoku Settings
+tenkan_len   = input.int(9,  title="Tenkan Period")
+kijun_len    = input.int(26, title="Kijun Period")
+senkou_b_len = input.int(52, title="Senkou B Period")
+chikou_len   = input.int(26, title="Chikou Displacement")
+
+// Ichimoku Calculations
+tenkan   = (ta.highest(high, tenkan_len)   + ta.lowest(low, tenkan_len))   / 2
+kijun    = (ta.highest(high, kijun_len)    + ta.lowest(low, kijun_len))    / 2
+senkou_a = (tenkan + kijun) / 2
+senkou_b = (ta.highest(high, senkou_b_len) + ta.lowest(low, senkou_b_len)) / 2
+
+// Plots
+p1 = plot(tenkan,   "Tenkan",   color=color.blue)
+p2 = plot(kijun,    "Kijun",    color=color.red)
+p3 = plot(senkou_a, "Senkou A", color=color.new(color.green, 70), offset=chikou_len)
+p4 = plot(senkou_b, "Senkou B", color=color.new(color.red,   70), offset=chikou_len)
+fill(p3, p4, color=senkou_a >= senkou_b ? color.new(color.green, 85) : color.new(color.red, 85))
+
+// Cloud values displaced 26 bars (current cloud based on past data)
+cloud_top    = math.max(senkou_a[chikou_len], senkou_b[chikou_len])
+cloud_bottom = math.min(senkou_a[chikou_len], senkou_b[chikou_len])
+
+// Chikou comparison: current close vs close 26 bars ago
+chikou_past_price = close[chikou_len]
+
+// Conditions
+price_above_cloud  = close > cloud_top
+price_below_cloud  = close < cloud_bottom
+tenkan_above_kijun = tenkan > kijun
+tenkan_below_kijun = tenkan < kijun
+chikou_above       = close > chikou_past_price
+
+// Entry Conditions
+long_entry  = price_above_cloud and tenkan_above_kijun and chikou_above
+short_entry = price_below_cloud and tenkan_below_kijun
+
+// Exit Conditions
+long_exit  = ta.crossunder(tenkan, kijun) or close < cloud_bottom
+short_exit = ta.crossover(tenkan, kijun)  or close > cloud_top
+
+// Strategy Execution
+if long_entry and strategy.position_size <= 0
+    strategy.entry("Long", strategy.long)
+    alert("action=buy symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if short_entry and strategy.position_size >= 0
+    strategy.entry("Short", strategy.short)
+    alert("action=sell symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if long_exit and strategy.position_size > 0
+    strategy.close("Long")
+    alert("action=close symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if short_exit and strategy.position_size < 0
+    strategy.close("Short")
+    alert("action=close symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)

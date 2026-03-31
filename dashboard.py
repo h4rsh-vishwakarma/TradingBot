@@ -385,6 +385,12 @@ def render():
         "Reversed_BarUpDn":       "Reversed BarUpDn Strategy",
         "BB_Squeeze_Break":       "Squeeze Momentum [LazyBear]",
         "EMA_Break_Momentum":     "EMA-SMA Crossover",
+        "Ichimoku_Trend_Pro":  "Ichimoku_Trend_Pro",
+        "Aggressive_Entry":    "Aggressive_Entry",
+        "Keltner_Breakout":    "Keltner_Breakout",
+        "Full_Momentum":       "Full_Momentum",
+        "MACD_Breakout":       "MACD_Breakout",
+        "Ichimoku_MACD_Pro":   "Ichimoku_MACD_Pro",
     }
     TV_SCRIPT_NAME = {
         "Aggressive_Entry":   "10 Aggressive Entry",

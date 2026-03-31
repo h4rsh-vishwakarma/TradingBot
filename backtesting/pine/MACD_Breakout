@@ -1,0 +1,44 @@
+//@version=5
+strategy("07 MACD Breakout [Webhook]", overlay=true, commission_type=strategy.commission.percent, commission_value=0.1, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Inputs
+macd_fast    = input.int(12, title="MACD Fast Length")
+macd_slow    = input.int(26, title="MACD Slow Length")
+macd_signal  = input.int(9,  title="MACD Signal Length")
+atr_len      = input.int(14, title="ATR Length")
+atr_sma_len  = input.int(20, title="ATR SMA Length")
+
+// Indicators
+[macd_line, signal_line, hist] = ta.macd(close, macd_fast, macd_slow, macd_signal)
+atr_val     = ta.atr(atr_len)
+atr_sma     = ta.sma(atr_val, atr_sma_len)
+atr_filter  = atr_val > atr_sma
+
+// MACD Crossovers
+macd_cross_up   = ta.crossover(macd_line,  signal_line)
+macd_cross_down = ta.crossunder(macd_line, signal_line)
+
+// Entry Conditions
+long_entry  = macd_cross_up   and macd_line > 0 and atr_filter
+short_entry = macd_cross_down and macd_line < 0 and atr_filter
+
+// Exit Conditions: opposite MACD crossover
+long_exit  = macd_cross_down
+short_exit = macd_cross_up
+
+// Strategy Execution
+if long_entry and strategy.position_size <= 0
+    strategy.entry("Long", strategy.long)
+    alert("action=buy symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if short_entry and strategy.position_size >= 0
+    strategy.entry("Short", strategy.short)
+    alert("action=sell symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if long_exit and strategy.position_size > 0
+    strategy.close("Long")
+    alert("action=close symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if short_exit and strategy.position_size < 0
+    strategy.close("Short")
+    alert("action=close symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
