@@ -260,13 +260,21 @@ class BinanceClient:
             logger.info(f"🚀 Executing {order_type} {side} on {symbol} (ID: {client_order_id})...")
             response = self.client.futures_create_order(**params)
             response["status"] = "SUCCESS"
-            logger.info(f"✅ Order Success: {response.get('orderId')}")
+            # Normalize camelCase avgPrice (Binance API) -> snake_case avg_price
+            raw_avg = float(response.get("avgPrice") or 0)
+            response["avg_price"] = raw_avg if raw_avg > 0 else (price or 0)
+            logger.info(f"✅ Order filled: {response.get('orderId')} | price=${response['avg_price']:.4f}")
             return response
 
         except BinanceAPIException as e:
             logger.error(f"❌ Binance API Error: code={e.code} msg={e.message} status={getattr(e, 'status_code', 'N/A')}")
             if e.code == -2011:
                 return {"status": "SKIPPED", "reason": "duplicate_id", "msg": e.message}
+            # -1007 TIMEOUT: order may or may not have been filled — do NOT retry (risk of double-fill)
+            if e.code == -1007 or "timeout" in str(e.message).lower():
+                logger.warning(f"⚠️ Binance TIMEOUT for {symbol} — order status UNKNOWN. Check exchange manually.")
+                return {"status": "FAILED", "reason": "timeout_unknown",
+                        "msg": f"Timeout — order status unknown. Verify {symbol} on Binance. {e.message}"}
             status_code = getattr(e, 'status_code', 0)
             if status_code in [429, 500, 502, 503, 504]:
                 raise RuntimeError(f"Transient Binance Failure: {e.message}")
@@ -315,49 +323,6 @@ class BinanceClient:
         except Exception as e:
             logger.error(f"❌ Stop-Loss Error: {e}")
             return {"status": "FAILED", "msg": str(e)}
-
-
-    def place_take_profit(self, symbol, side, quantity, entry_price, tp_pct=5.0, signal_id=None):
-        """Place a take-profit order after entry. tp_pct = profit distance in %."""
-        if not self.allow_real:
-            return {"status": "SKIPPED", "msg": "Dry-run mode"}
-        try:
-            tp_side = "SELL" if side == "BUY" else "BUY"
-            if side == "BUY":
-                tp_price = round(entry_price * (1 + tp_pct / 100), 2)
-            else:
-                tp_price = round(entry_price * (1 - tp_pct / 100), 2)
-
-            quantity = fix_quantity(symbol, quantity, price=tp_price)
-            params = {
-                "symbol": symbol,
-                "side": tp_side,
-                "type": "TAKE_PROFIT_MARKET",
-                "stopPrice": str(tp_price),
-                "quantity": quantity,
-                "closePosition": "false",
-                "newClientOrderId": f"TP_{signal_id}" if signal_id else f"TP_{int(time.time())}",
-                "workingType": "MARK_PRICE"
-            }
-            logger.info(f"🎯 Placing TP: {tp_side} {quantity} {symbol} @ ${tp_price} ({tp_pct}% from ${entry_price})")
-            response = self.client.futures_create_order(**params)
-            logger.info(f"✅ Take-Profit placed: {response.get('orderId')}")
-            return {"status": "SUCCESS", "orderId": response.get("orderId"), "tpPrice": tp_price}
-        except BinanceAPIException as e:
-            logger.error(f"❌ Take-Profit Error: {e.message}")
-            return {"status": "FAILED", "msg": e.message}
-        except Exception as e:
-            logger.error(f"❌ Take-Profit Error: {e}")
-            return {"status": "FAILED", "msg": str(e)}
-
-    def get_open_positions(self):
-        """Fetch all open futures positions from Binance."""
-        try:
-            positions = self.client.futures_position_information()
-            return [p for p in positions if float(p.get('positionAmt', 0)) != 0]
-        except Exception as e:
-            logger.error(f"Failed to fetch open positions: {e}")
-            return []
 
     def close_all_positions(self):
         """Emergency kill switch: close ALL open futures positions."""

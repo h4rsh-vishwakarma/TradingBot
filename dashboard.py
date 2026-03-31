@@ -1,120 +1,531 @@
-import streamlit as st
+"""
+Trading Bot — Senior Dashboard
+Full visibility: Services · Exchanges · Algos · Trades · PnL · Safety · Signals · System
+"""
+import csv, gc, json, os, re, shutil, subprocess, sys, time
+from collections import deque, defaultdict
+from datetime import datetime, timezone, date
+from pathlib import Path
+
 import pandas as pd
 import psutil
-import subprocess
-import os
-import sys
-import gc
-import time
-from io import StringIO
-from datetime import datetime
+import streamlit as st
 
-# --- PATH FIX: Ensure we are in the project root ---
-PROJECT_ROOT = "/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot"
-sys.path.append(PROJECT_ROOT)
+# ── paths ──────────────────────────────────────────────────────────────────
+PROJECT_ROOT  = Path(__file__).resolve().parent
+STORAGE       = PROJECT_ROOT / "tradingview_webhook_bot" / "storage"
+LEDGER_PATH   = STORAGE / "ledger_state.json"
+CB_PATH       = STORAGE / "circuit_breaker_state.json"
+SIGNALS_PATH  = STORAGE / "signals.jsonl"
+TOURNAMENT    = PROJECT_ROOT / "tournament_winners.csv"
+ENV_FILE      = Path("/etc/tradingbot/env_vars")
+SYSTEMCTL     = shutil.which("systemctl") or "/usr/bin/systemctl"
+JOURNALCTL    = shutil.which("journalctl") or "/usr/bin/journalctl"
 
-def clear_memory():
-    """Forcibly free up unused RAM"""
-    gc.collect()
+if str(PROJECT_ROOT / "tradingview_webhook_bot") not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT / "tradingview_webhook_bot"))
 
-def get_optimized_logs(file_path, n=20):
-    """Memory efficient: Reads only last N lines without loading full file"""
+# ── helpers ────────────────────────────────────────────────────────────────
+def run(cmd):
     try:
-        if os.path.exists(file_path):
-            # Using Linux 'tail' to avoid loading large CSV into RAM
-            proc = subprocess.Popen(['tail', f'-n', str(n), file_path], stdout=subprocess.PIPE)
-            output, _ = proc.communicate()
-            
-            # Read only the snippet into DataFrame
-            df = pd.read_csv(StringIO(output.decode()), names=['ID', 'Timestamp', 'Event', 'Details'])
-            return df
-        return pd.DataFrame()
-    except Exception as e:
-        return pd.DataFrame()
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+    except Exception:
+        return None
 
-try:
-    from exchange.binance_client import BinanceClient
-    client = BinanceClient()
-except Exception as e:
-    st.error(f"Binance Client Init Error: {e}")
-    client = None
+def svc_active(name):
+    r = run([SYSTEMCTL, "is-active", name])
+    return r and r.stdout.strip() == "active"
 
-# --- UI Setup ---
-st.set_page_config(page_title="Anything.ai Alpha Health", layout="wide", page_icon="🏥")
-st.title("🛡️ Alpha Engine Health & Price Monitor")
+def load_env():
+    env = {}
+    if ENV_FILE.exists():
+        for line in ENV_FILE.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, _, v = line.partition("=")
+                env[k.strip()] = v.strip().strip('"')
+    return env
 
-# --- Row 1: Infrastructure Status ---
-st.subheader("🌐 Infrastructure Status")
-s_col1, s_col2, s_col3 = st.columns(3)
-
-with s_col1:
-    webhook_up = any(conn.laddr.port == 5000 for conn in psutil.net_connections() if conn.status == 'LISTEN')
-    st.metric("Webhook (Port 5000)", "UP ✅" if webhook_up else "DOWN ❌")
-
-with s_col2:
+def load_json(path):
     try:
-        orch_status = subprocess.check_output(['systemctl', 'is-active', 'trading_orchestrator']).decode().strip()
-        orch_up = (orch_status == "active")
-    except:
-        orch_up = False
-    st.metric("Orchestrator Engine", "ACTIVE ✅" if orch_up else "OFFLINE ❌")
+        return json.loads(Path(path).read_text())
+    except Exception:
+        return {}
 
-with s_col3:
-    STORAGE_PATH = os.path.join(PROJECT_ROOT, "storage/signals.jsonl")
-    storage_ready = os.path.exists(STORAGE_PATH)
-    st.metric("Storage System", "READY ✅" if storage_ready else "ERROR ❌")
+def clean_tier(t):
+    return re.sub(r"[^\w\s\+\-]", "", str(t or "")).strip().upper()
 
-st.divider()
-
-# --- Row 2: Price substitution & Balance ---
-st.subheader("📊 Market Data & Substitution (Mainnet vs Testnet)")
-if client:
+def tail_lines(path, n=200):
     try:
-        mainnet_p = client.get_mainnet_mark_price("BTCUSDT")
-        testnet_p = float(client.client.futures_symbol_ticker(symbol="BTCUSDT")['price'])
-        health = client.get_account_health()
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return list(deque(f, maxlen=n))
+    except Exception:
+        return []
 
-        m_col1, m_col2, m_col3 = st.columns(3)
-        with m_col1: st.metric("Mainnet Price (Real)", f"${mainnet_p:,.2f}")
-        with m_col2:
-            diff = abs(mainnet_p - testnet_p)
-            st.metric("Price Sync Status", "🟢 HEALTHY" if diff/mainnet_p < 0.005 else "🔴 DRIFT", delta=f"{diff:.2f} USD Diff")
-        with m_col3: st.metric("Testnet Balance", f"${health['available_balance']:,.2f}")
-    except:
-        st.error("Live price sync failed. Check API connectivity.")
-else:
-    st.error("Client not initialized. Check /etc/tradingbot/env_vars")
+def journal(service, n=50):
+    r = run([JOURNALCTL, "-u", service, "-n", str(n), "--no-pager"])
+    return r.stdout if r else ""
 
-st.divider()
+# ── data loaders ───────────────────────────────────────────────────────────
+@st.cache_data(ttl=15)
+def load_ledger():
+    return load_json(LEDGER_PATH)
 
-# --- Row 3: Vitals & Optimized Logs ---
-st.subheader("💓 System Vitals & Recent Logs")
-v_col1, v_col2 = st.columns([1, 2])
+@st.cache_data(ttl=15)
+def load_circuit_breaker():
+    return load_json(CB_PATH)
 
-with v_col1:
-    cpu = psutil.cpu_percent()
-    ram = psutil.virtual_memory().percent
-    st.metric("CPU Usage", f"{cpu}%")
-    st.metric("RAM Usage", f"{ram}%", delta=f"{ram-80}%" if ram > 80 else None, delta_color="inverse")
+@st.cache_data(ttl=30)
+def load_tournament():
+    if not TOURNAMENT.exists():
+        return []
+    with open(TOURNAMENT) as f:
+        return list(csv.DictReader(f))
 
+@st.cache_data(ttl=10)
+def load_signals(n=100):
+    lines = tail_lines(SIGNALS_PATH, n)
+    records = []
+    for line in lines:
+        try:
+            d = json.loads(line)
+            p = d.get("payload", d)
+            records.append({
+                "time":     d.get("timestamp", "")[:19],
+                "symbol":   p.get("symbol", "?"),
+                "action":   p.get("action", "?"),
+                "price":    float(p.get("price", 0) or 0),
+                "qty":      float(p.get("quantity", 0) or 0),
+                "strategy": p.get("strategy", "unknown"),
+                "exchange": p.get("exchange", "binance"),
+            })
+        except Exception:
+            pass
+    return records
+
+@st.cache_data(ttl=10)
+def load_journal_events(n=150):
+    log = journal("trading_orchestrator", n)
+    events = []
+    keywords = ["SUCCESS", "BLOCKED", "FAILED", "AI Blocked", "sanity FAIL",
+                "Circuit", "circuit", "Trade Executed", "Price sanity", "⚠️",
+                "Heartbeat", "ERROR", "fill price", "Equity sizing"]
+    for line in log.splitlines():
+        if any(k in line for k in keywords):
+            # Extract timestamp and message
+            parts = line.split(" - ", 3)
+            ts  = parts[0].split()[-1] if parts else ""
+            msg = parts[-1][:120] if parts else line[:120]
+            level = "INFO"
+            if "ERROR" in line or "FAILED" in line or "sanity FAIL" in line:
+                level = "ERROR"
+            elif "WARNING" in line or "BLOCKED" in line or "⚠️" in line:
+                level = "WARN"
+            elif "SUCCESS" in line or "Trade Executed" in line:
+                level = "SUCCESS"
+            events.append({"ts": ts, "level": level, "msg": msg})
+    return events[-30:]
+
+@st.cache_data(ttl=10)
+def get_live_prices():
+    prices = {}
     try:
-        hb = subprocess.check_output("journalctl -u trading_orchestrator -n 50 | grep 'Heartbeat' | tail -n 1", shell=True).decode()
-        st.info(f"Latest Heartbeat: {hb.split('ip-172-31-26-202')[-1] if hb else 'N/A'}")
-    except:
-        st.warning("Heartbeat missing")
+        sys.path.insert(0, str(PROJECT_ROOT / "tradingview_webhook_bot"))
+        from exchange.binance_client import BinanceClient
+        c = BinanceClient()
+        for sym in ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "LINKUSDT"]:
+            try:
+                p = c.get_mainnet_mark_price(sym)
+                if p:
+                    prices[sym] = p
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return prices
 
-with v_col2:
-    AUDIT_PATH = "/home/ubuntu/tradingview_webhook_bot/trading_audit_12h.csv"
-    # Optimized Loading: Reading only last 10 lines
-    df = get_optimized_logs(AUDIT_PATH, n=10)
-    if not df.empty:
-        st.dataframe(df, use_container_width=True)
+# ══════════════════════════════════════════════════════════════════════════
+# MAIN DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════
+def render():
+    env = load_env()
+    st.set_page_config(
+        page_title="Trading Bot — Command Center",
+        layout="wide",
+        page_icon="🤖",
+        initial_sidebar_state="collapsed"
+    )
+
+    # ── Header ──────────────────────────────────────────────────────────
+    st.markdown("""
+        <h1 style='text-align:center; color:#00d4aa;'>🤖 Trading Bot — Command Center</h1>
+        <p style='text-align:center; color:#888; margin-top:-10px;'>
+            Real-time system health, algorithm performance & trade monitoring
+        </p>
+    """, unsafe_allow_html=True)
+
+    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    st.caption(f"🕐 Last updated: {now_utc}  |  Auto-refresh every 30s")
+    st.divider()
+
+    # ══════════════════════════════════════════════════════════════════
+    # SECTION 1 — SERVICE STATUS
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("📡 Service Status")
+    services = [
+        ("trading_orchestrator", "Orchestrator",      "Signal processor & trade executor"),
+        ("trading_webhook",      "Webhook Server",     "Receives TradingView alerts (port 5000)"),
+        ("trading_telegram",     "Telegram Alerts",    "Sends trade notifications"),
+        ("trading_dashboard",    "Dashboard",          "This Streamlit UI (port 8501)"),
+    ]
+    cols = st.columns(4)
+    all_ok = True
+    for i, (svc, label, desc) in enumerate(services):
+        ok = svc_active(svc)
+        if not ok:
+            all_ok = False
+        with cols[i]:
+            status_color = "#00c853" if ok else "#f44336"
+            status_text  = "✅ ACTIVE" if ok else "🔴 DOWN"
+            st.markdown(f"""
+                <div style='background:#1e1e2e; border-left:4px solid {status_color};
+                            padding:12px; border-radius:6px; height:90px;'>
+                    <b style='color:{status_color};'>{status_text}</b><br>
+                    <b>{label}</b><br>
+                    <small style='color:#888;'>{desc}</small>
+                </div>
+            """, unsafe_allow_html=True)
+
+    if all_ok:
+        st.success("✅ All 4 services running normally")
     else:
-        st.write("Audit logs loading...")
+        st.error("🔴 One or more services are DOWN")
 
-# Clean memory before sleeping
-import gc
-clear_memory()
+    st.divider()
 
-time.sleep(30)
-st.rerun()
+    # ══════════════════════════════════════════════════════════════════
+    # SECTION 2 — EXCHANGE CONNECTIONS + LIVE PRICES
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("🔗 Exchange Connections & Live Prices")
+    ex_col, price_col = st.columns([1, 2])
+
+    with ex_col:
+        # Check from journal logs
+        orch_log = journal("trading_orchestrator", 80)
+        binance_ok  = "Connected to Binance Futures [TESTNET]" in orch_log
+        lighter_ok  = "Connected to Lighter [TESTNET]" in orch_log
+        hl_key      = env.get("HL_WALLET_ADDRESS", "")
+        is_testnet  = env.get("BINANCE_TESTNET", "false").lower() == "true"
+        allow_real  = env.get("ALLOW_REAL_TRADES", "false").lower() == "true"
+        lighter_real = env.get("LIGHTER_ALLOW_REAL_TRADES", "false").lower() == "true"
+
+        rows = [
+            ("Binance Futures", "TESTNET" if is_testnet else "MAINNET",
+             binance_ok, f"Real trades: {'ON' if allow_real else 'Paper'}"),
+            ("Lighter DEX",     "TESTNET",
+             lighter_ok, f"Real trades: {'ON' if lighter_real else 'Paper'}"),
+            ("Hyperliquid",     "TESTNET",
+             bool(hl_key),      "Configured via HL_WALLET_ADDRESS"),
+        ]
+        for exch, net, ok, note in rows:
+            color = "#00c853" if ok else "#ff9800"
+            icon  = "✅" if ok else "⚠️"
+            st.markdown(f"""
+                <div style='background:#1e1e2e; border-left:4px solid {color};
+                            padding:10px; border-radius:6px; margin-bottom:8px;'>
+                    {icon} <b>{exch}</b> <span style='color:{color};font-size:12px;'>[{net}]</span><br>
+                    <small style='color:#aaa;'>{note}</small>
+                </div>
+            """, unsafe_allow_html=True)
+
+    with price_col:
+        st.markdown("**Live Market Prices (Mainnet)**")
+        prices = get_live_prices()
+        if prices:
+            p_cols = st.columns(len(prices))
+            for i, (sym, price) in enumerate(prices.items()):
+                base = sym.replace("USDT", "")
+                with p_cols[i]:
+                    st.metric(base, f"${price:,.2f}")
+        else:
+            st.warning("Live prices unavailable — check Binance connectivity")
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════════════════════
+    # SECTION 3 — ALGORITHM BRAIN
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("🧠 Algorithm Brain — Tournament Leaderboard")
+    rows = load_tournament()
+
+    if rows:
+        tiers = defaultdict(list)
+        for r in rows:
+            tiers[clean_tier(r.get("Tier", ""))].append(r)
+
+        t_cols = st.columns(4)
+        tier_info = [
+            ("ALPHA++", "#ffd700", "🏆", "Free trading — best performers"),
+            ("ALPHA",   "#00c853", "✅", "Free trading — strong performers"),
+            ("AVERAGE", "#ff9800", "⚠️", "Size-capped trading"),
+            ("BLOCKED", "#f44336", "🚫", "No trading allowed"),
+        ]
+        for i, (tier, color, icon, desc) in enumerate(tier_info):
+            count = len(tiers.get(tier, []))
+            with t_cols[i]:
+                st.markdown(f"""
+                    <div style='background:#1e1e2e; border:2px solid {color};
+                                padding:14px; border-radius:8px; text-align:center;'>
+                        <div style='font-size:28px;'>{icon}</div>
+                        <div style='color:{color}; font-size:22px; font-weight:bold;'>{count}</div>
+                        <div style='font-weight:bold;'>{tier}</div>
+                        <div style='color:#888; font-size:11px;'>{desc}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown(f"**Total strategies evaluated: {len(rows)}**")
+
+        with st.expander("🏆 View ALPHA++ Strategies (Top Performers)", expanded=True):
+            alpha_pp = tiers.get("ALPHA++", [])
+            if alpha_pp:
+                df_rows = []
+                for r in alpha_pp:
+                    df_rows.append({
+                        "Symbol":    r.get("Symbol", "?"),
+                        "Strategy":  r.get("Strategy", "?")[:50],
+                        "Win Rate":  r.get("Win_Rate_%", "?") + "%",
+                        "Daily ROI": r.get("Daily_ROI_%", "?") + "%",
+                        "Net DD":    r.get("Net_DD_%", "?") + "%",
+                        "Sharpe":    r.get("Sharpe_Ratio", "?"),
+                    })
+                st.dataframe(pd.DataFrame(df_rows), hide_index=True, use_container_width=True)
+            else:
+                st.info("No ALPHA++ strategies")
+
+        with st.expander("✅ View ALPHA Strategies"):
+            alpha = tiers.get("ALPHA", [])
+            if alpha:
+                df_rows = []
+                for r in alpha:
+                    df_rows.append({
+                        "Symbol":    r.get("Symbol", "?"),
+                        "Strategy":  r.get("Strategy", "?")[:50],
+                        "Win Rate":  r.get("Win_Rate_%", "?") + "%",
+                        "Daily ROI": r.get("Daily_ROI_%", "?") + "%",
+                        "Net DD":    r.get("Net_DD_%", "?") + "%",
+                    })
+                st.dataframe(pd.DataFrame(df_rows), hide_index=True, use_container_width=True)
+    else:
+        st.error("Tournament leaderboard not found")
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════════════════════
+    # SECTION 4 — PnL & OPEN POSITIONS
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("💰 PnL Summary & Positions")
+    ledger = load_ledger()
+    positions = ledger.get("positions", {})
+
+    today_str = date.today().strftime("%Y-%m-%d")
+    total_pnl = sum(v.get("realized_pnl", 0) for v in positions.values())
+    today_pnl = sum(v.get("daily_realized_pnl", 0) for v in positions.values()
+                    if v.get("last_update_date", "") == today_str)
+
+    open_pos   = {k:v for k,v in positions.items() if abs(v.get("quantity",0)) > 0 and v.get("avg_price",0) != 0}
+    ghost_pos  = {k:v for k,v in positions.items() if abs(v.get("quantity",0)) > 0 and v.get("avg_price",0) == 0}
+
+    pnl_c1, pnl_c2, pnl_c3, pnl_c4 = st.columns(4)
+    with pnl_c1:
+        color = "normal" if today_pnl >= 0 else "inverse"
+        st.metric("Today PnL", f"${today_pnl:.4f}", delta=f"{'▲' if today_pnl>=0 else '▼'} {today_str}")
+    with pnl_c2:
+        st.metric("All-time PnL", f"${total_pnl:.4f}")
+    with pnl_c3:
+        st.metric("Open Positions", len(open_pos))
+    with pnl_c4:
+        if ghost_pos:
+            st.metric("⚠️ Ghost Positions", len(ghost_pos), help="Corrupted entries from wrong-price bug — need ledger reset")
+        else:
+            st.metric("Ledger Health", "✅ Clean")
+
+    # Ghost warning
+    if ghost_pos:
+        st.warning(f"""
+        ⚠️ **{len(ghost_pos)} Ghost Position(s) detected** — these are corrupted ledger entries from the
+        wrong-price bug on Mar 30. They are NOT real open trades.
+        PnL shown above includes these fake losses. **Actual real-money risk = $0 (testnet).**
+        """)
+
+    # By symbol PnL
+    by_sym = defaultdict(float)
+    for v in positions.values():
+        sym = v.get("symbol","").replace("binance:","").split(":")[0]
+        by_sym[sym] += v.get("realized_pnl", 0)
+    non_zero = {k:v for k,v in by_sym.items() if abs(v) > 0.01}
+
+    if non_zero:
+        sym_df = pd.DataFrame([
+            {"Symbol": k, "All-time PnL ($)": round(v, 4),
+             "Status": "🟢 Profit" if v >= 0 else "🔴 Loss"}
+            for k,v in sorted(non_zero.items(), key=lambda x: x[1])
+        ])
+        st.dataframe(sym_df, hide_index=True, use_container_width=True)
+
+    if open_pos:
+        st.markdown("**Real Open Positions:**")
+        pos_df = pd.DataFrame([
+            {"Position": k, "Quantity": v["quantity"],
+             "Avg Price": f"${v['avg_price']:.2f}", "Realized PnL": f"${v['realized_pnl']:.4f}"}
+            for k,v in open_pos.items()
+        ])
+        st.dataframe(pos_df, hide_index=True, use_container_width=True)
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════════════════════
+    # SECTION 5 — SAFETY SYSTEMS
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("🛡️ Safety Systems")
+    cb = load_circuit_breaker()
+    tripped = cb.get("tripped", False) or str(cb.get("status","")).upper() == "TRIPPED"
+
+    s1, s2, s3, s4, s5, s6 = st.columns(6)
+    with s1:
+        cb_color = "#f44336" if tripped else "#00c853"
+        st.markdown(f"""
+            <div style='background:#1e1e2e; border-left:4px solid {cb_color};
+                        padding:10px; border-radius:6px; text-align:center;'>
+                <b>Circuit Breaker</b><br>
+                <span style='color:{cb_color}; font-size:18px;'>
+                    {'🔴 TRIPPED' if tripped else '✅ OK'}
+                </span>
+            </div>
+        """, unsafe_allow_html=True)
+    with s2:
+        st.metric("Daily Loss Tracked", f"${cb.get('daily_loss',0):.4f}")
+    with s3:
+        st.metric("CB Limit", f"{env.get('CB_DAILY_LOSS_PCT','5')}%/day")
+    with s4:
+        st.metric("Stop-Loss", f"{env.get('STOP_LOSS_PCT','3')}% per trade")
+    with s5:
+        st.metric("Take-Profit", f"{env.get('TAKE_PROFIT_PCT','5')}% per trade")
+    with s6:
+        st.metric("Price Sanity Check", "✅ 80% threshold", help="Signals with price >80% off market are replaced with live price")
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════════════════════
+    # SECTION 6 — RECENT SIGNALS
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("📥 Recent TradingView Signals")
+    signals = load_signals(50)
+    if signals:
+        sig_df = pd.DataFrame(signals[-20:])
+        sig_df["price_flag"] = sig_df.apply(
+            lambda r: "⚠️ BAD" if r["price"] > 10000 and r["symbol"] in ["SOLUSDT","LINKUSDT","ETHUSDT","BNBUSDT"] else "✅ OK",
+            axis=1
+        )
+        sig_df = sig_df.rename(columns={
+            "time": "Time", "symbol": "Symbol", "action": "Action",
+            "price": "Signal Price", "qty": "Qty",
+            "strategy": "Strategy", "exchange": "Exchange", "price_flag": "Price Check"
+        })
+        st.dataframe(sig_df, hide_index=True, use_container_width=True)
+
+        bad = sum(1 for s in signals if s["price"] > 10000 and s["symbol"] in ["SOLUSDT","LINKUSDT","ETHUSDT","BNBUSDT"])
+        if bad:
+            st.warning(f"⚠️ {bad} signals had wrong prices (>$10k for altcoins). "
+                       "Price sanity check is replacing these with live market prices. "
+                       "Fix TradingView alert templates to use `{{close}}`.")
+    else:
+        st.info("No signals received yet")
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════════════════════
+    # SECTION 7 — TRADE ACTIVITY LOG
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("📊 Recent Trade Activity (from Orchestrator)")
+    events = load_journal_events()
+    if events:
+        for e in reversed(events):
+            color = {"ERROR": "#f44336", "WARN": "#ff9800",
+                     "SUCCESS": "#00c853", "INFO": "#90caf9"}.get(e["level"], "#ccc")
+            icon  = {"ERROR": "🔴", "WARN": "⚠️",
+                     "SUCCESS": "🟢", "INFO": "ℹ️"}.get(e["level"], "•")
+            st.markdown(f"""
+                <div style='font-family:monospace; font-size:12px; color:{color};
+                            margin:2px 0; padding:3px 6px; background:#1a1a2e; border-radius:3px;'>
+                    {icon} <b>{e["ts"]}</b> — {e["msg"]}
+                </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("No trade events yet — bot is waiting for TradingView signals")
+
+    st.divider()
+
+    # ══════════════════════════════════════════════════════════════════
+    # SECTION 8 — SYSTEM VITALS
+    # ══════════════════════════════════════════════════════════════════
+    st.subheader("🖥️ System Vitals")
+    v1, v2, v3, v4, v5 = st.columns(5)
+    cpu = psutil.cpu_percent(interval=0.1)
+    ram = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+    boot_time = datetime.fromtimestamp(psutil.boot_time())
+    uptime_h  = (datetime.now() - boot_time).total_seconds() / 3600
+
+    with v1:
+        cpu_color = "#f44336" if cpu > 80 else "#00c853"
+        st.metric("CPU Usage", f"{cpu:.1f}%")
+    with v2:
+        ram_pct = ram.percent
+        st.metric("RAM Usage", f"{ram_pct:.1f}%", delta=f"{ram.used/1e9:.1f}GB used")
+    with v3:
+        st.metric("Disk Usage", f"{disk.percent:.1f}%", delta=f"{disk.free/1e9:.1f}GB free")
+    with v4:
+        st.metric("Server Uptime", f"{uptime_h:.1f}h")
+    with v5:
+        webhook_up = any(c.laddr.port == 5000 for c in psutil.net_connections() if c.status == "LISTEN")
+        st.metric("Port 5000", "✅ OPEN" if webhook_up else "🔴 CLOSED")
+
+    # ── Config summary ─────────────────────────────────────────────
+    with st.expander("⚙️ Bot Configuration"):
+        cfg_data = {
+            "Binance Mode":        "TESTNET" if env.get("BINANCE_TESTNET","true")=="true" else "MAINNET",
+            "Allow Real Trades":   env.get("ALLOW_REAL_TRADES", "?"),
+            "Position Size Mode":  env.get("POSITION_SIZE_MODE", "fixed"),
+            "Leverage":            env.get("LEVERAGE", "1"),
+            "Stop-Loss %":         env.get("STOP_LOSS_PCT", "3.0"),
+            "Take-Profit %":       env.get("TAKE_PROFIT_PCT", "5.0"),
+            "CB Daily Loss Limit": env.get("CB_DAILY_LOSS_PCT", "5.0") + "%",
+            "CB Max Consec Losses":env.get("CB_MAX_CONSECUTIVE_LOSSES", "8"),
+            "Cooldown (seconds)":  env.get("SYMBOL_COOLDOWN_SECONDS", "60"),
+            "Dedup Window (sec)":  env.get("DEDUP_WINDOW_SECONDS", "120"),
+            "Max Notional/trade":  "$" + env.get("MAX_NOTIONAL_PER_TRADE", "500"),
+            "Lighter Real Trades": env.get("LIGHTER_ALLOW_REAL_TRADES", "false"),
+            "Lighter Network":     "TESTNET" if "testnet" in env.get("LIGHTER_API_URL","").lower() else "MAINNET",
+            "Allowed Symbols":     env.get("ALLOWED_SYMBOLS", "BTCUSDT,ETHUSDT,SOLUSDT"),
+        }
+        cfg_df = pd.DataFrame(
+            [{"Parameter": k, "Value": v} for k, v in cfg_data.items()]
+        )
+        st.dataframe(cfg_df, hide_index=True, use_container_width=True)
+
+    # ── Footer ─────────────────────────────────────────────────────
+    st.divider()
+    st.markdown("""
+        <div style='text-align:center; color:#555; font-size:12px;'>
+            🤖 Trading Bot v2.0 · Binance Testnet · Lighter Testnet · Hyperliquid Testnet<br>
+            Auto-refreshes every 30 seconds · All trades on TESTNET · No real money at risk
+        </div>
+    """, unsafe_allow_html=True)
+
+    gc.collect()
+    time.sleep(30)
+    st.rerun()
+
+
+if __name__ == "__main__":
+    render()

@@ -9,12 +9,9 @@
 
 # 4. Hourly: Heartbeat Scan
 0 * * * * /home/ubuntu/tradingview_webhook_bot/venv/bin/python3 /home/ubuntu/tradingview_webhook_bot/scripts/auto_injector.py >> /home/ubuntu/tradingview_webhook_bot/auto_scan.log 2>&1
-0 0 * * * /home/ubuntu/tradingbot_sync.sh
 
-# 5. End-of-Day: Final Analytics Update
-55 23 * * * cd /home/ubuntu/tradingview_webhook_bot && /home/ubuntu/tradingview_webhook_bot/venv/bin/python3 -c 'from tradingview_webhook_bot.storage.analytics_writer import AnalyticsWriter; AnalyticsWriter().update_today()' >> /home/ubuntu/tradingview_webhook_bot/cron_logs.log 2>&1
-# 6. Every 15 min: Reconcile ledger vs exchange
-*/15 * * * * cd /home/ubuntu/tradingview_webhook_bot && /home/ubuntu/tradingview_webhook_bot/venv/bin/python3 scripts/reconcile.py >> /home/ubuntu/tradingview_webhook_bot/cron_logs.log 2>&1
-# 7. Weekly disk cleanup (Sunday 3am)
-0 3 * * 0 sudo journalctl --vacuum-size=50M && sudo find /var/log -name "*.gz" -delete && sudo find /var/log -name "*.1" -delete 2>/dev/null
-50 23 * * * /home/ubuntu/tradingview_webhook_bot/scripts/backup_ledger.sh >> /home/ubuntu/tradingview_webhook_bot/cron_logs.log 2>&1
+# 5. Daily 23:50 UTC: Backup ledger + queue + idempotency (7-day retention)
+50 23 * * * cd /home/ubuntu/tradingview_webhook_bot && bash scripts/backup_bot.sh >> /home/ubuntu/tradingview_webhook_bot/cron_logs.log 2>&1
+
+# 6. Weekly Sunday 03:00: SQLite VACUUM to reclaim space
+0 3 * * 0 cd /home/ubuntu/tradingview_webhook_bot && /home/ubuntu/tradingview_webhook_bot/venv/bin/python3 -c "import sqlite3; [sqlite3.connect(f).execute('VACUUM') or sqlite3.connect(f).close() for f in ['tradingview_webhook_bot/storage/signal_queue.db','tradingview_webhook_bot/storage/idempotency.db']]" >> /home/ubuntu/tradingview_webhook_bot/cron_logs.log 2>&1

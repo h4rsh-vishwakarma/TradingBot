@@ -78,6 +78,7 @@ Historical Data          Tournament              Live Trading
 |---------|------|------|-------------|
 | `trading_webhook` | Gunicorn | 5000 | HTTP webhook receiver |
 | `trading_orchestrator` | Python daemon | - | Signal consumer + executor |
+| `trading_dashboard` | Streamlit | 8501 | Health dashboard UI |
 | `hl_mirror` | Python daemon | - | Hyperliquid mirror (optional) |
 | `telegram_bot` | Python daemon | - | Telegram backtest bot |
 | `nginx` | Reverse proxy | 443 | SSL termination + rate limit |
@@ -86,17 +87,19 @@ Historical Data          Tournament              Live Trading
 
 ```bash
 # Status
-sudo systemctl status trading_webhook trading_orchestrator
+sudo systemctl status trading_webhook trading_orchestrator trading_dashboard
 
 # Restart
-sudo systemctl restart trading_webhook trading_orchestrator
+sudo systemctl restart trading_webhook trading_orchestrator trading_dashboard
 
 # Logs (live tail)
 journalctl -u trading_orchestrator -f
 journalctl -u trading_webhook -f
+journalctl -u trading_dashboard -f
 
 # Health check
 curl http://127.0.0.1:5000/health
+curl -I http://127.0.0.1:8501
 ```
 
 ---

@@ -51,7 +51,13 @@ def download_data(symbol, interval='15m', lookback='3 years ago UTC'):
 
 if __name__ == "__main__":
     # Top Alpha Symbols for Tournament
-    symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
+    symbols = [
+        'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'BNBUSDT',
+        'DOGEUSDT', 'ADAUSDT', 'AVAXUSDT', 'DOTUSDT', 'LINKUSDT',
+        'LTCUSDT', 'ATOMUSDT', 'UNIUSDT', 'NEARUSDT', 'INJUSDT',
+        'APTUSDT', 'ARBUSDT', 'OPUSDT', 'SUIUSDT', 'FILUSDT',
+        'AAVEUSDT', 'LDOUSDT',
+    ]
     
     print(f"🚀 Data Migration: Shifting from 1-Year to 3-Year Lookback...")
     

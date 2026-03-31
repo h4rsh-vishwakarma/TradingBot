@@ -28,10 +28,13 @@ cat <<EOF > new_cron
 # 4. Hourly: Heartbeat Scan
 0 * * * * $VENV_PYTHON $BOT_DIR/scripts/auto_injector.py >> $BOT_DIR/auto_scan.log 2>&1
 
-# 5. Daily 23:50 UTC: Backup ledger + queue + idempotency (7-day retention)
+# 5. Every 15 minutes: Refresh dashboard audit CSV from orchestrator journal
+*/15 * * * * cd $BOT_DIR && $VENV_PYTHON scripts/export_logs.py >> $BOT_DIR/cron_logs.log 2>&1
+
+# 6. Daily 23:50 UTC: Backup ledger + queue + idempotency (7-day retention)
 50 23 * * * cd $BOT_DIR && bash scripts/backup_bot.sh >> $BOT_DIR/cron_logs.log 2>&1
 
-# 6. Weekly Sunday 03:00: SQLite VACUUM to reclaim space
+# 7. Weekly Sunday 03:00: SQLite VACUUM to reclaim space
 0 3 * * 0 cd $BOT_DIR && $VENV_PYTHON -c "import sqlite3; [sqlite3.connect(f).execute('VACUUM') or sqlite3.connect(f).close() for f in ['tradingview_webhook_bot/storage/signal_queue.db','tradingview_webhook_bot/storage/idempotency.db']]" >> $BOT_DIR/cron_logs.log 2>&1
 EOF
 

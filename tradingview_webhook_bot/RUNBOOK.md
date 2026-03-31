@@ -6,14 +6,16 @@
 
 ```bash
 # Service status
-sudo systemctl status trading_webhook trading_orchestrator
+sudo systemctl status trading_webhook trading_orchestrator trading_dashboard
 
 # Live logs
 journalctl -u trading_orchestrator -f
 journalctl -u trading_webhook -f
+journalctl -u trading_dashboard -f
 
 # Health check
 curl http://127.0.0.1:5000/health
+curl -I http://127.0.0.1:8501
 
 # Emergency stop
 python3 scripts/kill_switch.py
