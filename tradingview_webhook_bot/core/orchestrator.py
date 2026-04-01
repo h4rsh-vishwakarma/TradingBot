@@ -529,6 +529,15 @@ class Orchestrator:
             return False, (f"Max strategies per symbol reached: {active_strat_count}/{max_strats} "
                            f"already active on {symbol}")
 
+        # --- Global max open positions check ---
+        max_open = int(os.getenv("MAX_OPEN_POSITIONS", "16"))
+        total_open = sum(
+            1 for key, pos_obj in getattr(self.ledger, 'positions', {}).items()
+            if not key.count(':') > 1 and abs(float(getattr(pos_obj, 'quantity', 0))) > 0
+        )
+        if total_open >= max_open:
+            return False, f"Global position limit reached: {total_open}/{max_open} open positions"
+
         return True, "Safe"
 
     def handle_signal(self, event: dict) -> bool:
