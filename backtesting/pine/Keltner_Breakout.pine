@@ -1,0 +1,81 @@
+//@version=5
+// ============================================================
+// Keltner_Breakout [Webhook] — TOURNAMENT MATCHED v2
+// ⚠️  USE ON 15m CHART ONLY (tournament optimized on 15m)
+// Filters: ADX>20 + ATR volatility guard + 3-loss cooldown
+// Optimal params: FILUSDT Mult=2.57 Len=15 | LDOUSDT Mult=3.07 Len=19
+//                 OPUSDT Mult=1.57 Len=8  | UNIUSDT Mult=2.07 Len=12
+// ============================================================
+strategy("Keltner Breakout [Webhook] v2", shorttitle="KB-WH", overlay=true,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.1,
+     calc_on_order_fills=false, calc_on_every_tick=false)
+
+// ── Inputs ──────────────────────────────────────────────────
+ema_len   = input.int(15,   "EMA Length",      minval=5,  maxval=50,  tooltip="FILUSDT=15, LDOUSDT=19, OPUSDT=8, UNIUSDT=12")
+atr_mult  = input.float(2.57,"ATR Multiplier",  minval=0.5, maxval=5.0, step=0.01, tooltip="FILUSDT=2.57, LDOUSDT=3.07, OPUSDT=1.57, UNIUSDT=2.07")
+sl_pct    = input.float(1.0, "Stop Loss %",     minval=0.1, maxval=5.0, step=0.1)
+tp_pct    = input.float(3.0, "Take Profit %",   minval=0.1, maxval=10.0, step=0.1)
+adx_th    = input.int(20,    "ADX Threshold",   minval=10, maxval=40)
+
+// ── Keltner Channel ─────────────────────────────────────────
+basis   = ta.ema(close, ema_len)
+atr_val = ta.atr(ema_len)
+upper   = basis + atr_mult * atr_val
+lower   = basis - atr_mult * atr_val
+
+// ── FILTER 1: ADX > threshold ───────────────────────────────
+[_, _, adx] = ta.dmi(14, 14)
+adxOK = adx > adx_th
+
+// ── FILTER 2: ATR Volatility Guard (skip extreme moves) ─────
+atr14   = ta.atr(14)
+atrMa   = ta.sma(atr14, 100)
+volOK   = atr14 < 2.0 * atrMa
+
+// ── FILTER 3: Cooldown after 3 consecutive losses ───────────
+var int  consec  = 0
+var int  cdBars  = 0
+var bool inCool  = false
+
+if strategy.closedtrades > 0
+    lastPnl = strategy.closedtrades.profit(strategy.closedtrades - 1)
+    if lastPnl < 0
+        consec := consec + 1
+    else
+        consec := 0
+    if consec >= 3
+        inCool := true
+        cdBars := 4
+        consec := 0
+
+if inCool
+    cdBars := cdBars - 1
+    if cdBars <= 0
+        inCool := false
+
+coolOK = not inCool
+
+// ── Signals ─────────────────────────────────────────────────
+longCond  = ta.crossover(close, upper)  and adxOK and volOK and coolOK
+shortCond = ta.crossunder(close, lower) and adxOK and volOK and coolOK
+
+// ── Entries ─────────────────────────────────────────────────
+if longCond
+    strategy.entry("Long", strategy.long)
+if shortCond
+    strategy.entry("Short", strategy.short)
+
+// ── Exits via SL/TP ─────────────────────────────────────────
+strategy.exit("XL", "Long",  loss=close * sl_pct / 100, profit=close * tp_pct / 100)
+strategy.exit("XS", "Short", loss=close * sl_pct / 100, profit=close * tp_pct / 100)
+
+// ── Plot ─────────────────────────────────────────────────────
+plot(basis, "EMA",   color=color.blue,   linewidth=1)
+plot(upper, "Upper", color=color.green,  linewidth=1)
+plot(lower, "Lower", color=color.red,    linewidth=1)
+bgcolor(inCool ? color.new(color.orange, 90) : na, title="Cooldown")
+
+// ── Alerts ──────────────────────────────────────────────────
+alertcondition(longCond,  "Long Entry",  '{"symbol":"{{ticker}}","action":"buy","strategy":"Keltner_Breakout","price":"{{close}}"}')
+alertcondition(shortCond, "Short Entry", '{"symbol":"{{ticker}}","action":"sell","strategy":"Keltner_Breakout","price":"{{close}}"}')

@@ -1,0 +1,53 @@
+//@version=5
+// Full_Momentum [Webhook] v2 -- TOURNAMENT MATCHED -- USE ON 15m CHART
+// ADX>20 filter + ATR volatility guard + 3-loss cooldown
+// FILUSDT Len=10 Mult=1.84 | LDOUSDT Len=12 Mult=2.04 | OPUSDT Len=15 Mult=2.54
+strategy("Full Momentum [Webhook] v2", shorttitle="FM-WH", overlay=false,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.1,
+     calc_on_order_fills=false, calc_on_every_tick=false)
+macd_fast = input.int(10, "MACD Fast", minval=5, maxval=30, tooltip="FILUSDT=10, LDOUSDT=12, OPUSDT=15")
+slow_mult = input.float(1.84, "Slow Multiplier", minval=1.0, maxval=5.0, step=0.01, tooltip="FILUSDT=1.84, LDOUSDT=2.04, OPUSDT=2.54")
+ema_trend = input.int(50, "Trend EMA", minval=20, maxval=200)
+sl_pct    = input.float(1.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1)
+tp_pct    = input.float(3.0, "Take Profit %", minval=0.1, maxval=10.0, step=0.1)
+adx_th    = input.int(20, "ADX Threshold", minval=10, maxval=40)
+macd_slow = math.round(macd_fast * slow_mult)
+[macdL, sigL, histL] = ta.macd(close, macd_fast, macd_slow, 9)
+rsi14     = ta.rsi(close, 14)
+ema50     = ta.ema(close, ema_trend)
+[_, _, adx] = ta.dmi(14, 14)
+adxOK     = adx > adx_th
+atr14     = ta.atr(14)
+atrMa     = ta.sma(atr14, 100)
+volOK     = atr14 < 2.0 * atrMa
+var int  consec = 0
+var int  cdBars = 0
+var bool inCool = false
+if strategy.closedtrades > 0
+    lastPnl = strategy.closedtrades.profit(strategy.closedtrades - 1)
+    consec  := lastPnl < 0 ? consec + 1 : 0
+    if consec >= 3
+        inCool := true
+        cdBars := 4
+        consec := 0
+if inCool
+    cdBars := cdBars - 1
+    if cdBars <= 0
+        inCool := false
+coolOK        = not inCool
+histFlipUp    = histL > 0 and histL[1] <= 0
+histFlipDown  = histL < 0 and histL[1] >= 0
+longCond      = histFlipUp   and rsi14 > 50 and close > ema50 and adxOK and volOK and coolOK
+shortCond     = histFlipDown and rsi14 < 50 and close < ema50 and adxOK and volOK and coolOK
+if longCond
+    strategy.entry("Long", strategy.long)
+if shortCond
+    strategy.entry("Short", strategy.short)
+strategy.exit("XL", "Long",  loss=close * sl_pct / 100, profit=close * tp_pct / 100)
+strategy.exit("XS", "Short", loss=close * sl_pct / 100, profit=close * tp_pct / 100)
+hline(0, "Zero", color=color.gray)
+plot(histL, "Hist", style=plot.style_histogram, color=histL >= 0 ? color.green : color.red)
+bgcolor(inCool ? color.new(color.orange, 90) : na, title="Cooldown")
+alertcondition(longCond,  "Long Entry",  '{"symbol":"{{ticker}}","action":"buy","strategy":"Full_Momentum","price":"{{close}}"}')
+alertcondition(shortCond, "Short Entry", '{"symbol":"{{ticker}}","action":"sell","strategy":"Full_Momentum","price":"{{close}}"}')

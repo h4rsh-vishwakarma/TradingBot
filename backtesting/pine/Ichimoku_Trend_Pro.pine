@@ -1,0 +1,89 @@
+//@version=5
+// ============================================================
+// Ichimoku_Trend_Pro [Webhook] — TOURNAMENT MATCHED v2
+// ⚠️  USE ON 15m CHART ONLY
+// Filters: ADX>20 + ATR volatility guard + 3-loss cooldown
+// Optimal params: FILUSDT Mult=2.55 Len=16 | LDOUSDT Mult=2.05 Len=13
+//                 UNIUSDT Mult=1.85 Len=11
+// ============================================================
+strategy("Ichimoku Trend Pro [Webhook] v2", shorttitle="ITP-WH", overlay=true,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.1,
+     calc_on_order_fills=false, calc_on_every_tick=false)
+
+// ── Inputs ──────────────────────────────────────────────────
+tenkan_len = input.int(16,   "Tenkan Length",    minval=5, maxval=50, tooltip="FILUSDT=16, LDOUSDT=13, UNIUSDT=11")
+kijun_mult = input.float(2.55,"Kijun Multiplier",minval=0.5, maxval=5.0, step=0.01, tooltip="FILUSDT=2.55, LDOUSDT=2.05, UNIUSDT=1.85")
+senkou_len = input.int(52,   "Senkou B Length",  minval=20, maxval=100)
+sl_pct     = input.float(1.0, "Stop Loss %",     minval=0.1, maxval=5.0, step=0.1)
+tp_pct     = input.float(3.0, "Take Profit %",   minval=0.1, maxval=10.0, step=0.1)
+adx_th     = input.int(20,   "ADX Threshold",    minval=10, maxval=40)
+
+// ── Ichimoku Components ─────────────────────────────────────
+kijun_len   = math.round(tenkan_len * kijun_mult)
+tenkan      = (ta.highest(high, tenkan_len) + ta.lowest(low, tenkan_len)) / 2
+kijun       = (ta.highest(high, kijun_len)  + ta.lowest(low, kijun_len))  / 2
+spanA       = (tenkan + kijun) / 2
+spanB       = (ta.highest(high, senkou_len) + ta.lowest(low, senkou_len)) / 2
+cloudTop    = math.max(spanA[26], spanB[26])
+cloudBot    = math.min(spanA[26], spanB[26])
+
+// ── FILTER 1: ADX ───────────────────────────────────────────
+[_, _, adx] = ta.dmi(14, 14)
+adxOK = adx > adx_th
+
+// ── FILTER 2: ATR Volatility Guard ──────────────────────────
+atr14  = ta.atr(14)
+atrMa  = ta.sma(atr14, 100)
+volOK  = atr14 < 2.0 * atrMa
+
+// ── FILTER 3: Cooldown ──────────────────────────────────────
+var int  consec  = 0
+var int  cdBars  = 0
+var bool inCool  = false
+
+if strategy.closedtrades > 0
+    lastPnl = strategy.closedtrades.profit(strategy.closedtrades - 1)
+    if lastPnl < 0
+        consec := consec + 1
+    else
+        consec := 0
+    if consec >= 3
+        inCool := true
+        cdBars := 4
+        consec := 0
+
+if inCool
+    cdBars := cdBars - 1
+    if cdBars <= 0
+        inCool := false
+
+coolOK = not inCool
+
+// ── Signals ─────────────────────────────────────────────────
+aboveCloud  = close > cloudTop
+belowCloud  = close < cloudBot
+tkCross     = ta.crossover(tenkan, kijun)
+tkCrossDown = ta.crossunder(tenkan, kijun)
+
+longCond  = tkCross     and aboveCloud and adxOK and volOK and coolOK
+shortCond = tkCrossDown and belowCloud and adxOK and volOK and coolOK
+
+// ── Entries ─────────────────────────────────────────────────
+if longCond
+    strategy.entry("Long", strategy.long)
+if shortCond
+    strategy.entry("Short", strategy.short)
+
+strategy.exit("XL", "Long",  loss=close * sl_pct / 100, profit=close * tp_pct / 100)
+strategy.exit("XS", "Short", loss=close * sl_pct / 100, profit=close * tp_pct / 100)
+
+// ── Plot ─────────────────────────────────────────────────────
+plot(tenkan, "Tenkan", color=color.new(color.red,   0), linewidth=1)
+plot(kijun,  "Kijun",  color=color.new(color.blue,  0), linewidth=2)
+c1 = spanA >= spanB ? color.new(color.green, 80) : color.new(color.red, 80)
+fill(plot(spanA[26], "SpanA", color=na), plot(spanB[26], "SpanB", color=na), color=c1)
+bgcolor(inCool ? color.new(color.orange, 90) : na, title="Cooldown")
+
+alertcondition(longCond,  "Long Entry",  '{"symbol":"{{ticker}}","action":"buy","strategy":"Ichimoku_Trend_Pro","price":"{{close}}"}')
+alertcondition(shortCond, "Short Entry", '{"symbol":"{{ticker}}","action":"sell","strategy":"Ichimoku_Trend_Pro","price":"{{close}}"}')
