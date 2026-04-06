@@ -46,8 +46,8 @@ SIGNAL_VARIABLE_PAIRS = [
 @dataclass(frozen=True)
 class AlphaCriteria:
     min_roi_per_day_pct: float = 1.0
-    max_gross_drawdown_pct: float = 15.0
-    max_net_drawdown_pct: float = 15.0
+    max_gross_drawdown_pct: float = 20.0
+    max_net_drawdown_pct: float = 20.0
 
 
 def _safe_float(value, default: float = 0.0) -> float:
@@ -195,7 +195,7 @@ def _classify_alpha(
         reasons.append(f"|Net DD| {abs(net_drawdown_pct):.2f}% >= {criteria.max_net_drawdown_pct:.2f}%")
     if reasons:
         return False, "; ".join(reasons)
-    return True, "Meets alpha rule: ROI/day > 1% and |Gross DD|, |Net DD| < 15%"
+    return True, "Meets alpha rule: ROI/day > 1% and |Gross DD|, |Net DD| < 20%"
 
 
 def evaluate_trade_csv(
@@ -446,7 +446,7 @@ def generate_alpha_pine_scripts(
         header = (
             f"// Alpha Engine Webhook Copy\n"
             f"// Source: {source_path.name}\n"
-            f"// Alpha Rule: ROI/day > 1% and |Gross DD|, |Net DD| < 15%\n"
+            f"// Alpha Rule: ROI/day > 1% and |Gross DD|, |Net DD| < 20%\n"
             f"// ROI/day: {row.get('ROI_Per_Day_Pct', 0):.4f}% | Gross DD: {row.get('Gross_Drawdown_Percent', 0):.2f}% | Net DD: {row.get('Net_Drawdown_Percent', 0):.2f}%\n"
         )
         webhook_block = (
@@ -519,14 +519,14 @@ def notify_alpha_candidates(
         telegram.send(
             severity=AlertSeverity.WARNING,
             title="Alpha Engine Report",
-            message="No alpha strategies qualified.\n\nRule: ROI/day &gt; 1% and |Gross DD|, |Net DD| &lt; 15%",
+            message="No alpha strategies qualified.\n\nRule: ROI/day &gt; 1% and |Gross DD|, |Net DD| &lt; 20%",
             force=True,
         )
         return
 
     summary_lines = [
         f"Qualified alpha strategies: <b>{len(alpha_candidates)}</b>",
-        "Rule: ROI/day &gt; 1% | |Gross DD| &lt; 15% | |Net DD| &lt; 15%",
+        "Rule: ROI/day &gt; 1% | |Gross DD| &lt; 20% | |Net DD| &lt; 20%",
     ]
     top_rows = alpha_candidates.sort_values("ROI_Per_Day_Pct", ascending=False).head(10)
     for idx, (_, row) in enumerate(top_rows.iterrows(), start=1):

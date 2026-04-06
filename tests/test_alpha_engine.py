@@ -31,7 +31,7 @@ def test_build_alpha_reports_qualifies_strategy(tmp_path):
         input_folder=input_dir,
         report_dir=report_dir,
         initial_capital=10_000,
-        criteria=AlphaCriteria(min_roi_per_day_pct=1.0, max_gross_drawdown_pct=15.0, max_net_drawdown_pct=15.0),
+        criteria=AlphaCriteria(min_roi_per_day_pct=1.0, max_gross_drawdown_pct=20.0, max_net_drawdown_pct=20.0),
     )
 
     assert len(reports["all"]) == 1
@@ -41,8 +41,8 @@ def test_build_alpha_reports_qualifies_strategy(tmp_path):
     assert row["Timeframe"] == "4h"
     assert row["Alpha_Qualified"] == "YES"
     assert row["ROI_Per_Day_Pct"] > 1.0
-    assert abs(row["Gross_Drawdown_Percent"]) < 15.0
-    assert abs(row["Net_Drawdown_Percent"]) < 15.0
+    assert abs(row["Gross_Drawdown_Percent"]) < 20.0
+    assert abs(row["Net_Drawdown_Percent"]) < 20.0
     assert (report_dir / "alpha_candidates.csv").exists()
     assert (report_dir / "alpha_best_per_symbol.csv").exists()
 
@@ -119,7 +119,7 @@ def test_build_alpha_reports_writes_headered_empty_best_csv(tmp_path):
         input_folder=input_dir,
         report_dir=report_dir,
         initial_capital=10_000,
-        criteria=AlphaCriteria(min_roi_per_day_pct=1.0, max_gross_drawdown_pct=15.0, max_net_drawdown_pct=15.0),
+        criteria=AlphaCriteria(min_roi_per_day_pct=1.0, max_gross_drawdown_pct=20.0, max_net_drawdown_pct=20.0),
     )
 
     assert len(reports["all"]) == 1

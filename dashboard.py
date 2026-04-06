@@ -13,7 +13,7 @@ try:
 except ImportError:
     HAS_PLOTLY = False
 
-# ── paths ──────────────────────────────────────────────────────────────────────
+# -- paths ----------------------------------------------------------------------
 PROJECT_ROOT   = "/home/ubuntu/tradingview_webhook_bot"
 STRATEGIES_DIR = os.path.join(PROJECT_ROOT, "strategies")
 REPORTS_DIR    = os.path.join(PROJECT_ROOT, "storage/reports")
@@ -33,7 +33,7 @@ SYMBOLS_16 = ["FILUSDT","OPUSDT","LDOUSDT","UNIUSDT","NEARUSDT","INJUSDT",
                "SUIUSDT","ARBUSDT","AAVEUSDT","DOGEUSDT","APTUSDT","ATOMUSDT",
                "SOLUSDT","LINKUSDT","AVAXUSDT","DOTUSDT"]
 
-# ── helpers ────────────────────────────────────────────────────────────────────
+# -- helpers --------------------------------------------------------------------
 def load_json(path):
     try:
         with open(path, encoding="utf-8") as f:
@@ -80,21 +80,65 @@ def is_port_listening(port):
     except:
         return False
 
-# ── set_page_config MUST be first st call ─────────────────────────────────────
+TOURNAMENT_NUMERIC_COLS = [
+    "Daily_ROI_%",
+    "Gross_DD_%",
+    "Net_DD_%",
+    "Win_Rate_%",
+    "Sharpe_Ratio",
+    "OOS_Daily_ROI_%",
+    "OOS_Gross_DD_%",
+    "OOS_Sharpe",
+    "Optimal_SL_%",
+    "Optimal_TP_%",
+    "Total_Trades",
+]
+
+def to_float(value, default=0.0):
+    try:
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            return default
+        if isinstance(value, str):
+            cleaned = value.strip().replace("%", "").replace(",", "")
+            if not cleaned:
+                return default
+            return float(cleaned)
+        return float(value)
+    except:
+        return default
+
+def read_csv_safe(path):
+    try:
+        return pd.read_csv(path)
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame()
+    except:
+        return pd.DataFrame()
+
+def read_tournament_csv(path):
+    df = read_csv_safe(path)
+    if df.empty:
+        return df
+    for col in TOURNAMENT_NUMERIC_COLS:
+        if col in df.columns:
+            df[col] = df[col].apply(lambda v: to_float(v, default=float("nan")))
+    return df
+
+# -- set_page_config MUST be first st call -------------------------------------
 st.set_page_config(
     page_title="Trading Bot — Command Center",
     layout="wide",
-    page_icon="⚡",
+    page_icon="?",
     initial_sidebar_state="expanded"
 )
 
-# ── session state ──────────────────────────────────────────────────────────────
+# -- session state --------------------------------------------------------------
 if "page"          not in st.session_state: st.session_state.page          = "Home"
 if "range"         not in st.session_state: st.session_state.range         = "Today"
 if "bot"           not in st.session_state: st.session_state.bot           = "Binance"
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
 
-# ── password gate ───────────────────────────────────────────────────────────────
+# -- password gate ---------------------------------------------------------------
 def _load_dashboard_password():
     _pw_file = os.path.join(PROJECT_ROOT, ".dashboard_password")
     try:
@@ -115,7 +159,7 @@ if not st.session_state.authenticated:
     .block-container { padding: 0 !important; max-width: 100% !important; }
     [data-testid="stMainBlockContainer"] { padding: 0 !important; }
 
-    /* ── Card: style the middle column as the login card ── */
+    /* -- Card: style the middle column as the login card -- */
     div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(2) > div {
         background: #161b27;
         border: 1px solid #30363d;
@@ -124,7 +168,7 @@ if not st.session_state.authenticated:
         box-shadow: 0 12px 48px rgba(0,0,0,.6);
     }
 
-    /* ── Input ── */
+    /* -- Input -- */
     [data-testid="stTextInput"] input {
         background: #0d1117 !important;
         border: 1px solid #30363d !important;
@@ -142,7 +186,7 @@ if not st.session_state.authenticated:
     [data-testid="stTextInput"] input::placeholder { color: #484f58 !important; }
     [data-testid="stTextInput"] label { display: none !important; }
 
-    /* ── Button ── */
+    /* -- Button -- */
     [data-testid="stButton"] > button {
         background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
         border: none !important;
@@ -158,7 +202,7 @@ if not st.session_state.authenticated:
     }
     [data-testid="stButton"] > button:hover { opacity: .88 !important; }
 
-    /* ── Pulse dot ── */
+    /* -- Pulse dot -- */
     .ldot {
         display: inline-block;
         width: 7px; height: 7px;
@@ -169,7 +213,7 @@ if not st.session_state.authenticated:
     </style>
     """, unsafe_allow_html=True)
 
-    # ── Vertical centering spacer ──
+    # -- Vertical centering spacer --
     st.markdown("<div style='height:18vh'></div>", unsafe_allow_html=True)
 
     _l, _mid, _r = st.columns([1, 1.5, 1])
@@ -180,7 +224,7 @@ if not st.session_state.authenticated:
           <div style="display:inline-flex;align-items:center;justify-content:center;
                       width:56px;height:56px;border-radius:16px;font-size:28px;
                       background:linear-gradient(135deg,#1f6feb,#388bfd);margin-bottom:14px">
-            ⚡
+            ?
           </div>
           <div style="font-size:22px;font-weight:700;color:#e6edf3;letter-spacing:-0.3px">
             TradingBot
@@ -199,7 +243,7 @@ if not st.session_state.authenticated:
                                     label_visibility="collapsed",
                                     placeholder="Enter your password…",
                                     key="login_pw")
-        _login_btn = st.button("🔓  Unlock Dashboard", use_container_width=True)
+        _login_btn = st.button("??  Unlock Dashboard", use_container_width=True)
 
         if _login_btn:
             if _pw_input == _load_dashboard_password():
@@ -209,7 +253,7 @@ if not st.session_state.authenticated:
                 st.markdown(
                     "<div style='text-align:center;color:#f85149;font-size:13px;"
                     "margin-top:10px;padding:8px;background:rgba(248,81,73,.08);"
-                    "border-radius:8px'>❌ Incorrect password</div>",
+                    "border-radius:8px'>? Incorrect password</div>",
                     unsafe_allow_html=True)
 
         st.markdown("""
@@ -223,7 +267,7 @@ if not st.session_state.authenticated:
 
     st.stop()
 
-# ── non-blocking Binance client ────────────────────────────────────────────────
+# -- non-blocking Binance client ------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def get_binance_client():
     import threading, queue
@@ -273,18 +317,18 @@ def get_lighter_client():
         return None
 
 client        = get_binance_client()
-hl_client     = get_hl_client()
+hl_client     = None
 lighter_client = get_lighter_client()
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  DARK THEME CSS
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 st.markdown("""
 <style>
-/* ════════════════════════════════════════════════════
+/* ----------------------------------------------------
    DARK THEME — Clean, non-conflicting overrides only
    Theme colours set via .streamlit/config.toml
-   ════════════════════════════════════════════════════ */
+   ---------------------------------------------------- */
 
 /* 1. Hide Streamlit chrome */
 #MainMenu, footer, header { visibility: hidden; }
@@ -376,7 +420,7 @@ html, body,
     color: #8b949e;
 }
 
-/* ── Custom layout components ── */
+/* -- Custom layout components -- */
 .ticker-bar {
     background: #161b27;
     border-bottom: 1px solid #21262d;
@@ -465,9 +509,9 @@ html, body,
 </style>
 """, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  DATA LOAD
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 ledger    = load_json(LEDGER_PATH)
 positions = ledger.get("positions", {})
 th        = ledger.get("trade_history", [])
@@ -531,22 +575,22 @@ def fp(sym, d=2):
 hl_balance = 0.0
 hl_wallet  = os.getenv("HL_WALLET_ADDRESS", "0xd31b417C007609fd7babc94ED71eB26e5f6397Ef")
 try:
-    if hl_client and hasattr(hl_client, 'get_balance'):
+    if hl_client and getattr(hl_client, 'info', None) and hasattr(hl_client, 'get_balance'):
         hl_balance = hl_client.get_balance() or 0.0
 except:
     pass
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  SIDEBAR — status panel only (nav moved to top bar)
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 def sdot(ok):
     c = "#3fb950" if ok else "#f85149"
-    return f'<span style="color:{c};font-size:9px">●</span>'
+    return f'<span style="color:{c};font-size:9px">?</span>'
 
 with st.sidebar:
     st.markdown(f"""
     <div style='padding:16px 14px 8px 14px'>
-      <div style='font-size:17px;font-weight:900;color:#58a6ff;margin-bottom:2px'>⚡ TradingBot</div>
+      <div style='font-size:17px;font-weight:900;color:#58a6ff;margin-bottom:2px'>? TradingBot</div>
       <div style='font-size:10px;color:#6e7681'>Command Center</div>
     </div>
     <hr style='border-color:#21262d;margin:0 0 10px 0'/>
@@ -572,14 +616,14 @@ with st.sidebar:
     </div>
     <hr style='border-color:#21262d;margin:6px 0'/>
     """, unsafe_allow_html=True)
-    if st.button("🚪 Logout", use_container_width=True, key="logout_btn"):
+    if st.button("?? Logout", use_container_width=True, key="logout_btn"):
         st.session_state.authenticated = False
         st.rerun()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  TICKER BAR (always shown)
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 st.markdown(f"""
 <div class="ticker-bar">
   <span>BTC&nbsp;<span class="tv">{fp("BTCUSDT",0)}</span></span>
@@ -589,7 +633,7 @@ st.markdown(f"""
   <span>LINK&nbsp;<span class="tv">{fp("LINKUSDT",2)}</span></span>
   <span>DOGE&nbsp;<span class="tv">{fp("DOGEUSDT",4)}</span></span>
   <span>AVAX&nbsp;<span class="tv">{fp("AVAXUSDT",2)}</span></span>
-  <span class="ticker-right">⚡ 4H · SL {sl_pct:.0f}% / TP {tp_pct:.0f}% · TESTNET · {datetime.now().strftime("%d %b %Y  %H:%M:%S")}</span>
+  <span class="ticker-right">? 4H · SL {sl_pct:.0f}% / TP {tp_pct:.0f}% · TESTNET · {datetime.now().strftime("%d %b %Y  %H:%M:%S")}</span>
 </div>
 <div class="info-bar">
   <span><span class="ib-key">BINANCE BOT:</span>
@@ -597,29 +641,29 @@ st.markdown(f"""
   <span><span class="ib-key">TOTAL PNL:</span>
     <span class="{"ib-val" if alltime_pnl>=0 else "ib-warn"}">${alltime_pnl:+,.4f}</span></span>
   <span><span class="ib-key">HL MIRROR:</span>
-    <span class="{"ib-val" if hl_up else "ib-warn"}">{"● ACTIVE" if hl_up else "● OFFLINE"}</span></span>
+    <span class="{"ib-val" if hl_up else "ib-warn"}">{"? ACTIVE" if hl_up else "? OFFLINE"}</span></span>
   <span><span class="ib-key">ORCHESTRATOR:</span>
-    <span class="{"ib-val" if orch_up else "ib-warn"}">{"● RUNNING" if orch_up else "● OFFLINE"}</span></span>
+    <span class="{"ib-val" if orch_up else "ib-warn"}">{"? RUNNING" if orch_up else "? OFFLINE"}</span></span>
   <span><span class="ib-key">WIN RATE:</span>
     <span class="ib-val">{win_rate:.1f}% ({wins}/{len(th)})</span></span>
 </div>
 """, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  TOP NAVIGATION — using st.pills (no CSS conflicts)
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 _PAGE_MAP = {
-    "🏠  Home":          "Home",
-    "⚡  Kill Switch":   "Kill Switch",
-    "📋  Order Manager": "Order Manager",
-    "🔔  Alerts":        "Alerts",
-    "📊  Order Status":  "Order Status",
-    "📡  Signals":       "Signals",
-    "📈  Backtest":      "Backtest",
-    "🌩  Lighter":       "Lighter",
+    "??  Home":          "Home",
+    "?  Kill Switch":   "Kill Switch",
+    "??  Order Manager": "Order Manager",
+    "??  Alerts":        "Alerts",
+    "??  Order Status":  "Order Status",
+    "??  Signals":       "Signals",
+    "??  Backtest":      "Backtest",
+    "??  Lighter":       "Lighter",
 }
 _LABEL_MAP  = {v: k for k, v in _PAGE_MAP.items()}
-_cur_label  = _LABEL_MAP.get(st.session_state.page, "🏠  Home")
+_cur_label  = _LABEL_MAP.get(st.session_state.page, "??  Home")
 _pill_sel   = st.pills("nav", list(_PAGE_MAP.keys()),
                         default=_cur_label, label_visibility="collapsed")
 if _pill_sel and _PAGE_MAP.get(_pill_sel) != st.session_state.page:
@@ -628,15 +672,15 @@ if _pill_sel and _PAGE_MAP.get(_pill_sel) != st.session_state.page:
 
 st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  HOME
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 if st.session_state.page == "Home":
 
-    # ── bot selector + range pills ─────────────────────────────────────────
+    # -- bot selector + range pills -----------------------------------------
     bot_col, range_col = st.columns([2, 5])
     with bot_col:
-        bot_sel = st.radio("Select Bot", ["🔵 Binance Bot", "🟣 HyperLiquid Bot"],
+        bot_sel = st.radio("Select Bot", ["?? Binance Bot", "?? HyperLiquid Bot"],
                            horizontal=True, label_visibility="collapsed",
                            key="bot_radio")
         st.session_state.bot = "Binance" if "Binance" in bot_sel else "HyperLiquid"
@@ -652,7 +696,7 @@ if st.session_state.page == "Home":
     since_date = RANGES.get(st.session_state.range, "2000")
     range_pnl  = pnl_since(since_date)
 
-    # ── BINANCE BOT ─────────────────────────────────────────────────────────
+    # -- BINANCE BOT ---------------------------------------------------------
     if st.session_state.bot == "Binance":
 
         # 4 metric cards
@@ -664,7 +708,7 @@ if st.session_state.page == "Home":
             st.markdown(f"""
             <div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#1f6feb,#388bfd)"></div>
-              <div class="dk-card-icon">💰</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">Capital Deployed</div>
               <div class="dk-card-value" style="color:#58a6ff">${total_invested:,.2f}</div>
               <div class="dk-card-sub">{len(open_pos)} active position(s)<br>
@@ -677,7 +721,7 @@ if st.session_state.page == "Home":
             st.markdown(f"""
             <div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#3fb950,#56d364)"></div>
-              <div class="dk-card-icon">📊</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">Realised PnL ({st.session_state.range})</div>
               <div class="dk-card-value" style="color:{c2_col}">${range_pnl:+,.4f}</div>
               <div class="dk-card-sub">All-time: <span style="color:{at_col};font-weight:600">${alltime_pnl:+,.4f}</span><br>
@@ -689,7 +733,7 @@ if st.session_state.page == "Home":
             st.markdown(f"""
             <div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#d29922,#e3b341)"></div>
-              <div class="dk-card-icon">📈</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">Open Position PnL</div>
               <div class="dk-card-value" style="color:{unr_col}">${open_unr_pnl:+,.4f}</div>
               <div class="dk-card-sub">{len(open_pos)} positions open<br>
@@ -701,21 +745,21 @@ if st.session_state.page == "Home":
             st.markdown(f"""
             <div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#bc8cff,#a371f7)"></div>
-              <div class="dk-card-icon">⚡</div>
+              <div class="dk-card-icon">?</div>
               <div class="dk-card-label">Win Rate</div>
               <div class="dk-card-value" style="color:{wr_col}">{win_rate:.1f}%</div>
               <div class="dk-card-sub">{wins} wins / {len(th) - wins} losses<br>
-                <span class="badge-active">● Orchestrator ACTIVE</span></div>
+                <span class="badge-active">? Orchestrator ACTIVE</span></div>
             </div>""", unsafe_allow_html=True)
 
         st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
-        # ── Charts ────────────────────────────────────────────────────────
+        # -- Charts --------------------------------------------------------
         ch1, ch2 = st.columns([3, 2])
 
         with ch1:
             st.markdown('<div class="chart-panel">', unsafe_allow_html=True)
-            st.markdown('<div class="chart-title">📉 Cumulative PnL</div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-title">?? Cumulative PnL</div>', unsafe_allow_html=True)
             if HAS_PLOTLY and th:
                 df_h = pd.DataFrame(th)
                 df_h['ts'] = pd.to_datetime(df_h['timestamp'], errors='coerce')
@@ -756,7 +800,7 @@ if st.session_state.page == "Home":
 
         with ch2:
             st.markdown('<div class="chart-panel">', unsafe_allow_html=True)
-            st.markdown('<div class="chart-title">🎯 Open Positions by Symbol</div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-title">?? Open Positions by Symbol</div>', unsafe_allow_html=True)
             if HAS_PLOTLY and open_pos:
                 sym_data = {}
                 for p in open_pos:
@@ -786,8 +830,8 @@ if st.session_state.page == "Home":
                 st.markdown('<div style="text-align:center;color:#6e7681;padding:60px 0;font-size:13px">No open positions</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # ── Open Positions table ──────────────────────────────────────────
-        st.markdown('<div class="sec-title">📂 Open Positions</div>', unsafe_allow_html=True)
+        # -- Open Positions table ------------------------------------------
+        st.markdown('<div class="sec-title">?? Open Positions</div>', unsafe_allow_html=True)
         if open_pos:
             rows_html = ""
             for p in open_pos:
@@ -796,7 +840,7 @@ if st.session_state.page == "Home":
                 ep   = p.get("avg_price", 0)
                 rpnl = p.get("realized_pnl", 0)
                 dpnl = p.get("daily_realized_pnl", 0)
-                side = "🟢 LONG" if qty > 0 else "🔴 SHORT"
+                side = "?? LONG" if qty > 0 else "?? SHORT"
                 tp_p = ep * (1 + tp_pct / 100) if qty > 0 else ep * (1 - tp_pct / 100)
                 sl_p = ep * (1 - sl_pct / 100) if qty > 0 else ep * (1 + sl_pct / 100)
                 rpnl_c = "#3fb950" if rpnl >= 0 else "#f85149"
@@ -825,14 +869,14 @@ if st.session_state.page == "Home":
         else:
             st.info("No open positions.")
 
-    # ── HYPERLIQUID BOT ──────────────────────────────────────────────────────
+    # -- HYPERLIQUID BOT ------------------------------------------------------
     else:
         hl_c1, hl_c2, hl_c3 = st.columns(3)
         with hl_c1:
             st.markdown(f"""
             <div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#bc8cff,#a371f7)"></div>
-              <div class="dk-card-icon">🟣</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">HL Balance (USDC)</div>
               <div class="dk-card-value" style="color:#bc8cff">${hl_balance:,.4f}</div>
               <div class="dk-card-sub">HyperLiquid Testnet</div>
@@ -841,7 +885,7 @@ if st.session_state.page == "Home":
             st.markdown(f"""
             <div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#3fb950,#56d364)"></div>
-              <div class="dk-card-icon">🔗</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">Mirror Bot Status</div>
               <div class="dk-card-value" style="color:{'#3fb950' if hl_up else '#f85149'}">{'ACTIVE' if hl_up else 'OFFLINE'}</div>
               <div class="dk-card-sub">Running since 2026-03-21<br>Lead trader mirror mode</div>
@@ -851,7 +895,7 @@ if st.session_state.page == "Home":
             st.markdown(f"""
             <div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#58a6ff,#79c0ff)"></div>
-              <div class="dk-card-icon">👛</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">Wallet Address</div>
               <div class="dk-card-value" style="color:#58a6ff;font-size:16px">{short_wallet}</div>
               <div class="dk-card-sub">Network: Testnet<br>
@@ -861,7 +905,7 @@ if st.session_state.page == "Home":
         st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
         st.markdown("""
         <div style='background:#1c2128;border:1px solid #30363d;border-radius:10px;padding:18px 20px;color:#8b949e;font-size:13px'>
-          🟣 <b style='color:#bc8cff'>HyperLiquid Mirror Bot</b> is actively mirroring lead trader positions.
+          ?? <b style='color:#bc8cff'>HyperLiquid Mirror Bot</b> is actively mirroring lead trader positions.
           Trade data will appear here as positions are opened and closed on HyperLiquid testnet.<br><br>
           <b style='color:#58a6ff'>Lead Trader:</b> 0x0e61a8fb14f6ac999646212d30b2192cd02080dd &nbsp;|&nbsp;
           <b style='color:#58a6ff'>Poll Interval:</b> 5s &nbsp;|&nbsp;
@@ -869,12 +913,12 @@ if st.session_state.page == "Home":
         </div>""", unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  KILL SWITCH
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 elif st.session_state.page == "Kill Switch":
 
-    st.markdown('<div class="sec-title">⚡ Kill Switch — Safety Controls</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-title">? Kill Switch — Safety Controls</div>', unsafe_allow_html=True)
 
     dd_lim     = float(risk.get("max_drawdown_limit", os.getenv("CB_DAILY_LOSS_PCT", 10.0)))
     today_loss = abs(today_pnl) if today_pnl < 0 else 0
@@ -918,12 +962,12 @@ elif st.session_state.page == "Kill Switch":
 
     # System status table
     st.markdown('<div class="chart-panel">', unsafe_allow_html=True)
-    st.markdown('<div class="chart-title">⚙️ System Safety Status</div>', unsafe_allow_html=True)
+    st.markdown('<div class="chart-title">?? System Safety Status</div>', unsafe_allow_html=True)
     raw_rows = [
-        ("Webhook Server",      f"{'🟢 ACTIVE :5000' if webhook_up else '🔴 DOWN'}"),
-        ("Orchestrator",        f"{'🟢 RUNNING' if orch_up else '🔴 OFFLINE'}"),
-        ("HyperLiquid Mirror",  f"{'🟢 ACTIVE' if hl_up else '🔴 OFFLINE'}"),
-        ("Price Sanity Check",  "✅ ON — 80%+ match required"),
+        ("Webhook Server",      f"{'?? ACTIVE :5000' if webhook_up else '?? DOWN'}"),
+        ("Orchestrator",        f"{'?? RUNNING' if orch_up else '?? OFFLINE'}"),
+        ("HyperLiquid Mirror",  f"{'?? ACTIVE' if hl_up else '?? OFFLINE'}"),
+        ("Price Sanity Check",  "? ON — 80%+ match required"),
         ("Max Positions",       str(risk.get("max_positions", os.getenv("MAX_OPEN_POSITIONS", 16)))),
         ("Position Size",       f"{risk.get('position_size_value', os.getenv('EQUITY_PCT_PER_TRADE', 10))}% of equity"),
         ("Leverage",            str(trading.get("leverage", os.getenv("TRADE_LEVERAGE", 1)))),
@@ -937,9 +981,9 @@ elif st.session_state.page == "Kill Switch":
     )
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Bot Control Buttons ────────────────────────────────────────────────
+    # -- Bot Control Buttons ------------------------------------------------
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
-    st.markdown('<div class="sec-title">🎛️ Bot Controls</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-title">??? Bot Controls</div>', unsafe_allow_html=True)
 
     try:
         _bot_resp   = _requests.get("http://127.0.0.1:5000/bot/status", timeout=3).json()
@@ -950,7 +994,7 @@ elif st.session_state.page == "Kill Switch":
         _real_trades = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
 
     _status_color = "#3fb950" if _orch_run else "#f85149"
-    _status_label = "● RUNNING" if _orch_run else "● STOPPED"
+    _status_label = "? RUNNING" if _orch_run else "? STOPPED"
     _trades_label = "LIVE TRADES ON" if _real_trades else "Paper / Testnet"
     _trades_color = "#f85149" if _real_trades else "#d29922"
 
@@ -963,40 +1007,40 @@ elif st.session_state.page == "Kill Switch":
 
     _bc1, _bc2, _bc3 = st.columns(3)
     with _bc1:
-        if st.button("▶️  Start Bot", use_container_width=True,
+        if st.button("??  Start Bot", use_container_width=True,
                      disabled=_orch_run, key="ks_start"):
             try:
                 _r = _requests.post("http://127.0.0.1:5000/bot/start",
                                     json={}, timeout=5)
                 if _r.status_code == 200:
-                    st.success("✅ Bot started")
+                    st.success("? Bot started")
                     st.rerun()
                 else:
                     st.error(f"Error: {_r.text[:100]}")
             except Exception as _e:
                 st.error(f"Request failed: {_e}")
     with _bc2:
-        if st.button("⏹️  Stop Bot", use_container_width=True,
+        if st.button("??  Stop Bot", use_container_width=True,
                      disabled=not _orch_run, key="ks_stop"):
             try:
                 _r = _requests.post("http://127.0.0.1:5000/bot/stop",
                                     json={}, timeout=5)
                 if _r.status_code == 200:
-                    st.success("✅ Bot stopped")
+                    st.success("? Bot stopped")
                     st.rerun()
                 else:
                     st.error(f"Error: {_r.text[:100]}")
             except Exception as _e:
                 st.error(f"Request failed: {_e}")
     with _bc3:
-        if st.button("🚨  Emergency Kill", use_container_width=True,
+        if st.button("??  Emergency Kill", use_container_width=True,
                      type="primary", key="ks_emergency"):
             try:
                 _r = _requests.post("http://127.0.0.1:5000/bot/emergency",
                                     json={}, timeout=15)
                 if _r.status_code == 200:
                     _d = _r.json()
-                    st.error(f"🚨 Emergency kill executed — {_d.get('positions_closed', 0)} positions closed")
+                    st.error(f"?? Emergency kill executed — {_d.get('positions_closed', 0)} positions closed")
                     st.rerun()
                 else:
                     st.error(f"Error: {_r.text[:100]}")
@@ -1006,19 +1050,19 @@ elif st.session_state.page == "Kill Switch":
     st.markdown("""
     <div style="font-size:11px;color:#6e7681;margin-top:8px;padding:8px 12px;
                 background:#1c2128;border-radius:8px;border:1px solid #30363d">
-      ⚠️ <b>Start Bot</b> — restarts the trading_orchestrator systemd service.<br>
-      ⏹️ <b>Stop Bot</b> — gracefully stops new signal processing (open trades remain).<br>
-      🚨 <b>Emergency Kill</b> — closes ALL open positions on Binance then stops the bot.
+      ?? <b>Start Bot</b> — restarts the trading_orchestrator systemd service.<br>
+      ?? <b>Stop Bot</b> — gracefully stops new signal processing (open trades remain).<br>
+      ?? <b>Emergency Kill</b> — closes ALL open positions on Binance then stops the bot.
     </div>""", unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  ORDER MANAGER
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 elif st.session_state.page == "Order Manager":
 
-    st.markdown('<div class="sec-title">📋 Order Manager</div>', unsafe_allow_html=True)
-    tab1, tab2 = st.tabs(["📂  Open Positions", "📖  Order Book"])
+    st.markdown('<div class="sec-title">?? Order Manager</div>', unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["??  Open Positions", "??  Order Book"])
 
     with tab1:
         if open_pos:
@@ -1030,7 +1074,7 @@ elif st.session_state.page == "Order Manager":
                 sl_p = ep * (1 - sl_pct / 100) if qty > 0 else ep * (1 + sl_pct / 100)
                 rows.append({
                     "Symbol":   p.get("symbol", "").replace("binance:", ""),
-                    "Side":     "🟢 LONG" if qty > 0 else "🔴 SHORT",
+                    "Side":     "?? LONG" if qty > 0 else "?? SHORT",
                     "Qty":      f"{abs(qty):.4f}",
                     "Entry":    f"${ep:,.4f}",
                     "TP":       f"${tp_p:,.4f}",
@@ -1059,12 +1103,12 @@ elif st.session_state.page == "Order Manager":
             st.info("No order history yet.")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  ALERTS
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 elif st.session_state.page == "Alerts":
 
-    st.markdown('<div class="sec-title">🔔 Alerts & System Logs</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-title">?? Alerts & System Logs</div>', unsafe_allow_html=True)
 
     lines_shown = False
 
@@ -1095,7 +1139,7 @@ elif st.session_state.page == "Alerts":
             shell=True, timeout=5, stderr=subprocess.DEVNULL).decode(errors="ignore")
         if raw.strip():
             lines_shown = True
-            st.markdown('<div class="chart-title" style="margin-top:14px">📋 Orchestrator Log</div>', unsafe_allow_html=True)
+            st.markdown('<div class="chart-title" style="margin-top:14px">?? Orchestrator Log</div>', unsafe_allow_html=True)
             html_parts = []
             for ln in raw.strip().splitlines()[-25:]:
                 l = ln.strip()
@@ -1116,12 +1160,12 @@ elif st.session_state.page == "Alerts":
         st.info("No alerts or logs available yet.")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  ORDER STATUS
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 elif st.session_state.page == "Order Status":
 
-    st.markdown('<div class="sec-title">📊 Order Status</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-title">?? Order Status</div>', unsafe_allow_html=True)
 
     tab_all, tab_fill, tab_open, tab_close = st.tabs(
         ["All Orders", "Filled", "Open", "Closed"])
@@ -1137,7 +1181,7 @@ elif st.session_state.page == "Order Status":
         df['PnL']         = df['pnl'].apply(lambda x: f"${float(x):+.4f}")
         df['Exit Price']  = df['exit_price'].apply(lambda x: f"${float(x):,.4f}")
         df['Status']      = df['pnl'].apply(
-            lambda x: "🟢 Profit" if float(x) > 0 else ("🔴 Loss" if float(x) < 0 else "⚪ Flat"))
+            lambda x: "?? Profit" if float(x) > 0 else ("?? Loss" if float(x) < 0 else "? Flat"))
         return df[['Time', 'Symbol', 'PnL', 'Exit Price', 'Status']]
 
     with tab_all:
@@ -1162,7 +1206,7 @@ elif st.session_state.page == "Order Status":
                      "Side":    "LONG" if p.get("quantity", 0) > 0 else "SHORT",
                      "Qty":     str(round(abs(p.get("quantity", 0)), 4)),
                      "Entry":   f"${p.get('avg_price', 0):,.4f}",
-                     "Status":  "🟡 Open"} for p in open_pos]
+                     "Status":  "?? Open"} for p in open_pos]
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
         else:
             st.info("No open orders.")
@@ -1178,17 +1222,17 @@ elif st.session_state.page == "Order Status":
             st.info("No order data.")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  SIGNALS
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 elif st.session_state.page == "Signals":
 
-    st.markdown('<div class="sec-title">📡 TradingView Signals</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-title">?? TradingView Signals</div>', unsafe_allow_html=True)
 
     sigs  = read_jsonl(SIGNALS_PATH, n=20)
     total = len(sigs)
 
-    search = st.text_input("Search signals", placeholder="🔍  Search by symbol, strategy...",
+    search = st.text_input("Search signals", placeholder="??  Search by symbol, strategy...",
                            label_visibility="collapsed", key="sig_search")
 
     if sigs:
@@ -1220,13 +1264,13 @@ elif st.session_state.page == "Signals":
             if search and search.lower() not in (sym + strategy + action).lower():
                 continue
             if action in ("BUY", "LONG"):
-                badge = '<span class="badge-bull">↗ BUY</span>'
+                badge = '<span class="badge-bull">? BUY</span>'
             elif action in ("SELL", "SHORT"):
-                badge = '<span class="badge-bear">↘ SELL</span>'
+                badge = '<span class="badge-bear">? SELL</span>'
             elif action == "EXIT":
-                badge = '<span class="badge-warn">⬛ EXIT</span>'
+                badge = '<span class="badge-warn">? EXIT</span>'
             else:
-                badge = '<span class="badge-neutral">→ Neutral</span>'
+                badge = '<span class="badge-neutral">? Neutral</span>'
 
             is_exit = payload.get("is_exit", False)
             exit_tag = ' <span style="font-size:10px;color:#d29922">[EXIT]</span>' if is_exit else ""
@@ -1274,22 +1318,22 @@ elif st.session_state.page == "Signals":
         st.markdown("""
         <div style='background:#1c2128;border:1px solid #30363d;border-radius:10px;
                     padding:24px;text-align:center;color:#8b949e'>
-          <div style='font-size:32px;margin-bottom:10px'>📡</div>
+          <div style='font-size:32px;margin-bottom:10px'>??</div>
           <div style='font-size:15px;font-weight:600;color:#e6edf3;margin-bottom:6px'>No Signals Yet</div>
           <div style='font-size:13px'>Waiting for TradingView webhook signals.<br>
           Set your alert webhook to: <code style='color:#58a6ff'>http://15.207.152.119:5000/webhook</code></div>
         </div>""", unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  BACKTEST ENGINE
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 elif st.session_state.page == "Backtest":
 
     BACKTEST_DATA_DIR = os.path.join(PROJECT_ROOT, "storage/backtest_data")
     SCRIPTS_DIR       = os.path.join(PROJECT_ROOT, "scripts")
 
-    # ── Engine status data ─────────────────────────────────────────────────
+    # -- Engine status data -------------------------------------------------
     data_files    = glob.glob(os.path.join(BACKTEST_DATA_DIR, "*.csv"))
     sym_4h        = [os.path.basename(f).replace("_3y_4h.csv","") for f in data_files if "_3y_4h" in f]
     sym_15m       = [os.path.basename(f).replace("_3y_15m.csv","") for f in data_files if "_3y_15m" in f]
@@ -1298,48 +1342,48 @@ elif st.session_state.page == "Backtest":
     tournament_running = is_process_running("tournament_4h_all_symbols")
 
     tab_engine, tab_custom, tab_tournament, tab_pine, tab_lab = st.tabs([
-        "🔧  Engine Status",
-        "🧪  Custom Backtest",
-        "🏆  Tournament Results",
-        "📜  Pine Scripts",
-        "🔬  Alpha Strategy Lab",
+        "??  Engine Status",
+        "??  Custom Backtest",
+        "??  Tournament Results",
+        "??  Pine Scripts",
+        "??  Alpha Strategy Lab",
     ])
 
-    # ══ TAB 1 — ENGINE STATUS ═══════════════════════════════════════════════
+    # -- TAB 1 — ENGINE STATUS -----------------------------------------------
     with tab_engine:
-        st.markdown('<div class="sec-title">🔧 Backtesting Engine Status</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-title">?? Backtesting Engine Status</div>', unsafe_allow_html=True)
 
         # Status cards row
         e1, e2, e3, e4 = st.columns(4)
         with e1:
             st.markdown(f"""<div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#1f6feb,#388bfd)"></div>
-              <div class="dk-card-icon">💾</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">4H Data Files</div>
               <div class="dk-card-value" style="color:#58a6ff">{len(sym_4h)}/16</div>
-              <div class="dk-card-sub">{"✅ All ready" if len(sym_4h)==16 else f"⚠️ {16-len(sym_4h)} missing"}<br>3-year 4H OHLCV</div>
+              <div class="dk-card-sub">{"? All ready" if len(sym_4h)==16 else f"?? {16-len(sym_4h)} missing"}<br>3-year 4H OHLCV</div>
             </div>""", unsafe_allow_html=True)
         with e2:
             st.markdown(f"""<div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#3fb950,#56d364)"></div>
-              <div class="dk-card-icon">📊</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">Tournament Results</div>
               <div class="dk-card-value" style="color:#3fb950">{"Ready" if t4h_ready else "None"}</div>
-              <div class="dk-card-sub">{"✅ tournament_winners_4h.csv" if t4h_ready else "⚠️ Run tournament first"}</div>
+              <div class="dk-card-sub">{"? tournament_winners_4h.csv" if t4h_ready else "?? Run tournament first"}</div>
             </div>""", unsafe_allow_html=True)
         with e3:
             st.markdown(f"""<div class="dk-card">
               <div class="dk-card-accent" style="background:{"linear-gradient(90deg,#3fb950,#56d364)" if tournament_running else "linear-gradient(90deg,#6e7681,#8b949e)"}"></div>
-              <div class="dk-card-icon">⚙️</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">Tournament Engine</div>
               <div class="dk-card-value" style="color:{"#3fb950" if tournament_running else "#6e7681"}">{"RUNNING" if tournament_running else "IDLE"}</div>
-              <div class="dk-card-sub">{"🔄 tournament_4h_all_symbols.py" if tournament_running else "Ready to run"}</div>
+              <div class="dk-card-sub">{"?? tournament_4h_all_symbols.py" if tournament_running else "Ready to run"}</div>
             </div>""", unsafe_allow_html=True)
         with e4:
             pine_count = len(glob.glob(os.path.join(STRATEGIES_DIR, "*4h*.pine")))
             st.markdown(f"""<div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#bc8cff,#a371f7)"></div>
-              <div class="dk-card-icon">📜</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">Pine Scripts</div>
               <div class="dk-card-value" style="color:#bc8cff">{pine_count}</div>
               <div class="dk-card-sub">4H universal strategies<br>Ready for TradingView</div>
@@ -1350,7 +1394,7 @@ elif st.session_state.page == "Backtest":
         # Data files status table
         ecol1, ecol2 = st.columns([3, 2])
         with ecol1:
-            st.markdown('<div class="sec-title" style="font-size:13px">📂 Data Files Status</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec-title" style="font-size:13px">?? Data Files Status</div>', unsafe_allow_html=True)
             file_rows = []
             for sym_name in SYMBOLS_16:
                 fname = os.path.join(BACKTEST_DATA_DIR, f"{sym_name}_3y_4h.csv")
@@ -1361,15 +1405,15 @@ elif st.session_state.page == "Backtest":
                         nrows = sum(1 for _ in open(fname)) - 1
                     except:
                         nrows = 0
-                    file_rows.append({"Symbol": sym_name, "Status": "✅ Ready",
+                    file_rows.append({"Symbol": sym_name, "Status": "? Ready",
                                       "Rows": str(nrows), "Size": f"{sz/1024:.0f} KB", "Updated": mtime})
                 else:
-                    file_rows.append({"Symbol": sym_name, "Status": "❌ Missing",
+                    file_rows.append({"Symbol": sym_name, "Status": "? Missing",
                                       "Rows": "—", "Size": "—", "Updated": "—"})
             st.dataframe(pd.DataFrame(file_rows), use_container_width=True, hide_index=True, height=320)
 
         with ecol2:
-            st.markdown('<div class="sec-title" style="font-size:13px">🧠 Strategy Categories</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec-title" style="font-size:13px">?? Strategy Categories</div>', unsafe_allow_html=True)
             cats = [
                 {"Category": "SuperTrend / ATR", "Strategies": "SuperTrend, ATR Band, SMA Cross, EMA Ribbon"},
                 {"Category": "Squeeze / Reversion", "Strategies": "Squeeze Momentum, Mean Reversion, Lorentzian"},
@@ -1379,31 +1423,31 @@ elif st.session_state.page == "Backtest":
             st.dataframe(pd.DataFrame(cats), use_container_width=True, hide_index=True)
 
             st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-            st.markdown('<div class="sec-title" style="font-size:13px">🚀 Run Tournament</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec-title" style="font-size:13px">?? Run Tournament</div>', unsafe_allow_html=True)
             if tournament_running:
-                st.warning("⚙️ Tournament is currently running...")
+                st.warning("?? Tournament is currently running...")
             else:
-                if st.button("▶️ Run Full 4H Tournament (All 16 Symbols)", use_container_width=True, type="primary"):
+                if st.button("?? Run Full 4H Tournament (All 16 Symbols)", use_container_width=True, type="primary"):
                     try:
                         script = os.path.join(PROJECT_ROOT, "scripts/run_4h_setup_all_symbols.sh")
                         subprocess.Popen(["bash", script], cwd=PROJECT_ROOT,
                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                        st.success("✅ Tournament started in background! Check Engine Status in ~5 min.")
+                        st.success("? Tournament started in background! Check Engine Status in ~5 min.")
                     except Exception as ex:
-                        st.error(f"❌ Failed to start: {ex}")
+                        st.error(f"? Failed to start: {ex}")
                 if len(sym_4h) < 16:
-                    if st.button("⬇️ Download Missing Data First", use_container_width=True):
+                    if st.button("?? Download Missing Data First", use_container_width=True):
                         try:
                             script = os.path.join(PROJECT_ROOT, "scripts/fetch_4h_data_all_symbols.py")
                             subprocess.Popen(["python3", script], cwd=PROJECT_ROOT,
                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                            st.success("✅ Data download started!")
+                            st.success("? Data download started!")
                         except Exception as ex:
-                            st.error(f"❌ {ex}")
+                            st.error(f"? {ex}")
 
-    # ══ TAB 2 — CUSTOM BACKTEST ══════════════════════════════════════════════
+    # -- TAB 2 — CUSTOM BACKTEST ----------------------------------------------
     with tab_custom:
-        st.markdown('<div class="sec-title">🧪 Custom Strategy Backtest</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-title">?? Custom Strategy Backtest</div>', unsafe_allow_html=True)
 
         cc1, cc2 = st.columns([1, 2])
         with cc1:
@@ -1422,13 +1466,13 @@ elif st.session_state.page == "Backtest":
             with cbs2:
                 cb_tp = st.number_input("TP %", 1.0, 50.0, 6.0, 0.5, key="cb_tp")
 
-            run_bt = st.button("▶️ Run Backtest", use_container_width=True, type="primary", key="run_bt")
+            run_bt = st.button("?? Run Backtest", use_container_width=True, type="primary", key="run_bt")
 
         with cc2:
             if run_bt:
                 data_file = os.path.join(BACKTEST_DATA_DIR, f"{cb_sym}_3y_4h.csv")
                 if not os.path.exists(data_file):
-                    st.error(f"❌ Data file not found: {cb_sym}_3y_4h.csv\nRun data download first.")
+                    st.error(f"? Data file not found: {cb_sym}_3y_4h.csv\nRun data download first.")
                 else:
                     with st.spinner(f"Running {cb_strat} on {cb_sym}..."):
                         try:
@@ -1481,7 +1525,7 @@ elif st.session_state.page == "Backtest":
                                         showlegend=False,
                                     )
                                     st.markdown('<div class="chart-panel">', unsafe_allow_html=True)
-                                    st.markdown('<div class="chart-title">📈 Equity Curve</div>', unsafe_allow_html=True)
+                                    st.markdown('<div class="chart-title">?? Equity Curve</div>', unsafe_allow_html=True)
                                     st.plotly_chart(fig_eq, use_container_width=True, config={'displayModeBar': False})
                                     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1495,7 +1539,7 @@ elif st.session_state.page == "Backtest":
 
                                 # Add to tournament button
                                 st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-                                if st.button("➕ Add This Result to Tournament CSV", key="add_tourn", type="secondary"):
+                                if st.button("? Add This Result to Tournament CSV", key="add_tourn", type="secondary"):
                                     try:
                                         daily_roi = roi_v / (len(df_bt) * 4 / 24 / 365 * 365) if len(df_bt) > 0 else 0
                                         new_row = {
@@ -1516,49 +1560,53 @@ elif st.session_state.page == "Backtest":
                                             "OOS_Sharpe": 0,
                                         }
                                         if os.path.exists(TOURNAMENT_4H):
-                                            df_exist = pd.read_csv(TOURNAMENT_4H)
+                                            df_exist = read_tournament_csv(TOURNAMENT_4H)
                                             df_new   = pd.concat([df_exist, pd.DataFrame([new_row])], ignore_index=True)
                                         else:
                                             df_new = pd.DataFrame([new_row])
                                         os.makedirs(REPORTS_DIR, exist_ok=True)
                                         df_new.to_csv(TOURNAMENT_4H, index=False)
-                                        st.success(f"✅ Added {cb_sym} / {cb_strat} to tournament results!")
+                                        st.success(f"? Added {cb_sym} / {cb_strat} to tournament results!")
                                     except Exception as ex:
-                                        st.error(f"❌ Failed to save: {ex}")
+                                        st.error(f"? Failed to save: {ex}")
                             else:
-                                st.warning("⚠️ Backtest returned no results. Check strategy name or data.")
+                                st.warning("?? Backtest returned no results. Check strategy name or data.")
                         except ImportError:
-                            st.error("❌ `my_strategies` module not found in scripts/. Make sure the file exists on the server.")
+                            st.error("? `my_strategies` module not found in scripts/. Make sure the file exists on the server.")
                         except Exception as ex:
-                            st.error(f"❌ Backtest error: {ex}")
+                            st.error(f"? Backtest error: {ex}")
             else:
                 st.markdown("""
                 <div class="dk-card" style="text-align:center;padding:40px 20px">
-                  <div style="font-size:40px;margin-bottom:12px">🧪</div>
+                  <div style="font-size:40px;margin-bottom:12px">??</div>
                   <div style="font-size:15px;font-weight:700;color:#e6edf3;margin-bottom:8px">Custom Strategy Backtest</div>
                   <div style="font-size:13px;color:#6e7681">Select a symbol and strategy on the left, then click<br>
-                    <b style="color:#58a6ff">▶️ Run Backtest</b> to simulate performance on 3 years of 4H data.</div>
+                    <b style="color:#58a6ff">?? Run Backtest</b> to simulate performance on 3 years of 4H data.</div>
                 </div>""", unsafe_allow_html=True)
 
-    # ══ TAB 3 — TOURNAMENT RESULTS ══════════════════════════════════════════
+    # -- TAB 3 — TOURNAMENT RESULTS ------------------------------------------
     with tab_tournament:
-        st.markdown('<div class="sec-title">📊 Tournament Results — 4H Strategy Analysis</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-title">?? Tournament Results — 4H Strategy Analysis</div>', unsafe_allow_html=True)
 
         if not t4h_ready:
-            st.warning("⚠️ 4H Tournament data not generated yet.\n\n"
+            st.warning("?? 4H Tournament data not generated yet.\n\n"
                        "Run: `bash scripts/run_4h_setup_all_symbols.sh`")
         else:
-            df_t     = pd.read_csv(TOURNAMENT_4H)
+            df_t     = read_tournament_csv(TOURNAMENT_4H)
             alpha_pp = df_t[df_t['Tier'] == 'ALPHA++'] if 'Tier' in df_t.columns else pd.DataFrame()
             alpha    = df_t[df_t['Tier'] == 'ALPHA']   if 'Tier' in df_t.columns else pd.DataFrame()
-            best_roi = df_t['Daily_ROI_%'].max() if 'Daily_ROI_%' in df_t.columns else 0
-            best_sym = df_t.loc[df_t['Daily_ROI_%'].idxmax(), 'Symbol'] if 'Daily_ROI_%' in df_t.columns else "—"
+            if not df_t.empty and 'Daily_ROI_%' in df_t.columns and df_t['Daily_ROI_%'].notna().any():
+                best_roi = to_float(df_t['Daily_ROI_%'].max(), 0.0)
+                best_sym = str(df_t.loc[df_t['Daily_ROI_%'].idxmax(), 'Symbol'])
+            else:
+                best_roi = 0.0
+                best_sym = "—"
 
             b1, b2, b3, b4 = st.columns(4)
             with b1:
                 st.markdown(f"""<div class="dk-card">
                   <div class="dk-card-accent" style="background:linear-gradient(90deg,#3fb950,#56d364)"></div>
-                  <div class="dk-card-icon">🏆</div>
+                  <div class="dk-card-icon">??</div>
                   <div class="dk-card-label">ALPHA++ Strategies</div>
                   <div class="dk-card-value" style="color:#3fb950">{len(alpha_pp)}</div>
                   <div class="dk-card-sub">Elite · ROI &gt; 0.30%/day</div>
@@ -1566,7 +1614,7 @@ elif st.session_state.page == "Backtest":
             with b2:
                 st.markdown(f"""<div class="dk-card">
                   <div class="dk-card-accent" style="background:linear-gradient(90deg,#58a6ff,#79c0ff)"></div>
-                  <div class="dk-card-icon">⭐</div>
+                  <div class="dk-card-icon">?</div>
                   <div class="dk-card-label">ALPHA Strategies</div>
                   <div class="dk-card-value" style="color:#58a6ff">{len(alpha)}</div>
                   <div class="dk-card-sub">Strong · ROI &gt; 0.10%/day</div>
@@ -1574,7 +1622,7 @@ elif st.session_state.page == "Backtest":
             with b3:
                 st.markdown(f"""<div class="dk-card">
                   <div class="dk-card-accent" style="background:linear-gradient(90deg,#bc8cff,#a371f7)"></div>
-                  <div class="dk-card-icon">📊</div>
+                  <div class="dk-card-icon">??</div>
                   <div class="dk-card-label">Total Evaluated</div>
                   <div class="dk-card-value" style="color:#bc8cff">{len(df_t)}</div>
                   <div class="dk-card-sub">{df_t['Symbol'].nunique() if 'Symbol' in df_t.columns else 16} symbols · {df_t['Strategy'].nunique() if 'Strategy' in df_t.columns else 28} strategies</div>
@@ -1582,7 +1630,7 @@ elif st.session_state.page == "Backtest":
             with b4:
                 st.markdown(f"""<div class="dk-card">
                   <div class="dk-card-accent" style="background:linear-gradient(90deg,#d29922,#e3b341)"></div>
-                  <div class="dk-card-icon">🚀</div>
+                  <div class="dk-card-icon">??</div>
                   <div class="dk-card-label">Best Daily ROI</div>
                   <div class="dk-card-value" style="color:#d29922">{best_roi:.3f}%</div>
                   <div class="dk-card-sub">{best_sym}</div>
@@ -1637,7 +1685,7 @@ elif st.session_state.page == "Backtest":
                         st.plotly_chart(fig4, use_container_width=True, config={'displayModeBar': False})
                     st.markdown('</div>', unsafe_allow_html=True)
 
-            with st.expander("🏆 Top ALPHA++ Results", expanded=True):
+            with st.expander("?? Top ALPHA++ Results", expanded=True):
                 top = alpha_pp.sort_values("Daily_ROI_%", ascending=False).head(30) if not alpha_pp.empty else pd.DataFrame()
                 if not top.empty:
                     cols = [c for c in ["Symbol","Strategy","Daily_ROI_%","Gross_DD_%","Net_DD_%",
@@ -1645,7 +1693,7 @@ elif st.session_state.page == "Backtest":
                     st.dataframe(top[cols], use_container_width=True, hide_index=True)
 
             if not alpha.empty:
-                with st.expander("⭐ ALPHA Results"):
+                with st.expander("? ALPHA Results"):
                     top_a = alpha.sort_values("Daily_ROI_%", ascending=False).head(20)
                     cols  = [c for c in ["Symbol","Strategy","Daily_ROI_%","Gross_DD_%","Net_DD_%",
                                          "Win_Rate_%","Sharpe_Ratio","Total_Trades","Tier"] if c in top_a.columns]
@@ -1668,8 +1716,8 @@ elif st.session_state.page == "Backtest":
                         _colors5 = ["#3fb950","#58a6ff","#bc8cff","#d29922","#f78166"]
                         for i5, (_, r5) in enumerate(top5.iterrows()):
                             with cols5[i5]:
-                                roi5 = r5.get("OOS_Daily_ROI_%", 0)
-                                gdd5 = r5.get("OOS_Gross_DD_%", 0)
+                                roi5 = to_float(r5.get("OOS_Daily_ROI_%", 0), 0.0)
+                                gdd5 = to_float(r5.get("OOS_Gross_DD_%", 0), 0.0)
                                 sym5 = r5.get("Symbol","")
                                 stg5 = str(r5.get("Strategy",""))[:18]
                                 c5   = _colors5[i5]
@@ -1677,9 +1725,9 @@ elif st.session_state.page == "Backtest":
                     else:
                         st.info("No elite strategies yet. Run the premium tournament first.")
 
-    # ══ TAB 4 — PINE SCRIPTS ════════════════════════════════════════════════
+    # -- TAB 4 — PINE SCRIPTS ------------------------------------------------
     with tab_pine:
-        st.markdown('<div class="sec-title">📜 Symbol-Optimized Pine Scripts</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-title">?? Symbol-Optimized Pine Scripts</div>', unsafe_allow_html=True)
 
         # Premium strategies highlight cards
         # Premium scripts — read live from tournament CSV
@@ -1696,7 +1744,7 @@ elif st.session_state.page == "Backtest":
         _PCLRS = ["#3fb950","#58a6ff","#bc8cff","#d29922","#f78166","#56d364","#79c0ff"]
         # Load live numbers from CSV
         try:
-            _df_t2 = pd.read_csv(TOURNAMENT_4H)
+            _df_t2 = read_tournament_csv(TOURNAMENT_4H)
         except Exception:
             _df_t2 = pd.DataFrame()
 
@@ -1776,7 +1824,7 @@ elif st.session_state.page == "Backtest":
 
             for sym_name in sorted(by_sym.keys()):
                 files_for_sym = sorted(by_sym[sym_name])
-                with st.expander(f"📊 {sym_name}  ({len(files_for_sym)} scripts)", expanded=(len(by_sym)==1)):
+                with st.expander(f"?? {sym_name}  ({len(files_for_sym)} scripts)", expanded=(len(by_sym)==1)):
                     cols4 = st.columns(3)
                     for i, fp2 in enumerate(files_for_sym):
                         nm = os.path.basename(fp2)
@@ -1789,7 +1837,7 @@ elif st.session_state.page == "Backtest":
                             roi_str = f"  ROI={roi_match.group(1)}%" if roi_match else ""
                             with cols4[i % 3]:
                                 st.download_button(
-                                    f"⬇️ {short_nm}{roi_str}",
+                                    f"?? {short_nm}{roi_str}",
                                     code2, file_name=nm,
                                     mime="text/plain", use_container_width=True,
                                     key=f"dl_{nm}"
@@ -1802,7 +1850,7 @@ elif st.session_state.page == "Backtest":
         st.divider()
 
         # Generic templates section
-        st.markdown('<div class="sec-title" style="font-size:13px">📁 Generic Template Scripts</div>',
+        st.markdown('<div class="sec-title" style="font-size:13px">?? Generic Template Scripts</div>',
                     unsafe_allow_html=True)
         if tmpl_pfiles:
             tcols = st.columns(3)
@@ -1812,7 +1860,7 @@ elif st.session_state.page == "Backtest":
                     with open(fp2, "r", encoding="utf-8", errors="ignore") as f:
                         code2 = f.read()
                     with tcols[i % 3]:
-                        st.download_button(f"📄 {nm}", code2, file_name=nm,
+                        st.download_button(f"?? {nm}", code2, file_name=nm,
                                            mime="text/plain", use_container_width=True,
                                            key=f"tmpl_{nm}")
                 except:
@@ -1821,20 +1869,20 @@ elif st.session_state.page == "Backtest":
         st.divider()
         st.markdown("""
         <div class="dk-card">
-          <div class="dk-card-label">📋 How to use Pine Scripts in TradingView</div>
+          <div class="dk-card-label">?? How to use Pine Scripts in TradingView</div>
           <ol style="color:#c9d1d9;font-size:13px;margin:8px 0 0 16px;line-height:2">
-            <li>Open TradingView → Set chart to <b style="color:#58a6ff">4H timeframe</b></li>
-            <li>Open Pine Script Editor → click <b style="color:#58a6ff">Open</b> → paste the downloaded code</li>
-            <li>Click <b style="color:#3fb950">Add to chart</b> → check <b>Strategy Tester</b> tab</li>
-            <li>If Net Profit is positive → click <b style="color:#d29922">Alert → Create</b></li>
+            <li>Open TradingView ? Set chart to <b style="color:#58a6ff">4H timeframe</b></li>
+            <li>Open Pine Script Editor ? click <b style="color:#58a6ff">Open</b> ? paste the downloaded code</li>
+            <li>Click <b style="color:#3fb950">Add to chart</b> ? check <b>Strategy Tester</b> tab</li>
+            <li>If Net Profit is positive ? click <b style="color:#d29922">Alert ? Create</b></li>
             <li>Set webhook URL to your server and use JSON message format</li>
           </ol>
         </div>""", unsafe_allow_html=True)
 
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-        st.markdown('<div class="sec-title" style="font-size:13px">📋 16 Symbols — Tournament Status</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-title" style="font-size:13px">?? 16 Symbols — Tournament Status</div>', unsafe_allow_html=True)
         if t4h_ready:
-            df_t2 = pd.read_csv(TOURNAMENT_4H)
+            df_t2 = read_tournament_csv(TOURNAMENT_4H)
             bps3  = (df_t2.sort_values("Daily_ROI_%", ascending=False)
                      .groupby("Symbol").first().reset_index()
                      .sort_values("Daily_ROI_%", ascending=False))
@@ -1843,15 +1891,15 @@ elif st.session_state.page == "Backtest":
             for sym_name in SYMBOLS_16:
                 d = sm.get(sym_name.upper())
                 if d is not None:
-                    _daily_roi = float(str(d.get("Daily_ROI_%", 0) or 0).replace("%", ""))
-                    _win_rate = float(str(d.get("Win_Rate_%", 0) or 0).replace("%", ""))
-                    sym_rows.append({"Symbol": sym_name, "Status": "✅ Ready",
+                    _daily_roi = to_float(d.get("Daily_ROI_%", 0), 0.0)
+                    _win_rate = to_float(d.get("Win_Rate_%", 0), 0.0)
+                    sym_rows.append({"Symbol": sym_name, "Status": "? Ready",
                                      "Best Strategy": str(d.get("Strategy", ""))[:30],
                                      "Daily ROI": f"{_daily_roi:.3f}%",
                                      "Win Rate": f"{_win_rate:.1f}%",
                                      "Tier": str(d.get("Tier", ""))})
                 else:
-                    sym_rows.append({"Symbol": sym_name, "Status": "⚠️ Needs run",
+                    sym_rows.append({"Symbol": sym_name, "Status": "?? Needs run",
                                      "Best Strategy": "Run tournament",
                                      "Daily ROI": "—", "Win Rate": "—", "Tier": "—"})
             st.dataframe(pd.DataFrame(sym_rows), use_container_width=True, hide_index=True)
@@ -1859,16 +1907,16 @@ elif st.session_state.page == "Backtest":
             st.warning("Run the 4H tournament first: `bash scripts/run_4h_setup_all_symbols.sh`")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ------------------------------------------------------------------------------
 #  LIGHTER DEX
 
-    # ══ TAB 5 — STRATEGY LAB ══════════════════════════════════════════════════
+    # -- TAB 5 — STRATEGY LAB --------------------------------------------------
     with tab_lab:
         st.markdown('<div class="sec-title">Alpha Strategy Lab — Separate Backtest Engine</div>', unsafe_allow_html=True)
         st.markdown("""<div style='font-size:12px;color:#6e7681;margin-bottom:12px'>
         This pipeline is separate from live execution. It first generates or ingests TradingView-style trade CSVs,
         then verifies alpha candidates using your rule:
-        <b>ROI/day &gt; 1%</b> and <b>|Gross DD|, |Net DD| &lt; 15%</b>.
+        <b>ROI/day &gt; 1%</b> and <b>|Gross DD|, |Net DD| &lt; 20%</b>.
         Qualified strategies get webhook-ready Pine copies with embedded JSON + secret.</div>""",
         unsafe_allow_html=True)
 
@@ -1914,9 +1962,9 @@ elif st.session_state.page == "Backtest":
             st.info("No alpha results yet. Click **Run Alpha Pipeline** to generate them.")
         else:
             try:
-                _df_val  = pd.read_csv(VAL_CSV)
-                _df_best = pd.read_csv(BEST_CSV) if _best_exists else pd.DataFrame()
-                _df_all  = pd.read_csv(ALL_CSV) if _all_exists else pd.DataFrame()
+                _df_val  = read_csv_safe(VAL_CSV)
+                _df_best = read_csv_safe(BEST_CSV) if _best_exists else pd.DataFrame()
+                _df_all  = read_csv_safe(ALL_CSV) if _all_exists else pd.DataFrame()
             except Exception as _e:
                 st.error(f"Error loading alpha results: {_e}")
                 _df_val = pd.DataFrame()
@@ -1926,8 +1974,8 @@ elif st.session_state.page == "Backtest":
             if not _df_val.empty:
                 # -- Summary cards --------------------------------------------
                 _sc1, _sc2, _sc3, _sc4 = st.columns(4)
-                _best_roi = _df_val['ROI_Per_Day_Pct'].max() if 'ROI_Per_Day_Pct' in _df_val.columns else 0
-                _best_sh  = _df_val['Sharpe_Ratio'].max() if 'Sharpe_Ratio' in _df_val.columns else 0
+                _best_roi = to_float(_df_val['ROI_Per_Day_Pct'].max(), 0.0) if 'ROI_Per_Day_Pct' in _df_val.columns else 0.0
+                _best_sh  = to_float(_df_val['Sharpe_Ratio'].max(), 0.0) if 'Sharpe_Ratio' in _df_val.columns else 0.0
                 _webhook_ready = int((_df_val.get('Webhook_Ready', pd.Series(dtype='object')) == 'YES').sum())
                 _last_run = _status.get("generated_at_utc", "")
                 _last_run_display = _last_run.replace("T", " ").replace("Z", " UTC") if _last_run else "Unknown"
@@ -1937,7 +1985,7 @@ elif st.session_state.page == "Backtest":
                       <div class="dk-card-icon">A</div>
                       <div class="dk-card-label">Alpha Strategies</div>
                       <div class="dk-card-value" style="color:#3fb950">{len(_df_val)}</div>
-                      <div class="dk-card-sub">ROI/day &gt; 1% and DD under 15%</div></div>""", unsafe_allow_html=True)
+                      <div class="dk-card-sub">ROI/day &gt; 1% and DD under 20%</div></div>""", unsafe_allow_html=True)
                 with _sc2:
                     st.markdown(f"""<div class="dk-card">
                       <div class="dk-card-accent" style="background:linear-gradient(90deg,#58a6ff,#79c0ff)"></div>
@@ -1972,15 +2020,15 @@ elif st.session_state.page == "Backtest":
                 for _vi, (_, _vrow) in enumerate(_df_val_s.iterrows()):
                     _vsym   = str(_vrow.get('Symbol',   ''))
                     _vstrat = str(_vrow.get('Strategy', ''))
-                    _vtp    = _vrow.get('TP_Pct',       0)
-                    _vsl    = _vrow.get('SL_Pct',       0)
-                    _vroi   = _vrow.get('ROI_Per_Day_Pct',  0)
-                    _vgdd   = _vrow.get('Gross_Drawdown_Percent',      0)
-                    _vndd   = _vrow.get('Net_Drawdown_Percent',      0)
-                    _vwr    = _vrow.get('Win_Rate_Percent', 0)
-                    _vsh    = _vrow.get('Sharpe_Ratio', 0)
-                    _vpf    = _vrow.get('Profit_Factor',0)
-                    _vtr    = _vrow.get('Total_Trades', 0)
+                    _vtp    = to_float(_vrow.get('TP_Pct', 0), 0.0)
+                    _vsl    = to_float(_vrow.get('SL_Pct', 0), 0.0)
+                    _vroi   = to_float(_vrow.get('ROI_Per_Day_Pct', 0), 0.0)
+                    _vgdd   = to_float(_vrow.get('Gross_Drawdown_Percent', 0), 0.0)
+                    _vndd   = to_float(_vrow.get('Net_Drawdown_Percent', 0), 0.0)
+                    _vwr    = to_float(_vrow.get('Win_Rate_Percent', 0), 0.0)
+                    _vsh    = to_float(_vrow.get('Sharpe_Ratio', 0), 0.0)
+                    _vpf    = to_float(_vrow.get('Profit_Factor', 0), 0.0)
+                    _vtr    = int(to_float(_vrow.get('Total_Trades', 0), 0.0))
                     _vgrade = _vrow.get('Performance_Grade', '')
                     _vstatus= _vrow.get('Deployment_Status', '')
                     _vreason= str(_vrow.get('Alpha_Reason', ''))
@@ -1990,7 +2038,7 @@ elif st.session_state.page == "Backtest":
                     _pine_path = str(_vrow.get('Generated_Pine_Script', '')).strip()
                     _pine_name = os.path.basename(_pine_path) if _pine_path else ""
 
-                    with st.expander(f"{'✅' if _pine_path else '⚠️'} {_vsym}  |  {_vstrat}  |  ROI {_vroi:.4f}%/day  |  GDD {_vgdd:.2f}%", expanded=(_vi==0)):
+                    with st.expander(f"{'?' if _pine_path else '??'} {_vsym}  |  {_vstrat}  |  ROI {_vroi:.4f}%/day  |  GDD {_vgdd:.2f}%", expanded=(_vi==0)):
                         _mc1, _mc2 = st.columns([1.2, 2])
 
                         with _mc1:
@@ -1998,7 +2046,7 @@ elif st.session_state.page == "Backtest":
                               <div style='font-size:11px;color:#6e7681;margin-bottom:8px'>ALPHA BACKTEST METRICS</div>
                               <table style='width:100%;font-size:12px;color:#c9d1d9'>
                               <tr><td>ROI / day</td><td style='color:{_vclr};font-weight:700;text-align:right'>{_vroi:.4f}%</td></tr>
-                              <tr><td>ROI / year</td><td style='color:{_vclr};text-align:right'>{_vrow.get("ROI_Annual_Percent",0):.1f}%</td></tr>
+                              <tr><td>ROI / year</td><td style='color:{_vclr};text-align:right'>{to_float(_vrow.get("ROI_Annual_Percent",0), 0.0):.1f}%</td></tr>
                               <tr><td>Win Rate</td><td style='color:{"#3fb950" if _vwr>=50 else "#f85149"};text-align:right'>{_vwr:.1f}%</td></tr>
                               <tr><td>Profit Factor</td><td style='text-align:right'>{_vpf:.2f}</td></tr>
                               <tr><td>Sharpe Ratio</td><td style='text-align:right'>{_vsh:.2f}</td></tr>
@@ -2046,31 +2094,39 @@ elif st.session_state.page == "Backtest":
                   <b style='color:#58a6ff'>Step 6:</b> Do not type custom JSON in the message box. The generated alpha script already embeds JSON and the webhook secret.
                   </div></div>""", unsafe_allow_html=True)
 
-            # -- Best per symbol table -----------------------------------------
-            st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-            st.markdown("<div style='font-size:13px;font-weight:700;color:#e6edf3;margin-bottom:6px'>Best Strategy Per Symbol</div>",
-                        unsafe_allow_html=True)
-            if not _df_best.empty:
-                _show_cols = [c for c in ['Symbol','Strategy','Timeframe','ROI_Per_Day_Pct','ROI_Annual_Percent',
-                                           'Gross_Drawdown_Percent','Net_Drawdown_Percent','Win_Rate_Percent','Sharpe_Ratio',
-                                           'Total_Trades','Webhook_Ready'] if c in _df_best.columns]
-                st.dataframe(_df_best[_show_cols].reset_index(drop=True),
-                             use_container_width=True, hide_index=True)
+                # -- Best per symbol table -----------------------------------------
+                st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:13px;font-weight:700;color:#e6edf3;margin-bottom:6px'>Best Strategy Per Symbol</div>",
+                            unsafe_allow_html=True)
+                if not _df_best.empty:
+                    _show_cols = [c for c in ['Symbol','Strategy','Timeframe','ROI_Per_Day_Pct','ROI_Annual_Percent',
+                                               'Gross_Drawdown_Percent','Net_Drawdown_Percent','Win_Rate_Percent','Sharpe_Ratio',
+                                               'Total_Trades','Webhook_Ready'] if c in _df_best.columns]
+                    st.dataframe(_df_best[_show_cols].reset_index(drop=True),
+                                 use_container_width=True, hide_index=True)
 
-            if not _df_all.empty:
-                with st.expander("All Backtest Results"):
-                    _show_all_cols = [c for c in ['Rank','Symbol','Strategy','Timeframe','ROI_Per_Day_Pct',
-                                                   'Gross_Drawdown_Percent','Net_Drawdown_Percent','Win_Rate_Percent',
-                                                   'Sharpe_Ratio','Alpha_Qualified','Deployment_Status'] if c in _df_all.columns]
-                    st.dataframe(_df_all[_show_all_cols], use_container_width=True, hide_index=True)
+                if not _df_all.empty:
+                    with st.expander("All Backtest Results"):
+                        _show_all_cols = [c for c in ['Rank','Symbol','Strategy','Timeframe','ROI_Per_Day_Pct',
+                                                       'Gross_Drawdown_Percent','Net_Drawdown_Percent','Win_Rate_Percent',
+                                                       'Sharpe_Ratio','Alpha_Qualified','Deployment_Status'] if c in _df_all.columns]
+                        st.dataframe(_df_all[_show_all_cols], use_container_width=True, hide_index=True)
+            else:
+                st.info("No alpha strategies qualified in the latest run. The full backtest results are saved below, but none met ROI/day > 1% with both drawdowns under 20%.")
+                if not _df_all.empty:
+                    with st.expander("All Backtest Results"):
+                        _show_all_cols = [c for c in ['Rank','Symbol','Strategy','Timeframe','ROI_Per_Day_Pct',
+                                                       'Gross_Drawdown_Percent','Net_Drawdown_Percent','Win_Rate_Percent',
+                                                       'Sharpe_Ratio','Alpha_Qualified','Deployment_Status'] if c in _df_all.columns]
+                        st.dataframe(_df_all[_show_all_cols], use_container_width=True, hide_index=True)
 
 
 # ------------------------------------------------------------------------------
 elif st.session_state.page == "Lighter":
 
-    st.markdown('<div class="sec-title">🌩 Lighter DEX — Exchange Dashboard</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-title">?? Lighter DEX — Exchange Dashboard</div>', unsafe_allow_html=True)
 
-    # ── Fetch live data from Lighter client ───────────────────────────────────
+    # -- Fetch live data from Lighter client -----------------------------------
     _lc = lighter_client
 
     # Connection status
@@ -2101,31 +2157,31 @@ elif st.session_state.page == "Lighter":
         except Exception as _ex:
             _lt_error = str(_ex)
 
-    # ── Status banner ──────────────────────────────────────────────────────────
+    # -- Status banner ----------------------------------------------------------
     if _lt_error:
-        st.error(f"❌ Lighter connection error: {_lt_error}")
+        st.error(f"? Lighter connection error: {_lt_error}")
     else:
         _conn_color  = "#3fb950" if _lt_ready     else "#f85149"
         _trade_color = "#3fb950" if _lt_can_trade else "#d29922"
-        _conn_label  = "● CONNECTED"  if _lt_ready     else "● OFFLINE"
-        _trade_label = "● TRADES ON"  if _lt_can_trade else "● PAPER / READ-ONLY"
+        _conn_label  = "? CONNECTED"  if _lt_ready     else "? OFFLINE"
+        _trade_label = "? TRADES ON"  if _lt_can_trade else "? PAPER / READ-ONLY"
         _network     = "MAINNET" if os.getenv("LIGHTER_API_URL","").find("testnet") == -1 else "TESTNET"
         st.markdown(f"""
         <div style="display:flex;gap:12px;align-items:center;padding:10px 16px;
                     background:#161b27;border:1px solid #30363d;border-radius:10px;
                     margin-bottom:16px;flex-wrap:wrap">
           <span style="color:{_conn_color};font-weight:700;font-size:13px">{_conn_label}</span>
-          <span style="color:#30363d">│</span>
+          <span style="color:#30363d">¦</span>
           <span style="color:{_trade_color};font-weight:700;font-size:13px">{_trade_label}</span>
-          <span style="color:#30363d">│</span>
+          <span style="color:#30363d">¦</span>
           <span style="color:#58a6ff;font-size:12px;font-weight:600">Network: {_network}</span>
-          <span style="color:#30363d">│</span>
+          <span style="color:#30363d">¦</span>
           <span style="color:#8b949e;font-size:12px">
             Lighter DEX · Perpetuals · Account #{_lt_account.get("account_index","—")}
           </span>
         </div>""", unsafe_allow_html=True)
 
-    # ── Metric Cards ──────────────────────────────────────────────────────────
+    # -- Metric Cards ----------------------------------------------------------
     if not _lt_error:
         _open_count  = len([p for p in _lt_positions if abs(float(p.get("size", p.get("quantity", 0)))) > 0])
         _avail_bal   = _lt_account.get("available_balance", _lt_balance)
@@ -2136,7 +2192,7 @@ elif st.session_state.page == "Lighter":
             st.markdown(f"""
             <div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#1f6feb,#388bfd)"></div>
-              <div class="dk-card-icon">💰</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">Account Balance</div>
               <div class="dk-card-value" style="color:#58a6ff">${_lt_balance:,.2f}</div>
               <div class="dk-card-sub">Available: ${_avail_bal:,.2f}<br>Lighter Perpetuals</div>
@@ -2146,7 +2202,7 @@ elif st.session_state.page == "Lighter":
             st.markdown(f"""
             <div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#3fb950,#56d364)"></div>
-              <div class="dk-card-icon">📈</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">Unrealised PnL</div>
               <div class="dk-card-value" style="color:{_upnl_col}">${_upnl_total:+,.4f}</div>
               <div class="dk-card-sub">{_open_count} open position(s)</div>
@@ -2155,7 +2211,7 @@ elif st.session_state.page == "Lighter":
             st.markdown(f"""
             <div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#bc8cff,#a371f7)"></div>
-              <div class="dk-card-icon">🌐</div>
+              <div class="dk-card-icon">??</div>
               <div class="dk-card-label">Markets Available</div>
               <div class="dk-card-value" style="color:#bc8cff">{len(_lt_markets)}</div>
               <div class="dk-card-sub">{", ".join(_lt_markets) if _lt_markets else "—"}</div>
@@ -2166,7 +2222,7 @@ elif st.session_state.page == "Lighter":
             st.markdown(f"""
             <div class="dk-card">
               <div class="dk-card-accent" style="background:linear-gradient(90deg,#d29922,#e3b341)"></div>
-              <div class="dk-card-icon">⚡</div>
+              <div class="dk-card-icon">?</div>
               <div class="dk-card-label">Trade Mode</div>
               <div class="dk-card-value" style="color:{_tc_col}">{_tc_lbl}</div>
               <div class="dk-card-sub">LIGHTER_ALLOW_REAL_TRADES<br>
@@ -2175,8 +2231,8 @@ elif st.session_state.page == "Lighter":
 
         st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
-        # ── Open Positions ─────────────────────────────────────────────────────
-        st.markdown('<div class="sec-title" style="font-size:14px">📂 Open Positions</div>',
+        # -- Open Positions -----------------------------------------------------
+        st.markdown('<div class="sec-title" style="font-size:14px">?? Open Positions</div>',
                     unsafe_allow_html=True)
         if _lt_positions:
             _pos_rows = []
@@ -2187,7 +2243,7 @@ elif st.session_state.page == "Lighter":
                 _sym  = _p.get("market", _p.get("symbol", "?"))
                 _ep   = float(_p.get("entry_price", _p.get("avg_price", 0)))
                 _upnl = float(_p.get("unrealized_pnl", _p.get("uPnL", 0)))
-                _side = "🟢 LONG" if _qty > 0 else "🔴 SHORT"
+                _side = "?? LONG" if _qty > 0 else "?? SHORT"
                 _pos_rows.append({
                     "Market":       _sym,
                     "Side":         _side,
@@ -2205,8 +2261,8 @@ elif st.session_state.page == "Lighter":
 
         st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
-        # ── Market Prices ──────────────────────────────────────────────────────
-        st.markdown('<div class="sec-title" style="font-size:14px">💱 Live Market Prices</div>',
+        # -- Market Prices ------------------------------------------------------
+        st.markdown('<div class="sec-title" style="font-size:14px">?? Live Market Prices</div>',
                     unsafe_allow_html=True)
         if _lt_markets:
             _mkt_cols = st.columns(len(_lt_markets))
@@ -2225,10 +2281,10 @@ elif st.session_state.page == "Lighter":
 
         st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
-        # ── Account Assets ─────────────────────────────────────────────────────
+        # -- Account Assets -----------------------------------------------------
         _lt_assets = _lt_account.get("assets", [])
         if _lt_assets:
-            st.markdown('<div class="sec-title" style="font-size:14px">🏦 Account Assets</div>',
+            st.markdown('<div class="sec-title" style="font-size:14px">?? Account Assets</div>',
                         unsafe_allow_html=True)
             _asset_rows = []
             for _a in _lt_assets:
@@ -2238,9 +2294,9 @@ elif st.session_state.page == "Lighter":
                 })
             st.dataframe(pd.DataFrame(_asset_rows), use_container_width=True, hide_index=True)
 
-        # ── Trade Enable Toggle ────────────────────────────────────────────────
+        # -- Trade Enable Toggle ------------------------------------------------
         st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
-        st.markdown('<div class="sec-title" style="font-size:14px">🔧 Trade Settings</div>',
+        st.markdown('<div class="sec-title" style="font-size:14px">?? Trade Settings</div>',
                     unsafe_allow_html=True)
         st.markdown(f"""
         <div class="dk-card">
@@ -2260,6 +2316,6 @@ elif st.session_state.page == "Lighter":
           </div>
         </div>""", unsafe_allow_html=True)
 
-        # ── Raw Account Debug ──────────────────────────────────────────────────
-        with st.expander("🔍 Raw Account Info (debug)"):
+        # -- Raw Account Debug --------------------------------------------------
+        with st.expander("?? Raw Account Info (debug)"):
             st.json(_lt_account)
