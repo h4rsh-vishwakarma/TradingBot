@@ -1595,7 +1595,7 @@ elif st.session_state.page == "Backtest":
             df_t     = read_tournament_csv(TOURNAMENT_4H)
             alpha_pp = df_t[df_t['Tier'] == 'ALPHA++'] if 'Tier' in df_t.columns else pd.DataFrame()
             alpha    = df_t[df_t['Tier'] == 'ALPHA']   if 'Tier' in df_t.columns else pd.DataFrame()
-            if not df_t.empty and 'Daily_ROI_%' in df_t.columns and df_t['Daily_ROI_%'].notna().any():
+            if not df_t.empty and {'Daily_ROI_%', 'Symbol'}.issubset(df_t.columns) and df_t['Daily_ROI_%'].notna().any():
                 best_roi = to_float(df_t['Daily_ROI_%'].max(), 0.0)
                 best_sym = str(df_t.loc[df_t['Daily_ROI_%'].idxmax(), 'Symbol'])
             else:
@@ -1638,7 +1638,7 @@ elif st.session_state.page == "Backtest":
 
             st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
-            if HAS_PLOTLY and 'Daily_ROI_%' in df_t.columns and not alpha_pp.empty:
+            if HAS_PLOTLY and {'Daily_ROI_%', 'Symbol'}.issubset(df_t.columns) and not alpha_pp.empty:
                 bc1, bc2 = st.columns([3, 2])
                 with bc1:
                     st.markdown('<div class="chart-panel">', unsafe_allow_html=True)
@@ -1754,15 +1754,15 @@ elif st.session_state.page == "Backtest":
             _clr   = _PCLRS[_pi % len(_PCLRS)]
             # Pull exact numbers from CSV
             _proi, _pgdd, _psh, _psl, _ptp = 0.0, 0.0, 0.0, 0.5, 12.0
-            if not _df_t2.empty:
+            if not _df_t2.empty and {"Symbol", "Strategy"}.issubset(_df_t2.columns):
                 _mask = (_df_t2["Symbol"] == _psym) & (_df_t2["Strategy"] == _pstrat_key)
                 if _mask.any():
                     _r = _df_t2[_mask].iloc[0]
-                    _proi = float(_r.get("OOS_Daily_ROI_%", 0))
-                    _pgdd = float(_r.get("OOS_Gross_DD_%",  0))
-                    _psh  = float(_r.get("OOS_Sharpe",      0))
-                    _psl  = float(_r.get("Optimal_SL_%",  0.5))
-                    _ptp  = float(_r.get("Optimal_TP_%",  12.0))
+                    _proi = to_float(_r.get("OOS_Daily_ROI_%", 0), 0.0)
+                    _pgdd = to_float(_r.get("OOS_Gross_DD_%",  0), 0.0)
+                    _psh  = to_float(_r.get("OOS_Sharpe",      0), 0.0)
+                    _psl  = to_float(_r.get("Optimal_SL_%",  0.5), 0.5)
+                    _ptp  = to_float(_r.get("Optimal_TP_%",  12.0), 12.0)
             with _pc[_pi % 4]:
                 st.markdown(f"""<div style='background:#161b22;border:1px solid {_clr}40;border-radius:8px;padding:10px 8px;margin-bottom:6px;text-align:center'>
                   <div style='font-size:11px;font-weight:700;color:{_clr}'>{_psym}</div>
@@ -1883,10 +1883,17 @@ elif st.session_state.page == "Backtest":
         st.markdown('<div class="sec-title" style="font-size:13px">?? 16 Symbols — Tournament Status</div>', unsafe_allow_html=True)
         if t4h_ready:
             df_t2 = read_tournament_csv(TOURNAMENT_4H)
-            bps3  = (df_t2.sort_values("Daily_ROI_%", ascending=False)
-                     .groupby("Symbol").first().reset_index()
-                     .sort_values("Daily_ROI_%", ascending=False))
-            sm = {r['Symbol'].upper(): r for _, r in bps3.iterrows()}
+            if not df_t2.empty and {'Daily_ROI_%', 'Symbol'}.issubset(df_t2.columns):
+                bps3  = (df_t2.sort_values("Daily_ROI_%", ascending=False)
+                         .groupby("Symbol").first().reset_index()
+                         .sort_values("Daily_ROI_%", ascending=False))
+                sm = {
+                    str(r.get("Symbol", "")).upper(): r
+                    for _, r in bps3.iterrows()
+                    if str(r.get("Symbol", "")).strip()
+                }
+            else:
+                sm = {}
             sym_rows = []
             for sym_name in SYMBOLS_16:
                 d = sm.get(sym_name.upper())
