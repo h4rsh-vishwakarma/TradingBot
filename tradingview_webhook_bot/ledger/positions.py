@@ -157,7 +157,25 @@ class PositionLedger:
         if abs(pos.quantity) < 1e-10:
             pos.avg_price = 0.0
         elif avg_price is not None and float(avg_price) > 0:
-            # Only overwrite if current avg_price is unknown (0) or entry price provided
-            if pos.avg_price == 0.0:
-                pos.avg_price = float(avg_price)
+            pos.avg_price = float(avg_price)
         self._save_state()
+
+    def sync_symbol_from_exchange(self, symbol: str, quantity: float, avg_price: float = None):
+        """
+        Sync aggregate exchange:symbol state to exchange truth.
+
+        Exchange snapshots are aggregate per symbol, while fills may be tracked under
+        exchange:symbol:strategy keys. During reconciliation, clear those strategy
+        children so they do not get re-aggregated into drift on the next pass.
+        """
+        parts = symbol.split(':')
+        base_key = ':'.join(parts[:2]) if len(parts) >= 2 else symbol
+
+        for key, pos in self.positions.items():
+            key_parts = key.split(':')
+            key_base = ':'.join(key_parts[:2]) if len(key_parts) >= 2 else key
+            if key != base_key and key_base == base_key:
+                pos.quantity = 0.0
+                pos.avg_price = 0.0
+
+        self.update_position_manually(base_key, quantity, avg_price=avg_price)

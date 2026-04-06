@@ -388,6 +388,50 @@ STRATEGY_FUNCTIONS = {
 
 # ================= DATA LOADER =================
 
+def apply_execution_slippage(price, side, slippage_bps=0.0):
+    """Apply adverse execution slippage for a BUY/SELL fill."""
+    slip = max(float(slippage_bps or 0.0), 0.0) / 10_000
+    if slip <= 0:
+        return float(price)
+    side = str(side or "").upper()
+    if side == "BUY":
+        return float(price) * (1 + slip)
+    return float(price) * (1 - slip)
+
+
+def calculate_position_size(
+    equity,
+    entry_price,
+    sizing_mode="fixed_notional",
+    fixed_notional=1000.0,
+    max_equity_fraction=0.25,
+    min_notional=25.0,
+):
+    """Return qty and notional for a realistic backtest position size."""
+    equity = float(equity or 0.0)
+    entry_price = float(entry_price or 0.0)
+    if equity <= 0 or entry_price <= 0:
+        return 0.0, 0.0
+
+    sizing_mode = str(sizing_mode or "fixed_notional").strip().lower()
+    capped_fraction_notional = equity * max(float(max_equity_fraction or 0.0), 0.0)
+
+    if sizing_mode == "fixed_notional":
+        requested_notional = float(fixed_notional or 0.0)
+        notional = min(requested_notional, equity)
+        if capped_fraction_notional > 0:
+            notional = min(notional, capped_fraction_notional)
+    elif sizing_mode == "capped_fraction":
+        notional = min(capped_fraction_notional, equity)
+    elif sizing_mode == "legacy_fraction":
+        notional = equity * 0.95
+    else:
+        raise ValueError(f"Unsupported sizing_mode={sizing_mode}")
+
+    if notional < float(min_notional or 0.0):
+        return 0.0, notional
+    return notional / entry_price, notional
+
 def fetch_binance_data(symbol, timeframe="4h", days=365*3):
     """Fetch OHLCV data from Binance or load from cache."""
     data_dir = Path("storage/backtest_data")
@@ -459,7 +503,9 @@ def fetch_binance_data(symbol, timeframe="4h", days=365*3):
 def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                  capital=10000, commission_pct=0.1, sl_pct=3.0, tp_pct=5.0,
                  use_atr=True, atr_sl_mult=1.5, atr_tp_mult=2.5, trailing_pct=2.0,
-                 max_bars_held=48, use_vwap=True, use_obv=True):
+                 max_bars_held=48, use_vwap=True, use_obv=True,
+                 sizing_mode="fixed_notional", fixed_notional=1000.0,
+                 max_equity_fraction=0.25, min_notional=25.0, slippage_bps=5.0):
     """
     Run backtest with ATR-based SL/TP and trailing stop.
 
@@ -489,6 +535,8 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
     trades = []
     position = 0  # 0=flat, 1=long, -1=short
     entry_price = 0
+    position_qty = 0.0
+    entry_notional = 0.0
     entry_time = None
     entry_idx = 0
     equity = capital
@@ -508,23 +556,28 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
         if position != 0 and max_bars_held > 0:
             bars_in_trade = i - entry_idx
             if bars_in_trade >= max_bars_held:
-                qty = equity * 0.95 / entry_price
-                pnl_pct_time = ((price - entry_price) / entry_price * 100) * position
-                pnl_usd_time = qty * (price - entry_price) * position
-                commission_time = qty * price * commission_pct / 100 * 2
+                exit_side = "SELL" if position == 1 else "BUY"
+                exit_price = apply_execution_slippage(price, exit_side, slippage_bps)
+                qty = position_qty
+                pnl_pct_time = ((exit_price - entry_price) / entry_price * 100) * position
+                pnl_usd_time = qty * (exit_price - entry_price) * position
+                commission_time = ((qty * entry_price) + (qty * exit_price)) * commission_pct / 100
                 net_pnl_time = pnl_usd_time - commission_time
                 equity += net_pnl_time
                 trades.append({
                     'strategy': strategy_name, 'symbol': symbol, 'timeframe': timeframe,
                     'entry_time': entry_time, 'exit_time': ts,
                     'side': 'LONG' if position == 1 else 'SHORT',
-                    'entry_price': round(entry_price, 4), 'exit_price': round(price, 4),
+                    'entry_price': round(entry_price, 4), 'exit_price': round(exit_price, 4),
                     'sl_price': round(current_sl, 4), 'tp_price': round(current_tp, 4),
                     'qty': round(qty, 6), 'pnl_pct': round(pnl_pct_time, 2),
                     'pnl_usd': round(net_pnl_time, 2), 'equity': round(equity, 2),
-                    'exit_reason': 'Time Exit', 'bars_held': bars_in_trade
+                    'exit_reason': 'Time Exit', 'bars_held': bars_in_trade,
+                    'entry_notional': round(entry_notional, 2),
                 })
                 position = 0
+                position_qty = 0.0
+                entry_notional = 0.0
                 continue
 
         # Check SL/TP/Trailing if in position
@@ -563,10 +616,12 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                     exit_price = current_tp
                     exit_reason = "Take-Profit"
 
+                exit_side = "SELL" if position == 1 else "BUY"
+                exit_price = apply_execution_slippage(exit_price, exit_side, slippage_bps)
                 pnl_pct = ((exit_price - entry_price) / entry_price * 100) * position
-                qty = equity * 0.95 / entry_price
+                qty = position_qty
                 pnl_usd = qty * (exit_price - entry_price) * position
-                commission = qty * exit_price * commission_pct / 100 * 2
+                commission = ((qty * entry_price) + (qty * exit_price)) * commission_pct / 100
                 net_pnl = pnl_usd - commission
                 equity += net_pnl
 
@@ -586,9 +641,12 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                     'pnl_usd': round(net_pnl, 2),
                     'equity': round(equity, 2),
                     'exit_reason': exit_reason,
-                    'bars_held': i - entry_idx
+                    'bars_held': i - entry_idx,
+                    'entry_notional': round(entry_notional, 2),
                 })
                 position = 0
+                position_qty = 0.0
+                entry_notional = 0.0
                 continue
 
         # New signal — apply VWAP and OBV filters
@@ -610,10 +668,12 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
 
             # Close existing position first (with current SL/TP levels)
             if position != 0:
-                pnl_pct = ((price - entry_price) / entry_price * 100) * position
-                qty = equity * 0.95 / entry_price
-                pnl_usd = qty * (price - entry_price) * position
-                commission = qty * price * commission_pct / 100 * 2
+                exit_side = "SELL" if position == 1 else "BUY"
+                exit_price = apply_execution_slippage(price, exit_side, slippage_bps)
+                pnl_pct = ((exit_price - entry_price) / entry_price * 100) * position
+                qty = position_qty
+                pnl_usd = qty * (exit_price - entry_price) * position
+                commission = ((qty * entry_price) + (qty * exit_price)) * commission_pct / 100
                 net_pnl = pnl_usd - commission
                 equity += net_pnl
 
@@ -625,7 +685,7 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                     'exit_time': ts,
                     'side': 'LONG' if position == 1 else 'SHORT',
                     'entry_price': round(entry_price, 4),
-                    'exit_price': round(price, 4),
+                    'exit_price': round(exit_price, 4),
                     'sl_price': round(current_sl, 4),
                     'tp_price': round(current_tp, 4),
                     'qty': round(qty, 6),
@@ -633,12 +693,27 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                     'pnl_usd': round(net_pnl, 2),
                     'equity': round(equity, 2),
                     'exit_reason': 'Signal Flip',
-                    'bars_held': i - entry_idx
+                    'bars_held': i - entry_idx,
+                    'entry_notional': round(entry_notional, 2),
                 })
 
             # Open new position with ATR-based SL/TP + trailing
             position = int(sig)
-            entry_price = price
+            entry_side = "BUY" if position == 1 else "SELL"
+            entry_price = apply_execution_slippage(price, entry_side, slippage_bps)
+            position_qty, entry_notional = calculate_position_size(
+                equity=equity,
+                entry_price=entry_price,
+                sizing_mode=sizing_mode,
+                fixed_notional=fixed_notional,
+                max_equity_fraction=max_equity_fraction,
+                min_notional=min_notional,
+            )
+            if position_qty <= 0:
+                position = 0
+                entry_price = 0
+                entry_notional = 0.0
+                continue
             entry_time = ts
             entry_idx = i
             peak_price = price  # Reset trailing tracker
@@ -661,6 +736,120 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
     return trades
 
 
+def summarize_trades(trades, initial_capital):
+    if not trades:
+        return {
+            "Total Trades": 0,
+            "Wins": 0,
+            "Losses": 0,
+            "Win Rate %": 0.0,
+            "Total PnL": 0.0,
+            "ROI %": 0.0,
+            "Max DD %": 0.0,
+            "Final Capital": float(initial_capital),
+            "Profit Factor": 0.0,
+        }
+
+    wins = len([t for t in trades if t['pnl_usd'] > 0])
+    losses = len([t for t in trades if t['pnl_usd'] <= 0])
+    total_pnl = sum(t['pnl_usd'] for t in trades)
+    final_equity = trades[-1]['equity']
+    roi = (final_equity - initial_capital) / initial_capital * 100 if initial_capital else 0.0
+    win_rate = wins / max(len(trades), 1) * 100
+
+    peak = initial_capital
+    max_dd = 0.0
+    gross_profit = 0.0
+    gross_loss = 0.0
+    for trade in trades:
+        if trade['equity'] > peak:
+            peak = trade['equity']
+        dd = (peak - trade['equity']) / peak * 100 if peak > 0 else 0.0
+        max_dd = max(max_dd, dd)
+        if trade['pnl_usd'] > 0:
+            gross_profit += trade['pnl_usd']
+        else:
+            gross_loss += abs(trade['pnl_usd'])
+
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0.0
+    return {
+        "Total Trades": len(trades),
+        "Wins": wins,
+        "Losses": losses,
+        "Win Rate %": round(win_rate, 1),
+        "Total PnL": round(total_pnl, 2),
+        "ROI %": round(roi, 2),
+        "Max DD %": round(max_dd, 2),
+        "Final Capital": round(final_equity, 2),
+        "Profit Factor": round(profit_factor, 2),
+    }
+
+
+def run_holdout_backtest(df, strategy_name, strategy_config, symbol, timeframe, train_pct=0.8, **kwargs):
+    split_idx = int(len(df) * train_pct)
+    if split_idx <= 0 or split_idx >= len(df):
+        return {}
+    test_df = df.iloc[split_idx:].copy()
+    trades = run_backtest(test_df, strategy_name, strategy_config, symbol, timeframe, **kwargs)
+    return summarize_trades(trades, kwargs.get("capital", 10_000))
+
+
+def run_walk_forward_backtest(df, strategy_name, strategy_config, symbol, timeframe, folds=4, **kwargs):
+    if folds < 2 or len(df) < folds * 50:
+        return {"WF Avg ROI %": 0.0, "WF Pass Rate %": 0.0, "WF Windows": 0}
+
+    window = len(df) // folds
+    rois = []
+    passing = 0
+    total = 0
+    for idx in range(1, folds):
+        start = idx * window
+        end = len(df) if idx == folds - 1 else (idx + 1) * window
+        segment = df.iloc[start:end].copy()
+        if len(segment) < 50:
+            continue
+        total += 1
+        trades = run_backtest(segment, strategy_name, strategy_config, symbol, timeframe, **kwargs)
+        summary = summarize_trades(trades, kwargs.get("capital", 10_000))
+        rois.append(summary["ROI %"])
+        if summary["ROI %"] > 0 and summary["Max DD %"] < 25:
+            passing += 1
+
+    if total == 0:
+        return {"WF Avg ROI %": 0.0, "WF Pass Rate %": 0.0, "WF Windows": 0}
+    return {
+        "WF Avg ROI %": round(float(np.mean(rois)) if rois else 0.0, 2),
+        "WF Pass Rate %": round((passing / total) * 100, 1),
+        "WF Windows": total,
+    }
+
+
+def build_realism_score(summary):
+    score = 100.0
+    flags = []
+
+    if float(summary.get("Total Trades", 0)) < 30:
+        score -= 20
+        flags.append("low_trade_count")
+    if float(summary.get("Max DD %", 0)) > 20:
+        score -= 20
+        flags.append("high_drawdown")
+    if float(summary.get("Profit Factor", 0)) < 1.1:
+        score -= 15
+        flags.append("weak_profit_factor")
+    if float(summary.get("OOS ROI %", 0)) <= 0:
+        score -= 20
+        flags.append("negative_oos")
+    if float(summary.get("WF Pass Rate %", 0)) < 50:
+        score -= 15
+        flags.append("weak_walk_forward")
+    if float(summary.get("Sizing Max Fraction", 0)) > 0.25:
+        score -= 10
+        flags.append("oversized_risk")
+
+    return max(round(score, 1), 0.0), ",".join(flags) if flags else "credible"
+
+
 # ================= MAIN =================
 
 def main():
@@ -677,6 +866,21 @@ def main():
     parser.add_argument("--atr-tp-mult", type=float, default=2.5, help="ATR multiplier for TP (default: 2.5)")
     parser.add_argument("--trail", type=float, default=2.0, help="Trailing stop %% (default: 2.0)")
     parser.add_argument("--max-bars", type=int, default=48, help="Max bars to hold (0=disabled, default: 48)")
+    parser.add_argument("--sizing-mode", type=str, default="fixed_notional",
+                        choices=["fixed_notional", "capped_fraction", "legacy_fraction"],
+                        help="Position sizing model (default: fixed_notional)")
+    parser.add_argument("--fixed-notional", type=float, default=1000.0,
+                        help="Fixed notional per trade when sizing-mode=fixed_notional")
+    parser.add_argument("--max-equity-fraction", type=float, default=0.25,
+                        help="Max fraction of equity allowed in a trade (default: 0.25)")
+    parser.add_argument("--min-notional", type=float, default=25.0,
+                        help="Minimum notional required to open a trade (default: 25)")
+    parser.add_argument("--slippage-bps", type=float, default=5.0,
+                        help="Adverse slippage in basis points applied to each fill (default: 5)")
+    parser.add_argument("--walk-forward-folds", type=int, default=4,
+                        help="Number of walk-forward segments for stability scoring (default: 4)")
+    parser.add_argument("--shortlist-limit", type=int, default=5,
+                        help="Number of top candidates written to SHORTLIST.csv (default: 5)")
     parser.add_argument("--no-vwap", action="store_true", help="Disable VWAP entry filter")
     parser.add_argument("--no-obv", action="store_true", help="Disable OBV entry filter")
     parser.add_argument("--output", type=str, default="storage/backtest_results", help="Output directory")
@@ -702,6 +906,7 @@ def main():
     obv_on = "ON" if not getattr(args, 'no_obv', False) else "OFF"
     max_b = getattr(args, 'max_bars', 48)
     print(f"  Capital: ${args.capital:,.0f} | SL: {atr_mode} ({getattr(args, 'atr_sl_mult', 1.5)}x ATR) | Trail: {getattr(args, 'trail', 2.0)}%")
+    print(f"  Sizing: {args.sizing_mode} | Fixed Notional: ${args.fixed_notional:,.0f} | Max Eq Frac: {args.max_equity_fraction:.0%} | Slippage: {args.slippage_bps:.1f} bps")
     print(f"  VWAP Filter: {vwap_on} | OBV Filter: {obv_on} | Max Hold: {max_b} bars")
     print("=" * 80)
 
@@ -732,8 +937,25 @@ def main():
             logger.info(f"Running: {strat_name} on {symbol} {tf}...")
 
             use_atr = not getattr(args, "no_atr", False)
+            backtest_kwargs = dict(
+                capital=args.capital,
+                sl_pct=args.sl,
+                tp_pct=args.tp,
+                use_atr=use_atr,
+                atr_sl_mult=getattr(args, "atr_sl_mult", 1.5),
+                atr_tp_mult=getattr(args, "atr_tp_mult", 2.5),
+                trailing_pct=getattr(args, "trail", 2.0),
+                max_bars_held=getattr(args, "max_bars", 48),
+                use_vwap=not getattr(args, "no_vwap", False),
+                use_obv=not getattr(args, "no_obv", False),
+                sizing_mode=args.sizing_mode,
+                fixed_notional=args.fixed_notional,
+                max_equity_fraction=args.max_equity_fraction,
+                min_notional=args.min_notional,
+                slippage_bps=args.slippage_bps,
+            )
             trades = run_backtest(df, strat_name, config, symbol, tf,
-                                  capital=args.capital, sl_pct=args.sl, tp_pct=args.tp, use_atr=use_atr, atr_sl_mult=getattr(args, "atr_sl_mult", 1.5), atr_tp_mult=getattr(args, "atr_tp_mult", 2.5), trailing_pct=getattr(args, "trail", 2.0), max_bars_held=getattr(args, "max_bars", 48), use_vwap=not getattr(args, "no_vwap", False), use_obv=not getattr(args, "no_obv", False))
+                                  **backtest_kwargs)
 
             if not trades:
                 logger.warning(f"  No trades generated for {strat_name} {symbol} {tf}")
@@ -802,68 +1024,116 @@ def main():
             trades_df.to_csv(csv_path, index=False)
 
             # Calculate summary
-            wins = len([t for t in trades if t['pnl_usd'] > 0])
-            losses = len([t for t in trades if t['pnl_usd'] <= 0])
-            total_pnl = sum(t['pnl_usd'] for t in trades)
-            final_equity = trades[-1]['equity']
-            roi = (final_equity - args.capital) / args.capital * 100
-            win_rate = wins / max(len(trades), 1) * 100
-
-            # Max drawdown
-            peak = args.capital
-            max_dd = 0
-            for t in trades:
-                if t['equity'] > peak:
-                    peak = t['equity']
-                dd = (peak - t['equity']) / peak * 100
-                if dd > max_dd:
-                    max_dd = dd
+            summary = summarize_trades(trades, args.capital)
+            oos_summary = run_holdout_backtest(
+                df=df,
+                strategy_name=strat_name,
+                strategy_config=config,
+                symbol=symbol,
+                timeframe=tf,
+                **backtest_kwargs,
+            )
+            wf_summary = run_walk_forward_backtest(
+                df=df,
+                strategy_name=strat_name,
+                strategy_config=config,
+                symbol=symbol,
+                timeframe=tf,
+                folds=args.walk_forward_folds,
+                **backtest_kwargs,
+            )
+            merged_summary = {
+                **summary,
+                "OOS ROI %": round(float(oos_summary.get("ROI %", 0.0)), 2),
+                "OOS Max DD %": round(float(oos_summary.get("Max DD %", 0.0)), 2),
+                **wf_summary,
+                "Sizing Mode": args.sizing_mode,
+                "Fixed Notional": round(args.fixed_notional, 2),
+                "Sizing Max Fraction": round(args.max_equity_fraction, 4),
+                "Slippage Bps": round(args.slippage_bps, 2),
+            }
+            reality_score, credibility_flags = build_realism_score(merged_summary)
+            shortlist_eligible = (
+                merged_summary["ROI %"] > 0
+                and merged_summary["OOS ROI %"] > 0
+                and merged_summary["WF Pass Rate %"] >= 50
+                and merged_summary["Max DD %"] <= 20
+            )
 
             summary_rows.append({
                 'Strategy': strat_name,
                 'Symbol': symbol,
                 'Timeframe': tf,
-                'Total Trades': len(trades),
-                'Wins': wins,
-                'Losses': losses,
-                'Win Rate %': round(win_rate, 1),
-                'Total PnL': round(total_pnl, 2),
-                'ROI %': round(roi, 2),
-                'Max DD %': round(max_dd, 2),
-                'Final Capital': round(final_equity, 2),
-                'CSV File': csv_name
+                'Total Trades': merged_summary['Total Trades'],
+                'Wins': merged_summary['Wins'],
+                'Losses': merged_summary['Losses'],
+                'Win Rate %': merged_summary['Win Rate %'],
+                'Total PnL': merged_summary['Total PnL'],
+                'ROI %': merged_summary['ROI %'],
+                'Max DD %': merged_summary['Max DD %'],
+                'Final Capital': merged_summary['Final Capital'],
+                'Profit Factor': merged_summary['Profit Factor'],
+                'OOS ROI %': merged_summary['OOS ROI %'],
+                'OOS Max DD %': merged_summary['OOS Max DD %'],
+                'WF Avg ROI %': merged_summary['WF Avg ROI %'],
+                'WF Pass Rate %': merged_summary['WF Pass Rate %'],
+                'WF Windows': merged_summary['WF Windows'],
+                'Reality Score': reality_score,
+                'Credibility Flags': credibility_flags,
+                'Shortlist Eligible': 'YES' if shortlist_eligible else 'NO',
+                'Sizing Mode': merged_summary['Sizing Mode'],
+                'Fixed Notional': merged_summary['Fixed Notional'],
+                'Sizing Max Fraction': merged_summary['Sizing Max Fraction'],
+                'Slippage Bps': merged_summary['Slippage Bps'],
+                'CSV File': csv_name,
             })
 
             total_strategies += 1
             total_trades += len(trades)
 
             print(f"  ✅ {strat_name} | {symbol} {tf} | {len(trades)} trades | "
-                  f"WR: {win_rate:.0f}% | PnL: ${total_pnl:,.2f} | ROI: {roi:.1f}% | DD: {max_dd:.1f}%")
+                  f"WR: {merged_summary['Win Rate %']:.0f}% | PnL: ${merged_summary['Total PnL']:,.2f} | "
+                  f"ROI: {merged_summary['ROI %']:.1f}% | DD: {merged_summary['Max DD %']:.1f}% | "
+                  f"OOS: {merged_summary['OOS ROI %']:.1f}% | Reality: {reality_score:.1f}")
 
     # Save summary
     if summary_rows:
         summary_df = pd.DataFrame(summary_rows)
+        shortlist_df = (
+            summary_df[summary_df["Shortlist Eligible"] == "YES"]
+            .sort_values(by=["Reality Score", "OOS ROI %", "ROI %"], ascending=[False, False, False])
+            .head(max(int(args.shortlist_limit), 1))
+            .copy()
+        )
+        if not shortlist_df.empty:
+            shortlist_df["Shortlist Status"] = "PAPER_CANDIDATE"
         summary_path = output_dir / "SUMMARY.csv"
         summary_df.to_csv(summary_path, index=False)
+        if not shortlist_df.empty:
+            shortlist_path = output_dir / "SHORTLIST.csv"
+            shortlist_df.to_csv(shortlist_path, index=False)
 
         print("\n" + "=" * 80)
         print(f"  BATCH COMPLETE: {total_strategies} strategies | {total_trades} total trades")
         print(f"  Output: {output_dir}/")
         print(f"  Summary: {summary_path}")
+        if not shortlist_df.empty:
+            print(f"  Shortlist: {output_dir / 'SHORTLIST.csv'}")
         print("=" * 80)
 
-    # Auto-merge results into tournament_winners.csv
-    try:
-        from merge_to_tournament import merge_results
-        summary_file = str(output_dir / "SUMMARY.csv")
-        winners_file = str(Path("storage/reports/tournament_winners.csv"))
-        merge_results(summary_file, winners_file)
-        print("\n  📊 Tournament leaderboard auto-updated!")
-    except Exception as e:
-        print(f"\n  ⚠️ Tournament merge skipped: {e}")
-        print(f"\n  Individual CSVs:")
-        for row in summary_rows:
-            print(f"    {row['CSV File']}")
+    if summary_rows:
+        # Auto-merge results into tournament_winners.csv
+        try:
+            from merge_to_tournament import merge_results
+            summary_file = str(output_dir / "SUMMARY.csv")
+            winners_file = str(Path("storage/reports/tournament_winners.csv"))
+            merge_results(summary_file, winners_file)
+            print("\n  Tournament leaderboard auto-updated.")
+        except Exception as e:
+            print(f"\n  Tournament merge skipped: {e}")
+            print("\n  Individual CSVs:")
+            for row in summary_rows:
+                print(f"    {row['CSV File']}")
     else:
         print("\n  No trades generated. Check data availability and strategy parameters.")
 

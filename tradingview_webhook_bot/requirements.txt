@@ -9,7 +9,6 @@ blinker==1.9.0
 ccxt==4.5.42
 certifi==2026.2.25
 cffi==2.0.0
-chardet==7.0.1
 charset-normalizer==3.4.5
 click==8.3.1
 coincurve==21.0.0

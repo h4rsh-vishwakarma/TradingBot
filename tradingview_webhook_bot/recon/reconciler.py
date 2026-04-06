@@ -4,9 +4,41 @@ from typing import Dict, Any, List
 logger = logging.getLogger(__name__)
 
 class Reconciler:
-    def __init__(self, ledger, tolerance: float = 0.0001):
+    def __init__(self, ledger=None, tolerance: float = 0.0001):
         self.ledger = ledger
         self.tolerance = tolerance
+
+    def classify_drift(self, ledger_qty: float, exchange_qty: float, drift: float) -> tuple[str, str, str]:
+        if drift <= self.tolerance:
+            return "SYNCED", "OK", "No correction needed"
+
+        if abs(exchange_qty) <= self.tolerance and abs(ledger_qty) > self.tolerance:
+            return (
+                "UNEXPECTED_FLAT",
+                "HIGH",
+                "Exchange was flat while ledger still showed exposure; ledger was flattened to exchange truth",
+            )
+        if abs(ledger_qty) <= self.tolerance and abs(exchange_qty) > self.tolerance:
+            return (
+                "UNEXPECTED_OPEN",
+                "HIGH",
+                "Exchange had open exposure while ledger was flat; ledger was opened to exchange truth",
+            )
+        if ledger_qty * exchange_qty < 0:
+            return (
+                "SIDE_MISMATCH",
+                "CRITICAL",
+                "Ledger and exchange were on opposite sides; ledger side/size was replaced with exchange truth",
+            )
+
+        max_abs = max(abs(ledger_qty), abs(exchange_qty), self.tolerance)
+        drift_ratio = drift / max_abs
+        severity = "MEDIUM" if drift_ratio < 0.25 else "HIGH"
+        return (
+            "POSITION_MISMATCH",
+            severity,
+            "Ledger quantity was synced to the exchange quantity",
+        )
 
     def reconcile_with_exchange(self, exchange_data: Dict[str, Any]) -> List[str]:
         """
@@ -32,7 +64,10 @@ class Reconciler:
             symbol = incident['symbol']
             try:
                 entry_price = incident.get('entry_price')
-                self.ledger.update_position_manually(symbol, incident['exchange_qty'], avg_price=entry_price)
+                if hasattr(self.ledger, "sync_symbol_from_exchange"):
+                    self.ledger.sync_symbol_from_exchange(symbol, incident['exchange_qty'], avg_price=entry_price)
+                else:
+                    self.ledger.update_position_manually(symbol, incident['exchange_qty'], avg_price=entry_price)
                 logger.info(f"🔧 Auto-synced Ledger for {symbol} to {incident['exchange_qty']} entry={entry_price}")
             except Exception as e:
                 logger.error(f"❌ Failed to auto-fix drift for {symbol}: {e}")
@@ -67,14 +102,32 @@ class Reconciler:
     def detect_qty_drift(self, ledger_qty: float, exchange_qty: float) -> Dict[str, Any]:
         drift = abs(ledger_qty - exchange_qty)
         is_synced = drift <= self.tolerance
+        drift_type, severity, correction = self.classify_drift(ledger_qty, exchange_qty, drift)
         return {
             "is_synced": is_synced,
+            "drift_type": drift_type,
+            "severity": severity,
             "drift": round(drift, 8),
             "ledger_qty": round(ledger_qty, 8),
             "exchange_qty": round(exchange_qty, 8),
+            "correction": correction,
+            "post_sync_qty": round(exchange_qty, 8),
         }
 
     def format_incident(self, symbol: str, report: Dict[str, Any]) -> str:
+        entry_price = report.get("entry_price")
+        entry_text = "n/a" if entry_price in (None, "", 0, 0.0) else str(entry_price)
+        return (
+            f"RECONCILIATION DRIFT FIXED: {symbol}\n"
+            f"Type: {report['drift_type']}\n"
+            f"Severity: {report['severity']}\n"
+            f"Ledger Before: {report['ledger_qty']}\n"
+            f"Exchange Before: {report['exchange_qty']}\n"
+            f"Drift: {report['drift']}\n"
+            f"Exchange Entry: {entry_text}\n"
+            f"Correction: {report['correction']}\n"
+            f"Ledger After: {report['post_sync_qty']}"
+        )
         return (
             f"🚨 *RECONCILIATION FIX: {symbol}*\n"
             f"━━━━━━━━━━━━━━━━━━\n"
