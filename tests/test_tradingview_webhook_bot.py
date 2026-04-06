@@ -232,6 +232,22 @@ class TestWebhookServer:
         resp = app_client.post("/webhook/tradingview", json=payload)
         assert resp.status_code == 401
 
+    def test_missing_secret_returns_401(self, client):
+        app_client, _ = client
+        payload = {
+            "symbol": "BTCUSDT",
+            "action": "BUY",
+            "price": 50000
+        }
+        resp = app_client.post("/webhook/tradingview", json=payload)
+        assert resp.status_code == 401
+
+    def test_secretless_order_fill_returns_401(self, client):
+        app_client, _ = client
+        payload = "BTC Breakout: order buy @ 50000 filled on BTCUSDT. New strategy position is 1"
+        resp = app_client.post("/webhook/tradingview", data=payload, content_type="text/plain")
+        assert resp.status_code == 401
+
     def test_missing_fields_returns_400(self, client):
         app_client, _ = client
         payload = {"secret": "test_secret_123", "symbol": "BTCUSDT"}
