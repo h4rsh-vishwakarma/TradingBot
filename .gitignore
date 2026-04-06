@@ -37,3 +37,42 @@ logs/
 .vscode/
 .idea/
 .claude/
+
+# Local tooling
+.codex
+.dashboard_password
+.streamlit/
+.pytest_cache/
+pytest-cache-files-*/
+
+# Runtime data inside package storage
+tradingview_webhook_bot/storage/*.json
+tradingview_webhook_bot/storage/*.db
+tradingview_webhook_bot/storage/*.jsonl
+tradingview_webhook_bot/storage/*.offset
+tradingview_webhook_bot/storage/*.csv
+tradingview_webhook_bot/storage/*.gz
+tradingview_webhook_bot/storage/*.bak
+tradingview_webhook_bot/storage/*.bak.*
+
+# Generated reports and scans
+orchestrator_logs_*.csv
+trading_audit_*.csv
+auto_scan.log
+cron_logs.log
+
+# Generated backtest data
+storage/backtest_data/
+backtesting/A_Leaderboard/backtest_imports/
+pine_scripts_4h/
+
+# Generated strategy outputs
+strategies/[A-Z0-9]*USDT_*_4h.pine
+strategies/pine_*.pine
+strategies/pine_v3/
+
+# Local backups
+config/settings.json.bak*
+tradingview_webhook_bot/core/*.bak*
+tradingview_webhook_bot/storage/*.jsonl.*
+backtesting/pine/
