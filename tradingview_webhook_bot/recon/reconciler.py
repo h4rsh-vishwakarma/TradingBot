@@ -8,6 +8,38 @@ class Reconciler:
         self.ledger = ledger
         self.tolerance = tolerance
 
+    def classify_drift(self, ledger_qty: float, exchange_qty: float, drift: float) -> tuple[str, str, str]:
+        if drift <= self.tolerance:
+            return "SYNCED", "OK", "No correction needed"
+
+        if abs(exchange_qty) <= self.tolerance and abs(ledger_qty) > self.tolerance:
+            return (
+                "UNEXPECTED_FLAT",
+                "HIGH",
+                "Exchange was flat while ledger still showed exposure; ledger was flattened to exchange truth",
+            )
+        if abs(ledger_qty) <= self.tolerance and abs(exchange_qty) > self.tolerance:
+            return (
+                "UNEXPECTED_OPEN",
+                "HIGH",
+                "Exchange had open exposure while ledger was flat; ledger was opened to exchange truth",
+            )
+        if ledger_qty * exchange_qty < 0:
+            return (
+                "SIDE_MISMATCH",
+                "CRITICAL",
+                "Ledger and exchange were on opposite sides; ledger side/size was replaced with exchange truth",
+            )
+
+        max_abs = max(abs(ledger_qty), abs(exchange_qty), self.tolerance)
+        drift_ratio = drift / max_abs
+        severity = "MEDIUM" if drift_ratio < 0.25 else "HIGH"
+        return (
+            "POSITION_MISMATCH",
+            severity,
+            "Ledger quantity was synced to the exchange quantity",
+        )
+
     def reconcile_with_exchange(self, exchange_data: Dict[str, Any]) -> List[str]:
         """
         Automated Reconciliation: Compares Ledger vs Exchange and AUTO-FIXES drift.
@@ -70,20 +102,31 @@ class Reconciler:
     def detect_qty_drift(self, ledger_qty: float, exchange_qty: float) -> Dict[str, Any]:
         drift = abs(ledger_qty - exchange_qty)
         is_synced = drift <= self.tolerance
+        drift_type, severity, correction = self.classify_drift(ledger_qty, exchange_qty, drift)
         return {
             "is_synced": is_synced,
-            "severity": "OK" if is_synced else "CRITICAL",
+            "drift_type": drift_type,
+            "severity": severity,
             "drift": round(drift, 8),
             "ledger_qty": round(ledger_qty, 8),
             "exchange_qty": round(exchange_qty, 8),
+            "correction": correction,
+            "post_sync_qty": round(exchange_qty, 8),
         }
 
     def format_incident(self, symbol: str, report: Dict[str, Any]) -> str:
+        entry_price = report.get("entry_price")
+        entry_text = "n/a" if entry_price in (None, "", 0, 0.0) else str(entry_price)
         return (
-            f"🚨 *RECONCILIATION DRIFT DETECTED FIX: {symbol}*\n"
+            f"🚨 *RECONCILIATION DRIFT FIXED: {symbol}*\n"
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"📈 *Old Ledger:* `{report['ledger_qty']}`\n"
-            f"📉 *Exchange:* `{report['exchange_qty']}`\n"
-            f"🔧 *Status:* Ledger Synced to Exchange\n"
+            f"⚠️ *Type:* `{report['drift_type']}`\n"
+            f"🧭 *Severity:* `{report['severity']}`\n"
+            f"📈 *Ledger Before:* `{report['ledger_qty']}`\n"
+            f"📉 *Exchange Before:* `{report['exchange_qty']}`\n"
+            f"📏 *Drift:* `{report['drift']}`\n"
+            f"🎯 *Exchange Entry:* `{entry_text}`\n"
+            f"🔧 *Correction:* {report['correction']}\n"
+            f"✅ *Ledger After:* `{report['post_sync_qty']}`\n"
             f"━━━━━━━━━━━━━━━━━━"
         )

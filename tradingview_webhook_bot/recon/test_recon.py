@@ -11,14 +11,30 @@ def test_drift_detection():
     # 2. Test Out of Sync (Large difference)
     report = recon.detect_qty_drift(1.0, 1.5)
     assert report["is_synced"] is False
-    assert report["severity"] == "CRITICAL"
+    assert report["severity"] == "HIGH"
+    assert report["drift_type"] == "POSITION_MISMATCH"
 
 def test_incident_formatting():
     recon = Reconciler()
     report = recon.detect_qty_drift(1.0, 2.0)
     incident_msg = recon.format_incident("BTCUSDT", report)
-    assert "DRIFT DETECTED" in incident_msg
+    assert "DRIFT FIXED" in incident_msg
     assert "BTCUSDT" in incident_msg
+    assert "POSITION_MISMATCH" in incident_msg
+
+
+def test_detect_qty_drift_unexpected_flat():
+    recon = Reconciler(tolerance=0.01)
+    report = recon.detect_qty_drift(0.75, 0.0)
+    assert report["drift_type"] == "UNEXPECTED_FLAT"
+    assert report["severity"] == "HIGH"
+
+
+def test_detect_qty_drift_side_mismatch():
+    recon = Reconciler(tolerance=0.01)
+    report = recon.detect_qty_drift(1.0, -1.0)
+    assert report["drift_type"] == "SIDE_MISMATCH"
+    assert report["severity"] == "CRITICAL"
 
 def test_reconcile_clears_strategy_children(tmp_path):
     ledger = PositionLedger(str(tmp_path / "ledger.json"))
