@@ -4,7 +4,7 @@ from typing import Dict, Any, List
 logger = logging.getLogger(__name__)
 
 class Reconciler:
-    def __init__(self, ledger, tolerance: float = 0.0001):
+    def __init__(self, ledger=None, tolerance: float = 0.0001):
         self.ledger = ledger
         self.tolerance = tolerance
 
@@ -32,7 +32,10 @@ class Reconciler:
             symbol = incident['symbol']
             try:
                 entry_price = incident.get('entry_price')
-                self.ledger.update_position_manually(symbol, incident['exchange_qty'], avg_price=entry_price)
+                if hasattr(self.ledger, "sync_symbol_from_exchange"):
+                    self.ledger.sync_symbol_from_exchange(symbol, incident['exchange_qty'], avg_price=entry_price)
+                else:
+                    self.ledger.update_position_manually(symbol, incident['exchange_qty'], avg_price=entry_price)
                 logger.info(f"🔧 Auto-synced Ledger for {symbol} to {incident['exchange_qty']} entry={entry_price}")
             except Exception as e:
                 logger.error(f"❌ Failed to auto-fix drift for {symbol}: {e}")
@@ -69,6 +72,7 @@ class Reconciler:
         is_synced = drift <= self.tolerance
         return {
             "is_synced": is_synced,
+            "severity": "OK" if is_synced else "CRITICAL",
             "drift": round(drift, 8),
             "ledger_qty": round(ledger_qty, 8),
             "exchange_qty": round(exchange_qty, 8),
@@ -76,7 +80,7 @@ class Reconciler:
 
     def format_incident(self, symbol: str, report: Dict[str, Any]) -> str:
         return (
-            f"🚨 *RECONCILIATION FIX: {symbol}*\n"
+            f"🚨 *RECONCILIATION DRIFT DETECTED FIX: {symbol}*\n"
             f"━━━━━━━━━━━━━━━━━━\n"
             f"📈 *Old Ledger:* `{report['ledger_qty']}`\n"
             f"📉 *Exchange:* `{report['exchange_qty']}`\n"

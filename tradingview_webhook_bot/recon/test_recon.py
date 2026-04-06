@@ -1,4 +1,5 @@
 from tradingview_webhook_bot.recon.reconciler import Reconciler
+from tradingview_webhook_bot.ledger.positions import PositionLedger
 
 def test_drift_detection():
     recon = Reconciler(tolerance=0.01)
@@ -18,3 +19,18 @@ def test_incident_formatting():
     incident_msg = recon.format_incident("BTCUSDT", report)
     assert "DRIFT DETECTED" in incident_msg
     assert "BTCUSDT" in incident_msg
+
+def test_reconcile_clears_strategy_children(tmp_path):
+    ledger = PositionLedger(str(tmp_path / "ledger.json"))
+    ledger.update_position_manually("binance:SUIUSDT", -674.5, avg_price=0.86)
+    ledger.update_position_manually("binance:SUIUSDT:cci trend", -278.2, avg_price=0.88)
+
+    recon = Reconciler(ledger=ledger)
+    alerts = recon.reconcile_with_exchange({
+        "binance:SUIUSDT": {"quantity": -674.5, "entry_price": 0.8646}
+    })
+
+    assert alerts
+    assert ledger.get_position("binance:SUIUSDT").quantity == -674.5
+    assert ledger.get_position("binance:SUIUSDT").avg_price == 0.8646
+    assert ledger.get_position("binance:SUIUSDT:cci trend").quantity == 0.0

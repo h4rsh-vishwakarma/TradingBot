@@ -324,17 +324,33 @@ class Orchestrator:
         }
 
         # ── 7. Append to both CSV copies ────────────────────────────────────
-        _fnames = ["Symbol","Strategy","Daily_ROI_%","Gross_DD_%","Net_DD_%",
-                   "Win_Rate_%","Sharpe_Ratio","Trade_Count","OOS_ROI_%","OOS_DD_%",
-                   "OOS_Sharpe","Best_Mult","Best_Len","Max_DD_Date","NDD_Date","Tier"]
+        # Write using existing CSV column structure (matches tournament_winners.csv format)
+        _csv_row = {
+            "Symbol": symbol, "Strategy": strategy_name,
+            "Daily_ROI_%": round(daily_roi, 3),
+            "Gross_DD_%": round(gross_dd, 2),
+            "Net_DD_%": round(net_dd, 2),
+            "Max_DD_%": round(gross_dd, 2),
+            "GDD_Date": gdd_date, "GDD_Capital_Left": "",
+            "NDD_Date": ndd_date, "NDD_Capital_Left": "",
+            "Win_Rate_%": win_rate, "Sharpe_Ratio": sharpe,
+            "Total_Trades": trades, "Tier": tier,
+            "Optimal_Mult": round(opt_p["mult"], 2), "Optimal_Len": opt_p["len"],
+            "OOS_Daily_ROI_%": round(oos_roi, 3),
+            "OOS_Gross_DD_%": round(oos_dd, 2), "OOS_Sharpe": round(oos_sharpe, 2),
+        }
+        _fnames = ["Symbol","Strategy","Daily_ROI_%","Gross_DD_%","Net_DD_%","Max_DD_%",
+                   "GDD_Date","GDD_Capital_Left","NDD_Date","NDD_Capital_Left",
+                   "Win_Rate_%","Sharpe_Ratio","Total_Trades","Tier",
+                   "Optimal_Mult","Optimal_Len","OOS_Daily_ROI_%","OOS_Gross_DD_%","OOS_Sharpe"]
         for _csv_path in set([REPORT_CSV, ROOT_CSV]):
             try:
                 _exists = os.path.exists(_csv_path)
                 with open(_csv_path, "a", newline="", encoding="utf-8") as _f:
-                    _w = _csv.DictWriter(_f, fieldnames=_fnames)
+                    _w = _csv.DictWriter(_f, fieldnames=_fnames, extrasaction="ignore")
                     if not _exists:
                         _w.writeheader()
-                    _w.writerow(result_row)
+                    _w.writerow(_csv_row)
             except Exception as _e:
                 logger.warning(f"[AutoRegister] CSV write to {_csv_path} failed: {_e}")
 
@@ -383,14 +399,30 @@ class Orchestrator:
                     "Best_Mult": round(r_opt["mult"], 2), "Best_Len": r_opt["len"],
                     "Max_DD_Date": r_gd, "NDD_Date": r_nd, "Tier": reverse_tier,
                 }
+                _rev_csv_row = {
+                    "Symbol": symbol, "Strategy": rev_name,
+                    "Daily_ROI_%": round(r_roi, 3), "Gross_DD_%": round(r_gdd, 2),
+                    "Net_DD_%": round(r_ndd, 2), "Max_DD_%": round(r_gdd, 2),
+                    "GDD_Date": r_gd, "GDD_Capital_Left": "",
+                    "NDD_Date": r_nd, "NDD_Capital_Left": "",
+                    "Win_Rate_%": r_wr, "Sharpe_Ratio": r_sh,
+                    "Total_Trades": r_tr, "Tier": reverse_tier,
+                    "Optimal_Mult": round(r_opt["mult"], 2), "Optimal_Len": r_opt["len"],
+                    "OOS_Daily_ROI_%": round(r_oos_roi, 3),
+                    "OOS_Gross_DD_%": round(r_oos_dd, 2), "OOS_Sharpe": round(r_oos_sh, 2),
+                }
+                _rev_fnames = ["Symbol","Strategy","Daily_ROI_%","Gross_DD_%","Net_DD_%","Max_DD_%",
+                               "GDD_Date","GDD_Capital_Left","NDD_Date","NDD_Capital_Left",
+                               "Win_Rate_%","Sharpe_Ratio","Total_Trades","Tier",
+                               "Optimal_Mult","Optimal_Len","OOS_Daily_ROI_%","OOS_Gross_DD_%","OOS_Sharpe"]
                 for _csv_path in set([REPORT_CSV, ROOT_CSV]):
                     try:
                         _exists = os.path.exists(_csv_path)
                         with open(_csv_path, "a", newline="", encoding="utf-8") as _f:
-                            _w = _csv.DictWriter(_f, fieldnames=_fnames)
+                            _w = _csv.DictWriter(_f, fieldnames=_rev_fnames, extrasaction="ignore")
                             if not _exists:
                                 _w.writeheader()
-                            _w.writerow(reverse_row)
+                            _w.writerow(_rev_csv_row)
                     except Exception as _e:
                         logger.warning(f"[AutoRegister] Reverse CSV write failed: {_e}")
 
@@ -455,6 +487,77 @@ class Orchestrator:
                     s = s.replace(ch, ' ')
                 return _re.sub(r"\s+", " ", s).strip().lower()
             strat_clean = _normalize(strategy_name)
+            # Strategy aliases: short codes -> full CSV strategy names
+            _STRATEGY_ALIASES = {
+                # Classic strategies
+                'kb 4h': '24 keltner breakout',
+                'mb 4h': '07 macd breakout',
+                'ae 4h': '10 aggressive entry',
+                'kb4h': '24 keltner breakout',
+                'mb4h': '07 macd breakout',
+                'ae4h': '10 aggressive entry',
+                'psar 4h': '44 psar volume surge 4h',
+                'psar_volume_surge_4h': '44 psar volume surge 4h',
+                'pvs 4h': '44 psar volume surge 4h',
+                'pvs4h': '44 psar volume surge 4h',
+                'psar tight': '56 psar volume tight',
+                'pvt 4h': '56 psar volume tight',
+                'pvt4h': '56 psar volume tight',
+                # Premium strategies (70-89)
+                'williams r': '70 williams r momentum',
+                'williamsr': '70 williams r momentum',
+                'wr momentum': '70 williams r momentum',
+                'stoch rsi': '71 stoch rsi power',
+                'stochrsi': '71 stoch rsi power',
+                'srsi': '71 stoch rsi power',
+                'hull ma': '72 hull ma trend',
+                'hullma': '72 hull ma trend',
+                'hull': '72 hull ma trend',
+                'squeeze': '73 squeeze momentum',
+                'sqz': '73 squeeze momentum',
+                'cci': '74 cci breakout',
+                'cci breakout': '74 cci breakout',
+                'mfi': '75 mfi reversal',
+                'mfi reversal': '75 mfi reversal',
+                'vortex': '76 vortex trend',
+                'dema': '77 dema ribbon',
+                'dema ribbon': '77 dema ribbon',
+                'heikin': '78 heikin ashi trend',
+                'heikin ashi': '78 heikin ashi trend',
+                'ha trend': '78 heikin ashi trend',
+                'wavetrend': '79 wavetrend osc',
+                'wave trend': '79 wavetrend osc',
+                'wt osc': '79 wavetrend osc',
+                'laguerre': '80 laguerre rsi',
+                'laguerre rsi': '80 laguerre rsi',
+                'elder ray': '81 elder ray trend',
+                'elderray': '81 elder ray trend',
+                'chandelier': '82 chandelier exit',
+                'chandelier exit': '82 chandelier exit',
+                'ce exit': '82 chandelier exit',
+                'triple ema': '83 triple ema cross',
+                'tripleema': '83 triple ema cross',
+                'tema cross': '83 triple ema cross',
+                'rsi momentum': '84 rsi momentum',
+                'rsimom': '84 rsi momentum',
+                'supertrend multi': '85 supertrend multi',
+                'st multi': '85 supertrend multi',
+                'bb squeeze': '86 bb squeeze break',
+                'bbsqueeze': '86 bb squeeze break',
+                'bb squeeze break': '86 bb squeeze break',
+                'vol weighted': '87 vol weighted breakout',
+                'vwb': '87 vol weighted breakout',
+                'market cipher': '88 market cipher b',
+                'cipher b': '88 market cipher b',
+                'mcb': '88 market cipher b',
+                'chande': '89 chande momentum',
+                'chande momentum': '89 chande momentum',
+                'cmo': '89 chande momentum',
+            }
+            if strat_clean in _STRATEGY_ALIASES:
+                resolved = _STRATEGY_ALIASES[strat_clean]
+                logger.info('[StratAlias] Strategy alias resolved: %s -> %s', strategy_name, resolved)
+                strat_clean = _normalize(resolved)
             def _strat_match(row_strat):
                 row_clean = _normalize(row_strat)
                 return strat_clean in row_clean or row_clean in strat_clean
@@ -570,28 +673,20 @@ class Orchestrator:
                 if "USDT" not in symbol:
                     symbol = f"{symbol.replace('USD', '')}USDT"
 
-            # --- 1. BRAIN TIER CHECK ---
-            is_allowed, reason, tier = self.check_tournament_alpha(symbol, strat_name)
-            if not is_allowed:
-                logger.warning(f"[{correlation_id}] AI Blocked: {reason}")
-                try:
-                    self.sheets_logger.log_blocked_trade(
-                        symbol=symbol, side="N/A", strategy=strat_name,
-                        reason=f"Tier Block: {reason}", signal_id=signal_id)
-                except Exception as e:
-                    logger.debug(f"Sheets log failed: {e}")
-                metrics.inc("bot_signals_blocked_total", labels={"reason": "tier_block"})
-                return True
+            # --- 0.5. ALLOWED SYMBOLS FILTER ---
+            _allowed_raw = os.getenv("ALLOWED_SYMBOLS", "").strip()
+            if _allowed_raw:
+                _allowed_list = [s.strip().upper() for s in _allowed_raw.split(",") if s.strip()]
+                if _allowed_list and symbol not in _allowed_list:
+                    logger.info(f"[{correlation_id}] Symbol {symbol} not in ALLOWED_SYMBOLS {_allowed_list} — skipping")
+                    metrics.inc("bot_signals_blocked_total", labels={"reason": "symbol_not_allowed"})
+                    return True
 
-            # --- 1.2. REVERSE SIGNAL FLIP (if backtest says reverse is ALPHA) ---
-            _reverse_active = "REVERSE_ALPHA" in tier
-            if _reverse_active:
-                _orig_action = str(payload_raw.get("action") or event.get("action") or "BUY").upper()
-                _flipped     = "SELL" if _orig_action in ("BUY", "LONG") else "BUY"
-                payload_raw["action"] = _flipped
-                if isinstance(event.get("payload"), dict):
-                    event["payload"]["action"] = _flipped
-                logger.info(f"[{correlation_id}] 🔄 REVERSE mode: {_orig_action} → {_flipped} for {strat_name}/{symbol}")
+            # --- 1. DIRECT TRADINGVIEW EXECUTION ---
+            # Tournament/leaderboard filtering, auto-backtest, and REVERSE_ALPHA
+            # flipping are intentionally bypassed. TradingView action is preserved.
+            tier = "TV_DIRECT"
+            logger.info(f"[{correlation_id}] Tournament filter bypassed: executing TradingView signal directly for {strat_name}/{symbol}")
 
             # --- 1.5. SIGNAL DEDUP CHECK ---
             side_hint = str(payload_raw.get("action") or event.get("action") or "").upper()
@@ -630,15 +725,6 @@ class Orchestrator:
             except (json.JSONDecodeError, ValueError, TypeError):
                 pass  # ROI check is optional — strategy field is usually plain text
 
-            # --- 3. TIER-BASED INTERACTIVE GATE ---
-            if "AVERAGE" in tier:
-                try:
-                    self.telegram.send(severity=AlertSeverity.WARNING, title="Manual Sync Needed",
-                        message=f"AVERAGE Strategy: {strat_name} for {symbol}. No auto-trade. ID: {signal_id}")
-                except Exception as e:
-                    logger.debug(f"Telegram failed: {e}")
-                return True
-
             # --- 4. PREPARE EXECUTION DATA ---
             try:
                 signal_data["strategy"] = strat_name
@@ -646,14 +732,23 @@ class Orchestrator:
                 signal_data["quantity"] = float(payload_raw.get("quantity") or event.get("quantity") or 0.003)
 
                 raw_price = float(payload_raw.get("price") or event.get("price") or 0.0)
+                # Always fetch live price for sanity check (and as fallback when raw_price == 0)
+                live_price = self.exchange_binance.get_mainnet_mark_price(symbol)
                 if raw_price <= 0:
-                    live_price = self.exchange_binance.get_mainnet_mark_price(symbol)
                     if live_price and live_price > 0:
                         raw_price = live_price
-                        logger.info(f"[{correlation_id}] Resolved price for {symbol}: ${raw_price}")
+                        logger.info(f"[{correlation_id}] Price=0 resolved via mainnet for {symbol}: ${raw_price:,.4f}")
                     else:
                         logger.warning(f"[{correlation_id}] Cannot resolve price for {symbol}. Skipping.")
                         return True
+                elif live_price and live_price > 0:
+                    deviation = abs(raw_price - live_price) / live_price
+                    if deviation > 0.20:  # More than 20% deviation from live market price
+                        logger.warning(
+                            f"[{correlation_id}] ⚠️ PRICE SANITY FAIL: signal ${raw_price:,.4f} vs live "
+                            f"${live_price:,.4f} ({deviation*100:.0f}% off) for {symbol}. Using live price."
+                        )
+                        raw_price = live_price
                 signal_data["price"] = raw_price
                 signal_data["action"] = str(payload_raw.get("action") or event.get("action") or "BUY").upper()
 
@@ -666,6 +761,7 @@ class Orchestrator:
             side = "SELL" if payload["action"] in ["SELL", "TP", "EXIT", "SHORT", "OFF"] else "BUY"
             qty, price_signal = float(payload["quantity"]), float(payload["price"])
             indicator_name = payload_raw.get("indicator") or "AI_Optimized"
+            ledger_pos_key = f"{target_exchange}:{symbol}:{strat_name}"
 
             # --- 4.5. EXIT/CLOSE HANDLING ---
             is_exit = payload_raw.get("is_exit", False)
@@ -677,17 +773,33 @@ class Orchestrator:
                 if "position is 0" in raw_body.lower() or "position is -" in raw_body.lower():
                     is_exit = True
             if is_exit:
-                current_pos = self.ledger.get_position(f"{target_exchange}:{symbol}:{strat_name}")
+                strategy_pos_key = ledger_pos_key
+                aggregate_pos_key = f"{target_exchange}:{symbol}"
+                current_pos = self.ledger.get_position(strategy_pos_key)
                 if current_pos.quantity == 0:
-                    logger.info(f"[{correlation_id}] Exit signal for {symbol} but no position open. Skipping.")
-                    return True
+                    aggregate_pos = self.ledger.get_position(aggregate_pos_key)
+                    if aggregate_pos.quantity == 0:
+                        logger.info(
+                            f"[{correlation_id}] Exit signal for {symbol} but no position open "
+                            f"on {strategy_pos_key} or {aggregate_pos_key}. Skipping."
+                        )
+                        return True
+                    current_pos = aggregate_pos
+                    ledger_pos_key = aggregate_pos_key
+                    logger.info(
+                        f"[{correlation_id}] Exit fallback: {strategy_pos_key} is flat; "
+                        f"closing aggregate {aggregate_pos_key} position instead."
+                    )
                 if current_pos.quantity > 0:
                     side = "SELL"
                     qty = abs(current_pos.quantity)
                 elif current_pos.quantity < 0:
                     side = "BUY"
                     qty = abs(current_pos.quantity)
-                logger.info(f"[{correlation_id}] Exit signal: closing {symbol} position ({current_pos.quantity}) with {side} {qty}")
+                logger.info(
+                    f"[{correlation_id}] Exit signal: closing {ledger_pos_key} "
+                    f"position ({current_pos.quantity}) with {side} {qty}"
+                )
                 # Cancel any open SL/TP orders BEFORE placing the close order to avoid
                 # double-fills: if SL hit first AND we then market-close, both execute.
                 if target_exchange == "binance":
@@ -742,7 +854,7 @@ class Orchestrator:
 
             # --- 5.5. POSITION SIZING ---
             size_mode = os.getenv("POSITION_SIZE_MODE", "fixed")
-            if size_mode == "equity_pct":
+            if not is_exit and size_mode == "equity_pct":
                 equity_pct = float(os.getenv("EQUITY_PCT_PER_TRADE", "5.0")) / 100
                 try:
                     health = self.exchange_binance.get_account_health()
@@ -756,11 +868,12 @@ class Orchestrator:
                 except Exception as e:
                     logger.warning(f"[{correlation_id}] Equity sizing failed, using signal qty: {e}")
 
-            # Max qty cap
-            max_allowed = self.MAX_QTY.get(symbol, 1.0)
-            if qty > max_allowed:
-                logger.warning(f"[{correlation_id}] Qty capped: {qty} -> {max_allowed} for {symbol}")
-                qty = max_allowed
+            # Max qty cap for new entries. Exits must be allowed to close full size.
+            if not is_exit:
+                max_allowed = self.MAX_QTY.get(symbol, 1.0)
+                if qty > max_allowed:
+                    logger.warning(f"[{correlation_id}] Qty capped: {qty} -> {max_allowed} for {symbol}")
+                    qty = max_allowed
 
             # --- 6. ACTUAL EXECUTION ---
             execution_res, fill_price = {}, price_signal
@@ -857,7 +970,7 @@ class Orchestrator:
             if execution_res.get("status") == "SUCCESS":
                 self.idempotency.mark_seen(signal_id)
                 try:
-                    pos_key = f"{target_exchange}:{symbol}:{strat_name}"
+                    pos_key = ledger_pos_key
                     _pnl_before = self.ledger.get_position(pos_key).daily_realized_pnl
                     pos_snapshot = self.ledger.apply_fill(pos_key, side, qty, fill_price)
                     _this_trade_pnl = pos_snapshot.daily_realized_pnl - _pnl_before
@@ -1045,12 +1158,20 @@ class Orchestrator:
                                     }
                             alerts = self.reconciler.reconcile_with_exchange(exchange_data)
                             if alerts:
-                                for alert_msg in alerts:
-                                    self.telegram.send(
-                                        severity=AlertSeverity.WARNING,
-                                        title="🔧 Reconciler Fix",
-                                        message=alert_msg
-                                    )
+                                # Batch all alerts into ONE Telegram message
+                                summary_lines = []
+                                for msg in alerts:
+                                    # Extract symbol name from message for compact display
+                                    import re as _re2
+                                    sym_match = _re2.search(r'binance:(\w+)', msg)
+                                    sym_label = sym_match.group(1) if sym_match else "?"
+                                    summary_lines.append(f"• {sym_label}: {msg.split('to')[-1].strip() if 'to' in msg else msg[:60]}")
+                                batch_msg = chr(10).join(summary_lines)
+                                self.telegram.send(
+                                    severity=AlertSeverity.WARNING,
+                                    title=f"🔧 Reconciler: {len(alerts)} drift(s) fixed",
+                                    message=batch_msg
+                                )
                                 logger.info(f"Reconciler: {len(alerts)} drift(s) fixed")
                             else:
                                 logger.debug("Reconciler: Ledger synced with exchange")

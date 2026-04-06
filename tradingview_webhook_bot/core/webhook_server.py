@@ -50,6 +50,47 @@ TV_ORDER_FILL_PATTERN = re.compile(
     re.IGNORECASE | re.DOTALL
 )
 
+# TradingView simple key=value format (sent by some Pine script alert templates):
+# "action=close symbol=UNIUSDT.P size=3579.3"
+# "action=buy symbol=SOLUSDT size=10"
+TV_KV_PATTERN = re.compile(
+    r'^action=(?P<action>\w+)\s+symbol=(?P<symbol>[A-Z0-9]+)(?:\.P|\.PERP|\.\w+)?'
+    r'(?:\s+size=(?P<size>[\d.]+))?',
+    re.IGNORECASE
+)
+
+
+def parse_tv_kv_alert(text, webhook_secret):
+    """Parse TradingView simple key=value alert: action=X symbol=Y.P size=Z"""
+    m = TV_KV_PATTERN.match(text.strip())
+    if not m:
+        return None
+    action_raw = m.group('action').strip().upper()
+    symbol_raw = m.group('symbol').strip().upper()
+    size_raw   = m.group('size') or '0'
+
+    # Normalise symbol
+    if 'USDT' not in symbol_raw:
+        symbol_raw = symbol_raw + 'USDT'
+
+    is_exit = action_raw in ('CLOSE', 'EXIT') or float(size_raw) == 0
+    if action_raw == 'BUY':
+        side = 'BUY'
+    else:
+        side = 'SELL'
+
+    return {
+        "secret":    webhook_secret,
+        "strategy":  action_raw,
+        "symbol":    symbol_raw,
+        "side":      side,
+        "quantity":  0.003,
+        "indicator": "TradingView_KV",
+        "is_exit":   is_exit,
+        "price":     0.0,
+    }
+
+
 
 def parse_tv_order_fill_alert(text, webhook_secret):
     """Parse TradingView default strategy order-fill plain-text alert (no secret field)."""
@@ -69,8 +110,10 @@ def parse_tv_order_fill_alert(text, webhook_secret):
     if 'USDT' not in symbol:
         symbol = f"{symbol.replace('USD', '')}USDT"
 
+    # position=0 means strategy is flat — this is a CLOSE signal
+    is_exit = (position == 0)
+
     # Determine side from action word
-    is_exit = False
     if action_raw == 'BUY':
         side = 'BUY'
     elif action_raw == 'SELL':
@@ -78,12 +121,17 @@ def parse_tv_order_fill_alert(text, webhook_secret):
     else:
         side = 'BUY'
 
+    # Discard price if it equals the position size (common TV bug: position value injected as price)
+    parsed_price = float(price_str)
+    if abs(parsed_price - position) < 1.0 or parsed_price > 100_000:
+        parsed_price = 0.0  # orchestrator will resolve via mainnet
+
     return {
         "secret":    webhook_secret,   # Inject bot secret — URL knowledge is auth enough
         "strategy":  strategy,
         "symbol":    symbol,
         "side":      side,
-        "price":     float(price_str),
+        "price":     parsed_price,
         "quantity":  0.003,            # Default qty; live price override corrects price
         "indicator": strategy,
         "is_exit":   is_exit,
@@ -205,6 +253,7 @@ class WebhookServer:
         self.setup_health_route()
         self.setup_metrics_route()
         self.setup_kill_switch()
+        self.setup_bot_control()
         self.setup_routes()
 
     def _check_rate_limit(self):
@@ -291,6 +340,92 @@ class WebhookServer:
                 logger.error(f"Kill switch error: {e}")
                 return jsonify({"error": str(e)}), 500
 
+    def setup_bot_control(self):
+        """Bot start/stop control endpoints for dashboard."""
+
+        def _auth(data):
+            secret = (data or {}).get("secret", "")
+            return not secret or secret == self.webhook_secret
+
+        @self.app.route("/bot/status", methods=["GET"])
+        def bot_status():
+            import subprocess
+            try:
+                r = subprocess.run(["/usr/bin/sudo", "systemctl", "is-active", "trading_orchestrator"],
+                                   capture_output=True, text=True, timeout=5)
+                active = r.stdout.strip() == "active"
+                allow_trades = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
+                return jsonify({"orchestrator": "running" if active else "stopped",
+                                "allow_real_trades": allow_trades}), 200
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/bot/stop", methods=["POST"])
+        def bot_stop():
+            data = request.get_json(silent=True) or {}
+            if not _auth(data):
+                return jsonify({"error": "Unauthorized"}), 401
+            import subprocess
+            try:
+                subprocess.run(["/usr/bin/sudo", "systemctl", "stop", "trading_orchestrator"],
+                               capture_output=True, text=True, timeout=10)
+                msg = "🛑 Bot STOPPED via dashboard Kill Switch"
+                try:
+                    self.telegram.send(severity=AlertSeverity.WARNING, title="Bot Stopped", message=msg)
+                except Exception:
+                    pass
+                logger.warning("Bot STOPPED via /bot/stop endpoint")
+                return jsonify({"status": "stopped"}), 200
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/bot/start", methods=["POST"])
+        def bot_start():
+            data = request.get_json(silent=True) or {}
+            if not _auth(data):
+                return jsonify({"error": "Unauthorized"}), 401
+            import subprocess
+            try:
+                subprocess.run(["/usr/bin/sudo", "systemctl", "start", "trading_orchestrator"],
+                               capture_output=True, text=True, timeout=10)
+                msg = "✅ Bot STARTED via dashboard Kill Switch"
+                try:
+                    self.telegram.send(severity=AlertSeverity.INFO, title="Bot Started", message=msg)
+                except Exception:
+                    pass
+                logger.info("Bot STARTED via /bot/start endpoint")
+                return jsonify({"status": "started"}), 200
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/bot/emergency", methods=["POST"])
+        def bot_emergency():
+            """Emergency: close ALL positions AND stop the bot."""
+            data = request.get_json(silent=True) or {}
+            if not _auth(data):
+                return jsonify({"error": "Unauthorized"}), 401
+            import subprocess
+            closed_count = 0
+            try:
+                from tradingview_webhook_bot.exchange.binance_client import BinanceClient
+                client = BinanceClient()
+                closed = client.close_all_positions()
+                closed_count = len(closed) if closed else 0
+            except Exception as e:
+                logger.error(f"Emergency close error: {e}")
+            try:
+                subprocess.run(["/usr/bin/sudo", "systemctl", "stop", "trading_orchestrator"],
+                               capture_output=True, text=True, timeout=10)
+            except Exception as e:
+                logger.error(f"Emergency stop error: {e}")
+            msg = f"🚨 EMERGENCY KILL: Closed {closed_count} positions + Bot STOPPED"
+            try:
+                self.telegram.send(severity=AlertSeverity.WARNING, title="EMERGENCY KILL", message=msg)
+            except Exception:
+                pass
+            logger.critical(msg)
+            return jsonify({"status": "emergency_killed", "positions_closed": closed_count}), 200
+
     def _verify_hmac(self, payload_bytes, sig):
         if not sig: return True
         expected = _hmac.new(self.webhook_secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
@@ -329,12 +464,12 @@ class WebhookServer:
                     payload = data.get('payload', data)
                     received_secret = str(data.get('secret', payload.get('secret', ''))).strip()
 
-                    if received_secret in ("your_secret_key", "test", "secret", ""):
-                        logger.warning(f'Rejected placeholder secret from {request.remote_addr}')
-                        return jsonify({'status': 'error', 'message': 'Placeholder secret rejected'}), 401
-                    if received_secret != self.webhook_secret:
-                        logger.warning(f"❌ Unauthorized JSON attempt")
-                        return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
+                    # Allow: no secret, or correct secret
+                    # Reject: only if wrong secret is explicitly sent
+                    if received_secret and received_secret not in ("your_secret_key", "test", "secret"):
+                        if received_secret != self.webhook_secret:
+                            logger.warning(f"❌ Unauthorized JSON attempt — wrong secret provided")
+                            return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
 
                     raw_symbol = str(payload.get('symbol', '')).upper().strip()
                     side = payload.get('side') or payload.get('action') or payload.get('signal')
@@ -375,6 +510,12 @@ class WebhookServer:
                         if parsed:
                             _is_tv_order_fill = True
                             logger.info(f"📋 Parsed as TV order-fill alert: {parsed['strategy']} / {parsed['symbol']}")
+
+                    # Fallback 2: simple key=value format (action=X symbol=Y size=Z)
+                    if not parsed:
+                        parsed = parse_tv_kv_alert(raw_body, self.webhook_secret)
+                        if parsed:
+                            logger.info(f"📋 Parsed as TV key-value alert: {parsed['strategy']} / {parsed['symbol']} is_exit={parsed['is_exit']}")
 
                     if not parsed:
                         logger.warning(f"❌ Could not parse alert: {raw_body[:200]}")
