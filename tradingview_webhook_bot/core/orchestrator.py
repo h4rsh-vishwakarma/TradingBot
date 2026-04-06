@@ -171,6 +171,28 @@ class Orchestrator:
         cooldown_key = f"{symbol}:{strategy}" if strategy else symbol
         self._symbol_cooldown[cooldown_key] = time.time()
 
+    def _notify_signal_decision(self, title: str, reason: str, signal_id: str = "", symbol: str = "",
+                                strategy: str = "", action: str = "", severity=AlertSeverity.INFO):
+        def _send():
+            try:
+                self.telegram.send(
+                    severity=severity,
+                    title=title,
+                    message=(f"⚠️ <b>{title}</b>\n\n"
+                             f"📍 <b>Symbol:</b> {symbol or 'N/A'}\n"
+                             f"↔️ <b>Action:</b> {str(action or 'N/A').upper()}\n"
+                             f"📋 <b>Strategy:</b> <code>{strategy or 'N/A'}</code>\n"
+                             f"🧠 <b>Reason:</b> {reason}\n"
+                             f"🆔 <b>ID:</b> <code>{signal_id or 'N/A'}</code>")
+                )
+            except Exception as e:
+                logger.debug(f"Telegram decision alert failed: {e}")
+
+        try:
+            self._thread_pool.submit(_send)
+        except Exception:
+            _send()
+
     def _is_duplicate_signal(self, strategy: str, symbol: str, side: str) -> bool:
         key = f"{strategy}:{symbol}:{side}".lower()
         now = time.time()
@@ -650,6 +672,16 @@ class Orchestrator:
             signal_id = event.get("signal_id")
             logger.info(f"[{correlation_id}] Processing signal {signal_id}")
             if self.idempotency.is_seen(signal_id):
+                dup_payload = event.get("payload", {})
+                self._notify_signal_decision(
+                    title="Signal Skipped",
+                    reason="Duplicate signal ID already processed",
+                    signal_id=signal_id,
+                    symbol=str(dup_payload.get("symbol") or event.get("symbol") or "N/A").upper(),
+                    strategy=self._normalize_strategy(dup_payload.get("strategy") or event.get("strategy") or "N/A"),
+                    action=str(dup_payload.get("action") or event.get("action") or "N/A").upper(),
+                    severity=AlertSeverity.INFO,
+                )
                 logger.info(f"[{correlation_id}] Skipping duplicate: {signal_id}")
                 return True
 
@@ -679,6 +711,15 @@ class Orchestrator:
                 _allowed_list = [s.strip().upper() for s in _allowed_raw.split(",") if s.strip()]
                 if _allowed_list and symbol not in _allowed_list:
                     logger.info(f"[{correlation_id}] Symbol {symbol} not in ALLOWED_SYMBOLS {_allowed_list} — skipping")
+                    self._notify_signal_decision(
+                        title="Signal Blocked",
+                        reason=f"Symbol {symbol} not in ALLOWED_SYMBOLS",
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        strategy=strat_name,
+                        action=payload_raw.get("action") or event.get("action") or "N/A",
+                        severity=AlertSeverity.WARNING,
+                    )
                     metrics.inc("bot_signals_blocked_total", labels={"reason": "symbol_not_allowed"})
                     return True
 
@@ -691,12 +732,30 @@ class Orchestrator:
             # --- 1.5. SIGNAL DEDUP CHECK ---
             side_hint = str(payload_raw.get("action") or event.get("action") or "").upper()
             if self._is_duplicate_signal(strat_name, symbol, side_hint):
+                self._notify_signal_decision(
+                    title="Signal Skipped",
+                    reason=f"Duplicate {side_hint} signal seen within {self.DEDUP_WINDOW_SECONDS}s window",
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    strategy=strat_name,
+                    action=side_hint,
+                    severity=AlertSeverity.INFO,
+                )
                 return True
 
             # --- 1.6. SYMBOL COOLDOWN CHECK ---
             if self._is_symbol_in_cooldown(symbol, strat_name):
                 metrics.inc("bot_signals_blocked_total", labels={"reason": "cooldown"})
                 logger.info(f"[{correlation_id}] Cooldown block: {symbol} (strategy: {strat_name})")
+                self._notify_signal_decision(
+                    title="Signal Blocked",
+                    reason=f"Cooldown active for {symbol}/{strat_name}",
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    strategy=strat_name,
+                    action=side_hint,
+                    severity=AlertSeverity.WARNING,
+                )
                 return True
 
             # --- 1.7. CANDLE LOCK ---
@@ -707,6 +766,15 @@ class Orchestrator:
                         reason="Candle Lock: Symbol locked to opposite direction", signal_id=signal_id)
                 except Exception as e:
                     logger.debug(f"Sheets log failed: {e}")
+                self._notify_signal_decision(
+                    title="Signal Blocked",
+                    reason="Candle lock active: symbol locked to opposite direction",
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    strategy=strat_name,
+                    action=side_hint,
+                    severity=AlertSeverity.WARNING,
+                )
                 return True
 
             # --- 2. ROI GUARD ---
@@ -721,6 +789,15 @@ class Orchestrator:
                             reason=f"ROI Guard: {incoming_roi}% (Negative)", signal_id=signal_id)
                     except Exception as e:
                         logger.debug(f"Sheets log failed: {e}")
+                    self._notify_signal_decision(
+                        title="Signal Blocked",
+                        reason=f"ROI guard blocked signal ({incoming_roi}%)",
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        strategy=strat_name,
+                        action=side_hint,
+                        severity=AlertSeverity.WARNING,
+                    )
                     return True
             except (json.JSONDecodeError, ValueError, TypeError):
                 pass  # ROI check is optional — strategy field is usually plain text
@@ -740,6 +817,15 @@ class Orchestrator:
                         logger.info(f"[{correlation_id}] Price=0 resolved via mainnet for {symbol}: ${raw_price:,.4f}")
                     else:
                         logger.warning(f"[{correlation_id}] Cannot resolve price for {symbol}. Skipping.")
+                        self._notify_signal_decision(
+                            title="Signal Skipped",
+                            reason="Cannot resolve price from signal or live market",
+                            signal_id=signal_id,
+                            symbol=symbol,
+                            strategy=strat_name,
+                            action=payload_raw.get("action") or event.get("action") or "N/A",
+                            severity=AlertSeverity.INFO,
+                        )
                         return True
                 elif live_price and live_price > 0:
                     deviation = abs(raw_price - live_price) / live_price
@@ -756,6 +842,15 @@ class Orchestrator:
                 payload = valid_payload.model_dump()
             except Exception as e:
                 logger.error(f"[{correlation_id}] Data Parsing Error: {e}")
+                self._notify_signal_decision(
+                    title="Signal Blocked",
+                    reason=f"Data parsing error: {e}",
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    strategy=strat_name,
+                    action=payload_raw.get("action") or event.get("action") or "N/A",
+                    severity=AlertSeverity.WARNING,
+                )
                 return True
 
             side = "SELL" if payload["action"] in ["SELL", "TP", "EXIT", "SHORT", "OFF"] else "BUY"
@@ -779,9 +874,22 @@ class Orchestrator:
                 if current_pos.quantity == 0:
                     aggregate_pos = self.ledger.get_position(aggregate_pos_key)
                     if aggregate_pos.quantity == 0:
+                        reason = (
+                            f"Exit signal received, but no open position exists on {strategy_pos_key} "
+                            f"or {aggregate_pos_key}"
+                        )
                         logger.info(
                             f"[{correlation_id}] Exit signal for {symbol} but no position open "
                             f"on {strategy_pos_key} or {aggregate_pos_key}. Skipping."
+                        )
+                        self._notify_signal_decision(
+                            title="Signal Skipped",
+                            reason=reason,
+                            signal_id=signal_id,
+                            symbol=symbol,
+                            strategy=strat_name,
+                            action=payload.get("action", side),
+                            severity=AlertSeverity.INFO,
                         )
                         return True
                     current_pos = aggregate_pos
@@ -809,6 +917,15 @@ class Orchestrator:
             # --- 4.9. KILL SWITCH CHECK ---
             kill_file = os.path.join(os.path.dirname(self.ledger_path), "KILL_SWITCH")
             if os.path.exists(kill_file):
+                self._notify_signal_decision(
+                    title="Signal Blocked",
+                    reason="Kill switch is active",
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    strategy=strat_name,
+                    action=payload.get("action", side),
+                    severity=AlertSeverity.WARNING,
+                )
                 logger.critical(f"[{correlation_id}] KILL SWITCH ACTIVE — blocking all trades")
                 return True
 
@@ -827,6 +944,15 @@ class Orchestrator:
                         reason=f"Circuit Breaker: {cb_reason}", signal_id=signal_id)
                 except Exception as e:
                     logger.debug(f"Sheets log failed: {e}")
+                self._notify_signal_decision(
+                    title="Signal Blocked",
+                    reason=f"Circuit breaker active: {cb_reason}",
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    strategy=strat_name,
+                    action=payload.get("action", side),
+                    severity=AlertSeverity.WARNING,
+                )
                 return True
 
             # --- 5. RISK GATES ---
@@ -839,11 +965,15 @@ class Orchestrator:
                 is_safe, risk_reason = self.check_safety_gate(symbol, qty, price_signal, side, exchange=target_exchange, strategy=strat_name)
             if not is_safe:
                 logger.warning(f"[{correlation_id}] Safety Gate Block: {risk_reason}")
-                try:
-                    self.telegram.send(severity=AlertSeverity.WARNING, title="Risk Block",
-                        message=f"Safety Gate: {symbol} - {risk_reason}")
-                except Exception as e:
-                    logger.debug(f"Telegram failed: {e}")
+                self._notify_signal_decision(
+                    title="Signal Blocked",
+                    reason=f"Safety gate blocked signal: {risk_reason}",
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    strategy=strat_name,
+                    action=payload.get("action", side),
+                    severity=AlertSeverity.WARNING,
+                )
                 try:
                     self.sheets_logger.log_blocked_trade(
                         symbol=symbol, side=side, strategy=strat_name,
@@ -880,6 +1010,15 @@ class Orchestrator:
             if target_exchange == "lighter":
                 if not self.exchange_lighter:
                     logger.warning("Lighter client not available")
+                    self._notify_signal_decision(
+                        title="Signal Skipped",
+                        reason="Lighter client not available",
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        strategy=strat_name,
+                        action=payload.get("action", side),
+                        severity=AlertSeverity.INFO,
+                    )
                     return True
                 try:
                     is_buy = (side == "BUY")
@@ -897,6 +1036,15 @@ class Orchestrator:
             elif target_exchange == "hyperliquid":
                 if not self.exchange_hl:
                     logger.warning(f"[{correlation_id}] HL client not available, skipping {symbol}")
+                    self._notify_signal_decision(
+                        title="Signal Skipped",
+                        reason="Hyperliquid client not available",
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        strategy=strat_name,
+                        action=payload.get("action", side),
+                        severity=AlertSeverity.INFO,
+                    )
                     return True
                 try:
                     res = self.exchange_hl.market_order(symbol, (side == "BUY"), qty)
@@ -1088,6 +1236,15 @@ class Orchestrator:
                 exec_msg = execution_res.get('msg', '')
                 metrics.inc("bot_execution_failures_total")
                 logger.error(f"[{correlation_id}] Execution Failure: {exec_reason} | Detail: {exec_msg}")
+                self._notify_signal_decision(
+                    title="Execution Failure",
+                    reason=f"{exec_reason}: {exec_msg}" if exec_msg else exec_reason,
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    strategy=strat_name,
+                    action=payload.get("action", side),
+                    severity=AlertSeverity.WARNING,
+                )
                 try:
                     self.sheets_logger.log_blocked_trade(
                         symbol=symbol, side=side, strategy=strat_name,
