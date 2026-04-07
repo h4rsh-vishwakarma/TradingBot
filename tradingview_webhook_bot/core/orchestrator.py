@@ -761,6 +761,12 @@ class Orchestrator:
                         logger.info(f"Lighter SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
                     else:
                         logger.warning(f"Lighter SL failed for {symbol}: {sl_res.get('msg')}")
+                    tp_pct = float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
+                    tp_res = self.exchange_lighter.place_take_profit(symbol, side, qty, fill_price, tp_pct=tp_pct, signal_id=signal_id)
+                    if tp_res.get("status") == "SUCCESS":
+                        logger.info(f"Lighter TP placed for {symbol} @ ${tp_res.get('stopPrice')}")
+                    else:
+                        logger.warning(f"Lighter TP failed for {symbol}: {tp_res.get('msg')}")
                 if not is_exit and target_exchange == "binance":
                     sl_pct = float(os.getenv("STOP_LOSS_PCT", "3.0"))
                     sl_res = self.exchange_binance.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
@@ -768,6 +774,12 @@ class Orchestrator:
                         logger.info(f"SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
                     else:
                         logger.warning(f"SL placement failed for {symbol}: {sl_res.get('msg')}")
+                    tp_pct = float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
+                    tp_res = self.exchange_binance.place_take_profit(symbol, side, qty, fill_price, tp_pct=tp_pct, signal_id=signal_id)
+                    if tp_res.get("status") == "SUCCESS":
+                        logger.info(f"TP placed for {symbol} @ ${tp_res.get('stopPrice')}")
+                    else:
+                        logger.warning(f"TP placement failed for {symbol}: {tp_res.get('msg')}")
 
                 self.processed_count += 1
                 # Async: non-blocking Sheets write
@@ -793,21 +805,45 @@ class Orchestrator:
                         logger.warning(f"Analytics update skipped (async): {ae}")
                 self._thread_pool.submit(_update_analytics)
 
-                emoji = "🟢" if side == "BUY" else "🔴"
-                sl_info = ""
+                # Determine trade type: Open Long/Short or Close Long/Short
+                if is_exit:
+                    trade_type = "Close Long" if side == "SELL" else "Close Short"
+                    trade_emoji = "🔻" if side == "SELL" else "🔺"
+                else:
+                    trade_type = "Open Long" if side == "BUY" else "Open Short"
+                    trade_emoji = "🟢" if side == "BUY" else "🔴"
+
+                # Build SL/TP info for entry trades
+                sl_tp_info = ""
                 if not is_exit and target_exchange in ("binance", "lighter"):
                     sl_pct_val = float(os.getenv("STOP_LOSS_PCT", "3.0"))
-                    sl_price_est = fill_price * (1 - sl_pct_val / 100) if side == "BUY" else fill_price * (1 + sl_pct_val / 100)
-                    sl_info = f"\n🛡️ <b>Stop-Loss:</b> <code>${sl_price_est:,.2f}</code> ({sl_pct_val}%)"
+                    tp_pct_val = float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
+                    if side == "BUY":
+                        sl_price_est = fill_price * (1 - sl_pct_val / 100)
+                        tp_price_est = fill_price * (1 + tp_pct_val / 100)
+                    else:
+                        sl_price_est = fill_price * (1 + sl_pct_val / 100)
+                        tp_price_est = fill_price * (1 - tp_pct_val / 100)
+                    sl_tp_info = (
+                        f"\n🛡️ <b>Stop-Loss:</b> <code>${sl_price_est:,.2f}</code> ({sl_pct_val}%)"
+                        f"\n🎯 <b>Take-Profit:</b> <code>${tp_price_est:,.2f}</code> ({tp_pct_val}%)"
+                    )
+
+                # Build P&L info for exit trades
+                pnl_info = f"\n💵 <b>Today PnL:</b> <code>${pos_snapshot.daily_realized_pnl:.2f}</code>"
+                if is_exit and pos_snapshot.realized_pnl != 0:
+                    pnl_info += f"\n📊 <b>Realized PnL:</b> <code>${pos_snapshot.realized_pnl:.2f}</code>"
+
                 try:
                     self.telegram.send(severity=AlertSeverity.INFO, title="Trade Success",
-                        message=(f"{emoji} <b>Bot Alert: Trade Executed</b>\n\n"
-                                 f"✅ <b>Executed:</b> {side} {symbol}\n"
+                        message=(f"{trade_emoji} <b>{trade_type}: {symbol}</b>\n\n"
+                                 f"📌 <b>Type:</b> {trade_type}\n"
                                  f"💰 <b>Price:</b> <code>${fill_price:,.2f}</code>\n"
                                  f"📊 <b>Quantity:</b> <code>{qty}</code>\n"
                                  f"📋 <b>Strategy:</b> <code>{strat_name}</code>\n"
-                                 f"📈 <b>Approval:</b> {approval_label}{sl_info}\n"
-                                 f"💵 <b>Today PnL:</b> <code>${pos_snapshot.daily_realized_pnl:.2f}</code>\n"
+                                 f"📈 <b>Approval:</b> {approval_label}"
+                                 f"{sl_tp_info}"
+                                 f"{pnl_info}\n"
                                  f"🆔 <b>ID:</b> <code>{signal_id}</code>"))
                 except Exception as e:
                     logger.debug(f"Telegram failed: {e}")

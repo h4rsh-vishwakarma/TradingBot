@@ -200,31 +200,47 @@ class TelegramAlert:
             alert_key="api_errors"
         )
     
-    def position_opened(self, signal_id: str, symbol: str, side: str, 
-                       entry_price: float, position_size: float):
-        """Alert: Position opened (INFO level)."""
+    def position_opened(self, signal_id: str, symbol: str, side: str,
+                       entry_price: float, position_size: float,
+                       sl_price: float = 0.0, tp_price: float = 0.0):
+        """Alert: Position opened with SL/TP (INFO level)."""
+        trade_type = "Open Long" if side.upper() == "BUY" else "Open Short"
+        emoji = "🟢" if side.upper() == "BUY" else "🔴"
+
+        sl_tp = ""
+        if sl_price > 0:
+            sl_tp += f"<b>Stop-Loss:</b> ${sl_price:,.2f}\n"
+        if tp_price > 0:
+            sl_tp += f"<b>Take-Profit:</b> ${tp_price:,.2f}\n"
+
         self.send(
             AlertSeverity.INFO,
-            f"📈 Position Opened: {side} {symbol}",
-            f"<b>Signal:</b> {signal_id}\n"
+            f"{emoji} {trade_type}: {symbol}",
+            f"<b>Type:</b> {trade_type}\n"
             f"<b>Entry:</b> ${entry_price:,.2f}\n"
-            f"<b>Size:</b> {position_size} contracts\n",
+            f"<b>Size:</b> {position_size} contracts\n"
+            f"{sl_tp}"
+            f"<b>Signal:</b> {signal_id}",
             alert_key=f"opened_{signal_id}"
         )
     
     def position_closed(self, symbol: str, side: str, exit_type: str,
                        pnl: float, balance: float):
         """Alert: Position closed with P&L."""
-        emoji = "✅" if pnl >= 0 else "❌"
+        # side is the closing side: SELL closes a long, BUY closes a short
+        trade_type = "Close Long" if side.upper() == "SELL" else "Close Short"
+        pnl_emoji = "✅" if pnl >= 0 else "❌"
+        trade_emoji = "🔻" if side.upper() == "SELL" else "🔺"
         severity = AlertSeverity.INFO if pnl >= 0 else AlertSeverity.WARNING
-        
+
         self.send(
             severity,
-            f"{emoji} Position Closed: {side} {symbol}",
-            f"<b>Exit Type:</b> {exit_type}\n"
-            f"<b>P&L:</b> ${pnl:.2f}\n"
+            f"{trade_emoji} {trade_type}: {symbol}",
+            f"<b>Type:</b> {trade_type}\n"
+            f"<b>Exit Reason:</b> {exit_type}\n"
+            f"{pnl_emoji} <b>P&L:</b> ${pnl:.2f}\n"
             f"<b>New Balance:</b> ${balance:.2f}",
-            alert_key=None  # Always send P&L updates
+            alert_key=None
         )
     
     def daily_summary(self, stats: Dict):
