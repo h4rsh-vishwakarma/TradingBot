@@ -109,6 +109,47 @@ def main():
                            str(PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "idempotency.db"))
     check("Idempotency DB exists", os.path.exists(idemp_path), idemp_path)
 
+    # --- OPERATIONAL GATES (CEO requirement: not just config, but real readiness) ---
+
+    # --- 15. Manifest is non-empty ---
+    manifest_path = PROJECT_ROOT / "config" / "approved_strategies.json"
+    manifest_count = 0
+    if manifest_path.exists():
+        try:
+            with open(manifest_path) as mf:
+                manifest_data = json.load(mf)
+                manifest_count = len(manifest_data.get("approvals", []))
+        except Exception:
+            pass
+    check("Approval manifest is populated", manifest_count >= 2,
+          f"{manifest_count} strategies approved" if manifest_count else "EMPTY")
+
+    # --- 16. Each manifest entry has provenance (backtest_hash + notes) ---
+    provenance_ok = True
+    if manifest_count > 0:
+        for entry in manifest_data.get("approvals", []):
+            if not entry.get("backtest_hash") or not entry.get("notes"):
+                provenance_ok = False
+                break
+    check("Manifest entries have provenance (hash + notes)", provenance_ok and manifest_count > 0,
+          "All entries have backtest_hash and notes" if provenance_ok else "Missing provenance fields")
+
+    # --- 17. Shortlist size is 2-5 (not too broad) ---
+    check("Shortlist size is 2-5 strategies", 2 <= manifest_count <= 5,
+          f"{manifest_count} strategies" if manifest_count else "EMPTY")
+
+    # --- 18. No critical reconciler drift in last 24h ---
+    dlq_path = os.getenv("DLQ_PATH",
+                         str(PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "dead_letter.jsonl"))
+    dlq_count = 0
+    if os.path.exists(dlq_path):
+        try:
+            with open(dlq_path) as df:
+                dlq_count = sum(1 for _ in df)
+        except Exception:
+            pass
+    check("Dead letter queue is clean", dlq_count == 0, f"{dlq_count} failed signals" if dlq_count else "Clean")
+
     # --- Summary ---
     print()
     print("=" * 60)
