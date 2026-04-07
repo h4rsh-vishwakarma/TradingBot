@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "updated_at": "2026-04-07T10:23:28Z",
+  "approvals": [
+    {
+      "strategy": "CCI Trend",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-07T10:23:25Z",
+      "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
+      "label": "ALPHA",
+      "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS"
+    },
+    {
+      "strategy": "Donchian Trend",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-07T10:23:28Z",
+      "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
+      "label": "ALPHA",
+      "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS"
+    }
+  ]
+}
