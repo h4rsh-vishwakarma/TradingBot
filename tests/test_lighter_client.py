@@ -1,6 +1,3 @@
-import pytest
-pytest.importorskip("lighter", reason="lighter SDK not installed")
-
 import asyncio
 from decimal import Decimal
 from types import SimpleNamespace
