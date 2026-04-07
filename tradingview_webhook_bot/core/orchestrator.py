@@ -34,11 +34,22 @@ try:
     from tradingview_webhook_bot.recon.reconciler import Reconciler
     from tradingview_webhook_bot.exchange.binance_client import BinanceClient
     from tradingview_webhook_bot.core.circuit_breaker import CircuitBreaker
-    from tradingview_webhook_bot.exchange.hl_client import HyperliquidClient
-    from tradingview_webhook_bot.exchange.lighter_client import LighterClient
 except ImportError as e:
-    logger.error(f"Import failed: {e}")
+    logger.error(f"Core import failed: {e}")
     sys.exit(1)
+
+# Optional exchange clients — may not be installed in CI/test environments
+try:
+    from tradingview_webhook_bot.exchange.hl_client import HyperliquidClient
+except ImportError:
+    HyperliquidClient = None
+    logger.warning("HyperliquidClient not available — hyperliquid SDK not installed")
+
+try:
+    from tradingview_webhook_bot.exchange.lighter_client import LighterClient
+except ImportError:
+    LighterClient = None
+    logger.warning("LighterClient not available — lighter SDK not installed")
 
 
 class Orchestrator:
@@ -84,7 +95,7 @@ class Orchestrator:
         self.exchange_binance = BinanceClient()
 
         try:
-            if os.getenv("HL_WALLET_ADDRESS") and os.getenv("HL_PRIVATE_KEY"):
+            if HyperliquidClient and os.getenv("HL_WALLET_ADDRESS") and os.getenv("HL_PRIVATE_KEY"):
                 self.exchange_hl = HyperliquidClient()
             else:
                 self.exchange_hl = None
@@ -94,7 +105,7 @@ class Orchestrator:
 
         try:
             lighter_key = os.getenv("LIGHTER_API_PRIVATE_KEY") or os.getenv("LIGHTER_PRIVATE_KEY")
-            if lighter_key:
+            if LighterClient and lighter_key:
                 self.exchange_lighter = LighterClient()
                 logger.info("Lighter client initialized [%s]",
                             "TESTNET" if self.exchange_lighter.is_testnet else "MAINNET")
