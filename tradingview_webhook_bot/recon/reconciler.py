@@ -40,6 +40,38 @@ class Reconciler:
             "Ledger quantity was synced to the exchange quantity",
         )
 
+    def classify_drift(self, ledger_qty: float, exchange_qty: float, drift: float) -> tuple[str, str, str]:
+        if drift <= self.tolerance:
+            return "SYNCED", "OK", "No correction needed"
+
+        if abs(exchange_qty) <= self.tolerance and abs(ledger_qty) > self.tolerance:
+            return (
+                "UNEXPECTED_FLAT",
+                "HIGH",
+                "Exchange was flat while ledger still showed exposure; ledger was flattened to exchange truth",
+            )
+        if abs(ledger_qty) <= self.tolerance and abs(exchange_qty) > self.tolerance:
+            return (
+                "UNEXPECTED_OPEN",
+                "HIGH",
+                "Exchange had open exposure while ledger was flat; ledger was opened to exchange truth",
+            )
+        if ledger_qty * exchange_qty < 0:
+            return (
+                "SIDE_MISMATCH",
+                "CRITICAL",
+                "Ledger and exchange were on opposite sides; ledger side/size was replaced with exchange truth",
+            )
+
+        max_abs = max(abs(ledger_qty), abs(exchange_qty), self.tolerance)
+        drift_ratio = drift / max_abs
+        severity = "MEDIUM" if drift_ratio < 0.25 else "HIGH"
+        return (
+            "POSITION_MISMATCH",
+            severity,
+            "Ledger quantity was synced to the exchange quantity",
+        )
+
     def reconcile_with_exchange(self, exchange_data: Dict[str, Any]) -> List[str]:
         """
         Automated Reconciliation: Compares Ledger vs Exchange and AUTO-FIXES drift.
