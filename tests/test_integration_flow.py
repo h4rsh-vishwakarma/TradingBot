@@ -235,7 +235,7 @@ class TestWebhookToQueue:
 
     def test_missing_json_secret_rejected(self):
         """Missing secret returns 401."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -256,7 +256,7 @@ class TestWebhookToQueue:
 
     def test_secretless_order_fill_alert_rejected(self):
         """TradingView order-fill plain text without explicit secret returns 401."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
