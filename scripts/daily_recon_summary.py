@@ -8,7 +8,9 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+
+IST = timezone(timedelta(hours=5, minutes=30))
 from pathlib import Path
 
 import requests
@@ -122,7 +124,7 @@ def main():
         f"  Candle lock: {counts['candle_lock_blocked']}\n"
         f"  Circuit breaker trips: {counts['circuit_breaker']}\n\n"
         f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
-        f"<i>{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</i>"
+        f"<i>{datetime.now(IST).strftime('%Y-%m-%d %I:%M %p IST')}</i>"
     )
 
     send_telegram(report)
@@ -131,7 +133,7 @@ def main():
     # Save to file
     report_dir = PROJECT_ROOT / "storage" / "reports" / "paper_validation"
     report_dir.mkdir(parents=True, exist_ok=True)
-    with open(report_dir / f"recon_{datetime.utcnow().strftime('%Y%m%d')}.txt", "w") as f:
+    with open(report_dir / f"recon_{datetime.now(IST).strftime('%Y%m%d')}.txt", "w") as f:
         f.write(report)
 
 

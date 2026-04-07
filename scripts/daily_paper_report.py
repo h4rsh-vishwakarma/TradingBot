@@ -11,6 +11,8 @@ import sqlite3
 import sys
 import time
 from datetime import datetime, timedelta, timezone
+
+IST = timezone(timedelta(hours=5, minutes=30))
 from pathlib import Path
 
 import requests
@@ -152,7 +154,7 @@ def main():
     report = (
         f"\U0001f4ca <b>DAILY PAPER VALIDATION REPORT</b>\n"
         f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n"
-        f"\U0001f4c5 <b>Day {day} of 7</b> | {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+        f"\U0001f4c5 <b>Day {day} of 7</b> | {datetime.now(IST).strftime('%Y-%m-%d %I:%M %p IST')}\n\n"
         f"<b>SIGNALS</b>\n"
         f"  Received: {signal_stats['total']}\n"
         f"  Executed: {signal_stats['executed']}\n"
@@ -170,7 +172,7 @@ def main():
         f"  Dead Letter Queue: {dlq} failed\n"
         f"  Duplicate executions: 0\n\n"
         f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
-        f"<i>Paper window: {PAPER_START} to 2026-04-14</i>"
+        f"<i>Paper window: {PAPER_START} to 2026-04-14 | All times in IST</i>"
     )
 
     send_telegram(report)
@@ -179,7 +181,7 @@ def main():
     # Also save to file
     report_dir = PROJECT_ROOT / "storage" / "reports" / "paper_validation"
     report_dir.mkdir(parents=True, exist_ok=True)
-    report_file = report_dir / f"day{day}_{datetime.utcnow().strftime('%Y%m%d')}.txt"
+    report_file = report_dir / f"day{day}_{datetime.now(IST).strftime('%Y%m%d')}.txt"
     with open(report_file, "w") as f:
         f.write(report)
     print(f"Saved to {report_file}")

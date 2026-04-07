@@ -11,7 +11,10 @@ import time
 from enum import Enum
 from typing import Dict, Optional
 
+from datetime import timezone, timedelta
 import requests
+
+IST = timezone(timedelta(hours=5, minutes=30))
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +113,7 @@ class TelegramAlert:
         text = f"{severity.value}\n\n"
         text += f"{title}\n\n"
         text += message
-        text += f"\n\nTime: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}"
+        text += f"\n\nTime: {time.strftime('%Y-%m-%d %I:%M:%S %p IST', time.localtime(time.time() + 19800))}"
         
         try:
             url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"

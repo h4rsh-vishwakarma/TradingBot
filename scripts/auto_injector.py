@@ -15,7 +15,9 @@ import sqlite3
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+IST = timezone(timedelta(hours=5, minutes=30))
 from pathlib import Path
 
 import requests
@@ -188,7 +190,7 @@ def _build_message(title: str, overall_status: str, checklist_lines: list[str], 
     lines.extend(
         [
             "━━━━━━━━━━━━━━━━━━",
-            f"<i>{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</i>",
+            f"<i>{datetime.now(IST).strftime('%Y-%m-%d %I:%M %p IST')}</i>",
         ]
     )
     return "\n".join(lines)
