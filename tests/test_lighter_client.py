@@ -1,3 +1,5 @@
+import asyncio
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -87,13 +89,56 @@ class FakeInfoApi:
         self.api_client = api_client
 
 
+class FakeLoopRunner:
+    def __init__(self, name):
+        self.name = name
+
+    def run(self, coro, timeout=30):
+        return asyncio.run(coro)
+
+    def stop(self):
+        return None
+
+
+async def _fake_async_initialize(self):
+    signer = FakeSignerClient(
+        url=self.api_url,
+        account_index=self.account_index,
+        api_private_keys={self.api_key_index: self.api_private_key},
+    )
+    order_api = signer.order_api
+    account_api = FakeAccountApi(order_api.api_client)
+    info_api = FakeInfoApi(order_api.api_client)
+
+    market = lighter_module.MarketSpec(
+        symbol="ETH-USDC",
+        market_id=101,
+        market_type="perp",
+        status="active",
+        size_decimals=4,
+        supported_size_decimals=4,
+        price_decimals=2,
+        supported_price_decimals=2,
+        quote_multiplier=1,
+        min_base_amount=Decimal("0.0010"),
+        min_quote_amount=Decimal("5.0"),
+        last_trade_price=Decimal("2500.50"),
+    )
+    by_symbol = {market.symbol: market}
+    by_alias = {
+        self._normalize_alias(alias): market
+        for alias in self._aliases_for_symbol(market.symbol)
+    }
+    return signer, order_api, account_api, info_api, by_alias, by_symbol
+
+
 def _build_test_client(monkeypatch, allow_real="true"):
     monkeypatch.setattr(lighter_module, "LIGHTER_SDK_AVAILABLE", True)
-    monkeypatch.setattr(lighter_module, "SignerClient", FakeSignerClient)
-    monkeypatch.setattr(lighter_module, "AccountApi", FakeAccountApi)
-    monkeypatch.setattr(lighter_module, "InfoApi", FakeInfoApi)
+    monkeypatch.setattr(lighter_module, "_AsyncLoopRunner", FakeLoopRunner)
+    monkeypatch.setattr(lighter_module.LighterClient, "_async_initialize", _fake_async_initialize)
     monkeypatch.setenv("LIGHTER_API_PRIVATE_KEY", "abc123")
     monkeypatch.setenv("ALLOW_REAL_TRADES", allow_real)
+    monkeypatch.setenv("LIGHTER_ALLOW_REAL_TRADES", allow_real)
     monkeypatch.setenv("LIGHTER_API_URL", "https://testnet.zklighter.elliot.ai")
     return lighter_module.LighterClient()
 
@@ -103,7 +148,7 @@ def test_lighter_client_initializes_with_market_cache(monkeypatch):
     try:
         assert client.is_ready is True
         assert client.get_supported_markets() == ["ETH-USDC"]
-        assert client.get_account_info()["data"]["value"] == "0"
+        assert client.get_account_info()["data"]["value"] == str(client.account_index)
         assert client._resolve_market("ETHUSDT").market_id == 101
     finally:
         client.close()
@@ -146,13 +191,12 @@ def test_orchestrator_executes_lighter_via_normalized_client_contract(monkeypatc
     orch._is_duplicate_signal = lambda *args, **kwargs: False
     orch._is_symbol_in_cooldown = lambda *args, **kwargs: False
     orch._is_candle_locked = lambda *args, **kwargs: False
-    orch.check_tournament_alpha = lambda symbol, strategy: (
-        True,
-        "Verified ALPHA: Direct Execution",
-        "ALPHA",
-    )
+    orch.require_approval_manifest = False
+    orch._notify_signal_decision = Orchestrator._notify_signal_decision.__get__(orch, Orchestrator)
     orch.check_safety_gate = lambda *args, **kwargs: (True, "Safe")
     orch.exchange_lighter = MagicMock()
+    orch.exchange_lighter.get_mark_price.return_value = 2500.5
+    orch.exchange_lighter.place_stop_loss.return_value = {"status": "SKIPPED", "msg": "test"}
     orch.exchange_lighter.execute_futures_order.return_value = {
         "status": "SUCCESS",
         "avg_price": 2500.5,
@@ -160,6 +204,7 @@ def test_orchestrator_executes_lighter_via_normalized_client_contract(monkeypatc
     }
     orch.exchange_hl = None
     orch.exchange_binance = MagicMock()
+    orch.exchange_binance.get_mainnet_mark_price.return_value = 2500.5
     orch.ledger = MagicMock()
     orch.ledger.apply_fill.return_value = SimpleNamespace(quantity=0.5, daily_realized_pnl=10.0)
     orch.analytics = MagicMock()
@@ -168,6 +213,7 @@ def test_orchestrator_executes_lighter_via_normalized_client_contract(monkeypatc
     orch.MAX_QTY = {"ETHUSDT": 1.0}
     orch._mark_symbol_traded = MagicMock()
     orch._set_candle_lock = MagicMock()
+    orch._persist_exec_lock = MagicMock()
     orch.allow_real = True
     orch.daily_loss_limit = -50.0
     orch.ledger_path = "/tmp/test_lighter_ledger.json"
@@ -191,7 +237,7 @@ def test_orchestrator_executes_lighter_via_normalized_client_contract(monkeypatc
         "ETHUSDT",
         "BUY",
         0.5,
-        2500.5,
+        price=2500.5,
         signal_id="SIG-LIGHTER-001",
     )
     assert orch.telegram.send.call_args.kwargs["title"] == "Trade Success"

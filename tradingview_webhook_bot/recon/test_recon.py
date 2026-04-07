@@ -1,18 +1,18 @@
-from tradingview_webhook_bot.recon.reconciler import Reconciler
 from tradingview_webhook_bot.ledger.positions import PositionLedger
+from tradingview_webhook_bot.recon.reconciler import Reconciler
+
 
 def test_drift_detection():
     recon = Reconciler(tolerance=0.01)
-    
-    # 1. Test Synced (Difference within tolerance)
+
     report = recon.detect_qty_drift(1.0, 1.005)
     assert report["is_synced"] is True
-    
-    # 2. Test Out of Sync (Large difference)
+
     report = recon.detect_qty_drift(1.0, 1.5)
     assert report["is_synced"] is False
     assert report["severity"] == "HIGH"
     assert report["drift_type"] == "POSITION_MISMATCH"
+
 
 def test_incident_formatting():
     recon = Reconciler()
@@ -35,6 +35,7 @@ def test_detect_qty_drift_side_mismatch():
     report = recon.detect_qty_drift(1.0, -1.0)
     assert report["drift_type"] == "SIDE_MISMATCH"
     assert report["severity"] == "CRITICAL"
+
 
 def test_reconcile_clears_strategy_children(tmp_path):
     ledger = PositionLedger(str(tmp_path / "ledger.json"))

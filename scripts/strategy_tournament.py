@@ -12,17 +12,18 @@ def strategy_tournament():
 
     all_files = sorted([f for f in os.listdir(PINE_FOLDER) if os.path.isfile(os.path.join(PINE_FOLDER, f))])
     results = []
-    seen_signatures = set()
+    seen_signatures = {}
 
-    # Expanded Grid — 7 combos for deeper optimization
+    # WIDE Grid — 15 combos targeting 1%+ daily ROI, max DD 55%
     param_grid = [
-        {'mult': 1.5, 'len': 7},   # Ultra-Scalp
-        {'mult': 1.8, 'len': 9},   # Hyper-Aggressive
-        {'mult': 2.0, 'len': 11},  # Fast Swing
-        {'mult': 2.5, 'len': 14},  # Balanced
-        {'mult': 3.0, 'len': 18},  # Moderate Trend
-        {'mult': 3.5, 'len': 21},  # Trend-Following
-        {'mult': 4.0, 'len': 26}   # Macro Trend
+        {'mult': 1.2, 'len': 5},  {'mult': 1.5, 'len': 7},
+        {'mult': 1.8, 'len': 9},  {'mult': 2.0, 'len': 11},
+        {'mult': 2.2, 'len': 13}, {'mult': 2.5, 'len': 14},
+        {'mult': 2.8, 'len': 16}, {'mult': 3.0, 'len': 18},
+        {'mult': 3.2, 'len': 20}, {'mult': 3.5, 'len': 22},
+        {'mult': 3.8, 'len': 24}, {'mult': 4.0, 'len': 26},
+        {'mult': 4.5, 'len': 30}, {'mult': 5.0, 'len': 35},
+        {'mult': 6.0, 'len': 50},
     ]
 
     print(f"🔥 ALPHA AGGRESSOR MODE: Target 2% Daily ROI | Scanning {len(all_files)} Strategies...")
@@ -268,12 +269,15 @@ def run_test(df_raw, name, optimize, mult, length, reverse=False):
         # DD thresholds tightened: NDD must be < -50% for any ALPHA tier
 
         # Hard reject: DD > 50% or NDD > 50%
-        if abs(gross_dd) > 50 or abs(net_dd) > 50:
+        if abs(gross_dd) > 55 or abs(net_dd) > 55:
             if daily_roi >= 0.5:
                 status = "⚖️ AVERAGE"  # High ROI but too much DD → AVERAGE only
             else:
                 status = "💀 REJECT"
-        # ALPHA++ — Elite: good ROI + low DD + quality metrics
+        # PREMIUM: 1%+ ROI, DD<=55% — LIVE READY
+        elif daily_roi >= 1.0 and abs(gross_dd) <= 55:
+            status = "💎 PREMIUM"
+        # ALPHA++ — Elite
         elif daily_roi >= 0.6 and sharpe >= 4.0 and win_rate >= 45 and abs(gross_dd) < 30:
             status = "🚀 ALPHA++"
         elif daily_roi >= 0.5 and sharpe >= 3.5 and win_rate >= 45 and abs(gross_dd) < 35:
@@ -292,7 +296,9 @@ def run_test(df_raw, name, optimize, mult, length, reverse=False):
             status = "💀 REJECT"
 
         # Bonus: Extremely high Sharpe with decent ROI and low DD
-        if sharpe >= 6.0 and daily_roi >= 0.3 and abs(gross_dd) < 30 and "ALPHA++" not in status:
+        if daily_roi >= 1.0 and abs(gross_dd) <= 55 and "PREMIUM" not in status:
+            status = "💎 PREMIUM"
+        elif sharpe >= 6.0 and daily_roi >= 0.5 and abs(gross_dd) < 30 and "ALPHA++" not in status:
             status = "🚀 ALPHA++"
         elif sharpe >= 5.0 and daily_roi >= 0.2 and abs(gross_dd) < 40 and "ALPHA" not in status:
             status = "🎯 ALPHA"

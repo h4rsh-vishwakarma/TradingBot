@@ -21,6 +21,7 @@ TOURNAMENT_4H  = os.path.join(REPORTS_DIR,  "tournament_winners_4h.csv")
 ALPHA_ALL_CSV  = os.path.join(REPORTS_DIR,  "alpha_backtest_results.csv")
 ALPHA_VAL_CSV  = os.path.join(REPORTS_DIR,  "alpha_candidates.csv")
 ALPHA_BEST_CSV = os.path.join(REPORTS_DIR,  "alpha_best_per_symbol.csv")
+ALPHA_SHORTLIST_CSV = os.path.join(REPORTS_DIR, "alpha_shortlist.csv")
 ALPHA_STATUS   = os.path.join(REPORTS_DIR,  "alpha_pipeline_status.json")
 ALPHA_SCRIPTS_DIR = os.path.join(PROJECT_ROOT, "storage/generated_alpha_scripts")
 LEDGER_PATH    = os.path.join(PROJECT_ROOT, "tradingview_webhook_bot/storage/ledger_state.json")
@@ -1931,6 +1932,7 @@ elif st.session_state.page == "Backtest":
         VAL_CSV  = ALPHA_VAL_CSV
         ALL_CSV  = ALPHA_ALL_CSV
         BEST_CSV = ALPHA_BEST_CSV
+        SHORTLIST_CSV = ALPHA_SHORTLIST_CSV
 
         # -- Run backtest button ----------------------------------------------
         rb1, rb2 = st.columns([1, 4])
@@ -1963,6 +1965,7 @@ elif st.session_state.page == "Backtest":
         _val_exists  = os.path.exists(VAL_CSV)
         _best_exists = os.path.exists(BEST_CSV)
         _all_exists  = os.path.exists(ALL_CSV)
+        _short_exists = os.path.exists(SHORTLIST_CSV)
         _status      = load_json(ALPHA_STATUS)
 
         if not _val_exists:
@@ -1972,11 +1975,13 @@ elif st.session_state.page == "Backtest":
                 _df_val  = read_csv_safe(VAL_CSV)
                 _df_best = read_csv_safe(BEST_CSV) if _best_exists else pd.DataFrame()
                 _df_all  = read_csv_safe(ALL_CSV) if _all_exists else pd.DataFrame()
+                _df_short = read_csv_safe(SHORTLIST_CSV) if _short_exists else pd.DataFrame()
             except Exception as _e:
                 st.error(f"Error loading alpha results: {_e}")
                 _df_val = pd.DataFrame()
                 _df_best = pd.DataFrame()
                 _df_all = pd.DataFrame()
+                _df_short = pd.DataFrame()
 
             if not _df_val.empty:
                 # -- Summary cards --------------------------------------------
@@ -1984,6 +1989,7 @@ elif st.session_state.page == "Backtest":
                 _best_roi = to_float(_df_val['ROI_Per_Day_Pct'].max(), 0.0) if 'ROI_Per_Day_Pct' in _df_val.columns else 0.0
                 _best_sh  = to_float(_df_val['Sharpe_Ratio'].max(), 0.0) if 'Sharpe_Ratio' in _df_val.columns else 0.0
                 _webhook_ready = int((_df_val.get('Webhook_Ready', pd.Series(dtype='object')) == 'YES').sum())
+                _short_count = len(_df_short) if not _df_short.empty else int(_status.get("shortlist_count", 0))
                 _last_run = _status.get("generated_at_utc", "")
                 _last_run_display = _last_run.replace("T", " ").replace("Z", " UTC") if _last_run else "Unknown"
                 with _sc1:
@@ -2004,8 +2010,8 @@ elif st.session_state.page == "Backtest":
                     st.markdown(f"""<div class="dk-card">
                       <div class="dk-card-accent" style="background:linear-gradient(90deg,#bc8cff,#a371f7)"></div>
                       <div class="dk-card-icon">SR</div>
-                      <div class="dk-card-label">Best Sharpe</div>
-                      <div class="dk-card-value" style="color:#bc8cff">{_best_sh:.2f}</div>
+                      <div class="dk-card-label">Shortlist / Sharpe</div>
+                      <div class="dk-card-value" style="color:#bc8cff">{_short_count} / {_best_sh:.2f}</div>
                       <div class="dk-card-sub">{_webhook_ready} webhook-ready Pine files</div></div>""", unsafe_allow_html=True)
                 with _sc4:
                     st.markdown(f"""<div class="dk-card">
@@ -2036,6 +2042,9 @@ elif st.session_state.page == "Backtest":
                     _vsh    = to_float(_vrow.get('Sharpe_Ratio', 0), 0.0)
                     _vpf    = to_float(_vrow.get('Profit_Factor', 0), 0.0)
                     _vtr    = int(to_float(_vrow.get('Total_Trades', 0), 0.0))
+                    _vrs    = to_float(_vrow.get('Reality Score', 0), 0.0)
+                    _voos   = to_float(_vrow.get('OOS ROI %', 0), 0.0)
+                    _vwf    = to_float(_vrow.get('WF Pass Rate %', 0), 0.0)
                     _vgrade = _vrow.get('Performance_Grade', '')
                     _vstatus= _vrow.get('Deployment_Status', '')
                     _vreason= str(_vrow.get('Alpha_Reason', ''))
@@ -2057,6 +2066,9 @@ elif st.session_state.page == "Backtest":
                               <tr><td>Win Rate</td><td style='color:{"#3fb950" if _vwr>=50 else "#f85149"};text-align:right'>{_vwr:.1f}%</td></tr>
                               <tr><td>Profit Factor</td><td style='text-align:right'>{_vpf:.2f}</td></tr>
                               <tr><td>Sharpe Ratio</td><td style='text-align:right'>{_vsh:.2f}</td></tr>
+                              <tr><td>Reality Score</td><td style='text-align:right'>{_vrs:.1f}</td></tr>
+                              <tr><td>OOS ROI</td><td style='text-align:right'>{_voos:.2f}%</td></tr>
+                              <tr><td>WF Pass Rate</td><td style='text-align:right'>{_vwf:.1f}%</td></tr>
                               <tr><td>Gross DD</td><td style='color:#f85149;text-align:right'>{_vgdd:.2f}%</td></tr>
                               <tr><td>Net DD</td><td style='color:#f85149;text-align:right'>{_vndd:.2f}%</td></tr>
                               <tr><td>SL / TP</td><td style='text-align:right'>{_vsl}% / {_vtp}%</td></tr>
@@ -2103,18 +2115,29 @@ elif st.session_state.page == "Backtest":
 
                 # -- Best per symbol table -----------------------------------------
                 st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+
+                if not _df_short.empty:
+                    st.markdown("<div style='font-size:13px;font-weight:700;color:#e6edf3;margin-bottom:6px'>Frozen Paper-Trade Shortlist</div>",
+                                unsafe_allow_html=True)
+                    _show_short_cols = [c for c in ['Shortlist Rank','Symbol','Strategy','Timeframe','Reality Score','OOS ROI %',
+                                                    'WF Pass Rate %','ROI_Per_Day_Pct','Gross_Drawdown_Percent',
+                                                    'Net_Drawdown_Percent','Shortlist Status'] if c in _df_short.columns]
+                    st.dataframe(_df_short[_show_short_cols].reset_index(drop=True),
+                                 use_container_width=True, hide_index=True)
+                    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
                 st.markdown("<div style='font-size:13px;font-weight:700;color:#e6edf3;margin-bottom:6px'>Best Strategy Per Symbol</div>",
                             unsafe_allow_html=True)
                 if not _df_best.empty:
                     _show_cols = [c for c in ['Symbol','Strategy','Timeframe','ROI_Per_Day_Pct','ROI_Annual_Percent',
                                                'Gross_Drawdown_Percent','Net_Drawdown_Percent','Win_Rate_Percent','Sharpe_Ratio',
-                                               'Total_Trades','Webhook_Ready'] if c in _df_best.columns]
+                                               'Reality Score','Total_Trades','Webhook_Ready'] if c in _df_best.columns]
                     st.dataframe(_df_best[_show_cols].reset_index(drop=True),
                                  use_container_width=True, hide_index=True)
 
                 if not _df_all.empty:
                     with st.expander("All Backtest Results"):
                         _show_all_cols = [c for c in ['Rank','Symbol','Strategy','Timeframe','ROI_Per_Day_Pct',
+                                                       'Reality Score','OOS ROI %','WF Pass Rate %',
                                                        'Gross_Drawdown_Percent','Net_Drawdown_Percent','Win_Rate_Percent',
                                                        'Sharpe_Ratio','Alpha_Qualified','Deployment_Status'] if c in _df_all.columns]
                         st.dataframe(_df_all[_show_all_cols], use_container_width=True, hide_index=True)
@@ -2123,6 +2146,7 @@ elif st.session_state.page == "Backtest":
                 if not _df_all.empty:
                     with st.expander("All Backtest Results"):
                         _show_all_cols = [c for c in ['Rank','Symbol','Strategy','Timeframe','ROI_Per_Day_Pct',
+                                                       'Reality Score','OOS ROI %','WF Pass Rate %',
                                                        'Gross_Drawdown_Percent','Net_Drawdown_Percent','Win_Rate_Percent',
                                                        'Sharpe_Ratio','Alpha_Qualified','Deployment_Status'] if c in _df_all.columns]
                         st.dataframe(_df_all[_show_all_cols], use_container_width=True, hide_index=True)

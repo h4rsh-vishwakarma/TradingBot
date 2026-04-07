@@ -1,0 +1,82 @@
+//@version=5
+// 
+// Keltner_Breakout [Webhook] v3  4H CHART
+// 
+// WHY 4H: 15m had 1677 trades = -9728% on TV
+//         4H has  ~105 trades = 0.013%/day fees  very viable
+// Entry: price breaks above/below Keltner Channel with ADX trend
+// 
+// SYMBOL PARAMS:
+//   FILUSDT   Len=15, Mult=2.57
+//   LDOUSDT   Len=19, Mult=3.07
+//   OPUSDT    Len=17, Mult=2.77
+// 
+strategy("Keltner Breakout [Webhook] v3  4H", shorttitle="KB-4H",
+     overlay=true,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.06,
+     calc_on_order_fills=false, calc_on_every_tick=false)
+
+//  Inputs 
+kc_len  = input.int(15,    "Keltner Length",         minval=5, maxval=50, tooltip="FILUSDT=15, LDOUSDT=19, OPUSDT=17")
+kc_mult = input.float(2.57,"Keltner Multiplier",     minval=0.5, maxval=6.0, step=0.01, tooltip="FILUSDT=2.57, LDOUSDT=3.07, OPUSDT=2.77")
+sl_pct  = input.float(2.0, "Stop Loss %",            minval=0.5, maxval=10.0, step=0.1)
+tp_pct  = input.float(6.0, "Take Profit %",          minval=1.0, maxval=20.0, step=0.1)
+adx_th  = input.int(20,    "ADX Threshold",          minval=10, maxval=40)
+min_gap = input.int(2,     "Min Bars Between Signals",minval=1, maxval=10, tooltip="2 bars on 4H = 8h minimum gap")
+
+//  Indicators 
+atr14      = ta.atr(14)
+atrMa      = ta.sma(atr14, 100)
+kcBasis    = ta.ema(close, kc_len)
+kcUpper    = kcBasis + kc_mult * atr14
+kcLower    = kcBasis - kc_mult * atr14
+[_, _, adx] = ta.dmi(14, 14)
+
+//  Filters 
+adxOK = adx > adx_th
+volOK = atr14 < 2.5 * atrMa
+var int  consec = 0
+var int  cdBars = 0
+var bool inCool = false
+if strategy.closedtrades > 0
+    lastPnl = strategy.closedtrades.profit(strategy.closedtrades - 1)
+    consec  := lastPnl < 0 ? consec + 1 : 0
+    if consec >= 3
+        inCool := true
+        cdBars := 3
+        consec := 0
+if inCool
+    cdBars -= 1
+    if cdBars <= 0
+        inCool := false
+var int lastSigBar = 0
+gapOK = bar_index - lastSigBar >= min_gap
+allF  = adxOK and volOK and (not inCool) and gapOK
+
+//  Signals 
+// Breakout: close crosses outside Keltner Channel
+longCond  = ta.crossover(close, kcUpper)  and allF
+shortCond = ta.crossunder(close, kcLower) and allF
+
+//  Execute 
+if longCond
+    lastSigBar := bar_index
+    strategy.entry("Long", strategy.long)
+    strategy.exit("XL", "Long", loss=close*sl_pct/100, profit=close*tp_pct/100)
+if shortCond
+    lastSigBar := bar_index
+    strategy.entry("Short", strategy.short)
+    strategy.exit("XS", "Short", loss=close*sl_pct/100, profit=close*tp_pct/100)
+
+//  Plots 
+plot(kcUpper,  "KC Upper",  color=color.new(color.blue,40), linewidth=1)
+plot(kcBasis,  "KC Basis",  color=color.gray,               linewidth=1)
+plot(kcLower,  "KC Lower",  color=color.new(color.blue,40), linewidth=1)
+bgcolor(inCool ? color.new(color.orange,90) : na, title="Cooldown")
+plotshape(longCond,  style=shape.triangleup,   location=location.belowbar, color=color.green, size=size.small)
+plotshape(shortCond, style=shape.triangledown, location=location.abovebar, color=color.red,   size=size.small)
+
+//  Alerts 
+alertcondition(longCond,  "LONG 4H", '{"symbol":"{{ticker}}","action":"buy","strategy":"Keltner_Breakout","timeframe":"4h","price":"{{close}}","sl_pct":2.0,"tp_pct":6.0}')
+alertcondition(shortCond, "SHORT 4H", '{"symbol":"{{ticker}}","action":"sell","strategy":"Keltner_Breakout","timeframe":"4h","price":"{{close}}","sl_pct":2.0,"tp_pct":6.0}')

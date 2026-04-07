@@ -3,12 +3,15 @@ Telegram alert system for critical trading events.
 Sends formatted notifications for circuit breaker trips, errors, and important events.
 """
 
-import os
-import requests
-import time
-from typing import Optional, Dict
-from enum import Enum
+import html
 import logging
+import os
+import re
+import time
+from enum import Enum
+from typing import Dict, Optional
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +48,27 @@ class TelegramAlert:
         # Rate limiting
         self.last_alert_time = {}
         self.rate_limit_seconds = 60  # Don't spam same alert within 60s
+
+    @staticmethod
+    def _normalize_display_text(text: str) -> str:
+        """Normalize Telegram-facing text for consistent presentation."""
+        normalized = str(text or "").strip()
+        if not normalized:
+            return normalized
+
+        normalized = html.unescape(normalized)
+        for tag in ("<b>", "</b>", "<code>", "</code>", "<i>", "</i>"):
+            normalized = normalized.replace(tag, "")
+
+        replacements = [
+            (r"\bBUY↔SELL\b", "LONG↔SHORT"),
+            (r"\bSELL↔BUY\b", "SHORT↔LONG"),
+            (r"\bBUY\b", "LONG"),
+            (r"\bSELL\b", "SHORT"),
+        ]
+        for pattern, replacement in replacements:
+            normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
+        return normalized
     
     def _should_send(self, alert_key: str) -> bool:
         """Check if alert should be sent (rate limiting)."""
@@ -78,12 +102,15 @@ class TelegramAlert:
         if alert_key and not force:
             if not self._should_send(alert_key):
                 return False
+
+        title = self._normalize_display_text(title)
+        message = self._normalize_display_text(message)
         
         # Format message
         text = f"{severity.value}\n\n"
-        text += f"<b>{title}</b>\n\n"
+        text += f"{title}\n\n"
         text += message
-        text += f"\n\n<i>Time: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}</i>"
+        text += f"\n\nTime: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}"
         
         try:
             url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"

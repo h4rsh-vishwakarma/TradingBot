@@ -4,27 +4,27 @@ strategy("OBV + WaveTrend Scalper - Webhook", overlay=true, initial_capital=1000
 //---------------------------------------------------------------------------------------------------------------------}
 //WEBHOOK CONFIGURATION
 //---------------------------------------------------------------------------------------------------------------------{
-grp_webhook = "🔔 Webhook Configuration"
+grp_webhook = " Webhook Configuration"
 enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
 webhook_secret = input.string("obv_wavetrend_scalper_2026_secure", "Webhook Secret", group=grp_webhook, tooltip="Must match bot configuration")
 
 //---------------------------------------------------------------------------------------------------------------------}
 //RISK MANAGEMENT
 //---------------------------------------------------------------------------------------------------------------------{
-grp_risk = "⚠️ Risk Management"
+grp_risk = " Risk Management"
 stop_loss_pct = input.float(1.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1, group=grp_risk, tooltip="Scalper: 0.5-1.5%")
 take_profit_pct = input.float(2.0, "Take Profit %", minval=0.5, maxval=10.0, step=0.5, group=grp_risk, tooltip="Scalper: 1.5-3.0%")
 
 //---------------------------------------------------------------------------------------------------------------------}
 //OBV SETTINGS
 //---------------------------------------------------------------------------------------------------------------------{
-grp_obv = "📊 OBV Parameters"
+grp_obv = " OBV Parameters"
 obv_ema_period = input.int(20, "OBV EMA Period", minval=5, maxval=100, group=grp_obv, tooltip="Volume trend confirmation")
 
 //---------------------------------------------------------------------------------------------------------------------}
 //WAVETREND SETTINGS
 //---------------------------------------------------------------------------------------------------------------------{
-grp_wt = "🌊 WaveTrend Parameters"
+grp_wt = " WaveTrend Parameters"
 channel_length = input.int(10, "Channel Length (n1)", minval=1, maxval=50, group=grp_wt, tooltip="Classic: 10")
 average_length = input.int(21, "Average Length (n2)", minval=1, maxval=50, group=grp_wt, tooltip="Classic: 21")
 overbought_level = input.int(60, "Overbought Level", minval=40, maxval=80, group=grp_wt)

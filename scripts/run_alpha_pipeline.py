@@ -21,6 +21,7 @@ if os.path.exists(ENV_VARS_PATH):
 from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert
 from tradingview_webhook_bot.alpha_engine import (
     AlphaCriteria,
+    build_alpha_shortlist,
     build_alpha_reports,
     generate_alpha_pine_scripts,
     notify_alpha_candidates,
@@ -58,6 +59,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-roi-day", type=float, default=1.0, help="Alpha threshold: ROI per day must be strictly above this percent.")
     parser.add_argument("--max-gross-dd", type=float, default=20.0)
     parser.add_argument("--max-net-dd", type=float, default=20.0)
+    parser.add_argument("--shortlist-limit", type=int, default=5, help="Number of shortlisted paper-trade candidates.")
     parser.add_argument("--skip-batch-backtest", action="store_true", help="Only analyze the existing CSVs in --input-dir.")
     parser.add_argument("--skip-script-generation", action="store_true", help="Do not generate webhook-ready Pine copies.")
     parser.add_argument("--notify-telegram", action="store_true", help="Send alpha report and generated scripts to Telegram.")
@@ -89,6 +91,7 @@ def main() -> int:
         fees_exchange=args.fees_exchange,
         data_source=args.data_source,
         criteria=criteria,
+        summary_csv=input_dir / "SUMMARY.csv",
     )
 
     alpha_candidates = reports["alpha"]
@@ -119,25 +122,30 @@ def main() -> int:
             .first()
         )
         best_per_symbol.to_csv(report_dir / "alpha_best_per_symbol.csv", index=False)
+    shortlist = build_alpha_shortlist(alpha_candidates, limit=args.shortlist_limit)
+    shortlist.to_csv(report_dir / "alpha_shortlist.csv", index=False)
 
     status_path = write_pipeline_status(
         report_dir=report_dir,
         all_results=reports["all"],
         alpha_candidates=alpha_candidates,
         best_per_symbol=best_per_symbol,
+        shortlist=shortlist,
         input_dir=input_dir,
         scripts_dir=alpha_scripts_dir,
     )
 
     if args.notify_telegram:
-        notify_alpha_candidates(alpha_candidates, status_path=status_path, telegram=TelegramAlert(), send_scripts=True)
+        notify_alpha_candidates(shortlist if not shortlist.empty else alpha_candidates, status_path=status_path, telegram=TelegramAlert(), send_scripts=True)
 
     print(f"Processed CSV files from: {input_dir}")
     print(f"All backtest results: {report_dir / 'alpha_backtest_results.csv'}")
     print(f"Alpha candidates: {report_dir / 'alpha_candidates.csv'}")
     print(f"Best per symbol: {report_dir / 'alpha_best_per_symbol.csv'}")
+    print(f"Shortlist: {report_dir / 'alpha_shortlist.csv'}")
     print(f"Alpha scripts dir: {alpha_scripts_dir}")
     print(f"Qualified alpha strategies: {len(alpha_candidates)}")
+    print(f"Shortlisted strategies: {len(shortlist)}")
     return 0
 
 

@@ -109,7 +109,7 @@ class TestWebhookToQueue:
 
     def test_json_signal_enqueued(self):
         """JSON webhook signal gets parsed and enqueued."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -136,7 +136,7 @@ class TestWebhookToQueue:
 
     def test_plain_text_signal_enqueued(self):
         """Plain text TradingView alert gets parsed and enqueued."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -153,7 +153,7 @@ class TestWebhookToQueue:
 
     def test_invalid_secret_rejected(self):
         """Wrong secret returns 401."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -175,7 +175,7 @@ class TestWebhookToQueue:
 
     def test_missing_json_secret_rejected(self):
         """Missing secret returns 401."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -196,7 +196,7 @@ class TestWebhookToQueue:
 
     def test_secretless_order_fill_alert_rejected(self):
         """TradingView order-fill plain text without explicit secret returns 401."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -211,9 +211,31 @@ class TestWebhookToQueue:
 
             assert resp.status_code == 401
 
+    def test_secret_and_signature_mode_rejects_missing_signature(self):
+        """Configured signature mode rejects requests without X-Signature."""
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret_and_signature"}):
+            from tradingview_webhook_bot.core.webhook_server import WebhookServer
+            import tempfile
+            tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
+            config = {"webhook": {"secret": "test_secret_123"}}
+            server = WebhookServer(config=config, signals_queue_file=tf.name)
+            client = server.app.test_client()
+
+            payload = {
+                "secret": "test_secret_123",
+                "symbol": "SOLUSDT",
+                "action": "BUY",
+                "price": "92.50",
+            }
+            resp = client.post("/webhook/tradingview",
+                data=json.dumps(payload),
+                content_type="application/json")
+
+            assert resp.status_code == 401
+
     def test_health_endpoint(self):
         """Health endpoint returns 200."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -225,7 +247,7 @@ class TestWebhookToQueue:
 
     def test_metrics_endpoint(self):
         """Metrics endpoint returns Prometheus format."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)

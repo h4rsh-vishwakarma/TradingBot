@@ -164,10 +164,9 @@ class PositionLedger:
         """
         Sync aggregate exchange:symbol state to exchange truth.
 
-        The exchange only reports aggregate symbol exposure, while live fills can be
-        tracked under exchange:symbol:strategy. When reconciling to exchange truth,
-        clear those child strategy quantities so they do not get re-aggregated into
-        a fresh drift on the next reconciler run.
+        Exchange snapshots are aggregate per symbol, while fills may be tracked under
+        exchange:symbol:strategy keys. During reconciliation, clear those strategy
+        children so they do not get re-aggregated into drift on the next pass.
         """
         parts = symbol.split(':')
         base_key = ':'.join(parts[:2]) if len(parts) >= 2 else symbol

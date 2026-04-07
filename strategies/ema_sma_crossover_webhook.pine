@@ -1,8 +1,8 @@
-// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © julioperez75955 | Webhook Integration by GratefulFutures
+// This Pine Script code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+//  julioperez75955 | Webhook Integration by GratefulFutures
 
 //@version=5
-strategy("EMA/SMA Crossover — Webhook", overlay=true)
+strategy("EMA/SMA Crossover  Webhook", overlay=true)
 
 // ========================================
 // WEBHOOK CONFIGURATION

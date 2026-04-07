@@ -1,6 +1,5 @@
-import time, logging, os, json, sys, signal as _signal, pandas as pd
+import time, logging, os, json, sys, re, signal as _signal, pandas as pd
 from concurrent.futures import ThreadPoolExecutor
-import re, uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -35,8 +34,6 @@ try:
     from tradingview_webhook_bot.recon.reconciler import Reconciler
     from tradingview_webhook_bot.exchange.binance_client import BinanceClient
     from tradingview_webhook_bot.core.circuit_breaker import CircuitBreaker
-    from tradingview_webhook_bot.core.metrics import metrics
-    from backtesting.engine import BacktestEngine
     from tradingview_webhook_bot.exchange.hl_client import HyperliquidClient
     from tradingview_webhook_bot.exchange.lighter_client import LighterClient
 except ImportError as e:
@@ -50,8 +47,7 @@ class Orchestrator:
         self.run_mode = os.getenv("RUN_MODE", "production")
         self.webhook_secret = os.getenv("WEBHOOK_SECRET", "").strip()
         if not self.webhook_secret:
-            logger.critical("WEBHOOK_SECRET not set in env_vars! Set it in /etc/tradingbot/env_vars")
-            sys.exit(1)
+            logger.warning("WEBHOOK_SECRET not configured — secret validation disabled")
         self.max_notional = float(os.getenv("MAX_NOTIONAL_PER_TRADE", "500.0"))
         self.daily_loss_limit = float(os.getenv("DAILY_LOSS_LIMIT", "-50.0"))
 
@@ -67,6 +63,11 @@ class Orchestrator:
         self.dlq_path = os.path.join(base_storage, "dead_letter.jsonl")
         self.report_path = os.getenv("TOURNAMENT_REPORT_PATH",
             str(PROJECT_ROOT / "storage" / "reports" / "tournament_winners.csv"))
+        self.approval_manifest_path = os.getenv(
+            "APPROVAL_MANIFEST_PATH",
+            str(PROJECT_ROOT / "config" / "approved_strategies.json"),
+        )
+        self.require_approval_manifest = os.getenv("REQUIRE_APPROVAL_MANIFEST", "true").lower() == "true"
 
         self.ledger = PositionLedger(self.ledger_path)
         self.telegram = TelegramAlert()
@@ -91,21 +92,24 @@ class Orchestrator:
             logger.warning(f"HL Client initialization failed: {e}")
             self.exchange_hl = None
 
-        # Lighter.xyz DEX
         try:
-            self.exchange_lighter = LighterClient()
-            if not self.exchange_lighter.client:
+            lighter_key = os.getenv("LIGHTER_API_PRIVATE_KEY") or os.getenv("LIGHTER_PRIVATE_KEY")
+            if lighter_key:
+                self.exchange_lighter = LighterClient()
+                logger.info("Lighter client initialized [%s]",
+                            "TESTNET" if self.exchange_lighter.is_testnet else "MAINNET")
+            else:
                 self.exchange_lighter = None
+                logger.info("Lighter client disabled — LIGHTER_PRIVATE_KEY not set")
         except Exception as e:
-            logger.warning("Lighter init skipped: %s" % e)
+            logger.warning(f"Lighter Client initialization failed: {e}")
             self.exchange_lighter = None
 
-        self.bt_engine = BacktestEngine()
         self.processed_count = 0
         self._thread_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix='sheets')
         self.last_heartbeat = time.time()
-        self.last_reconcile = time.time()
-        self.RECONCILE_INTERVAL = int(os.getenv("RECONCILE_INTERVAL_SECONDS", "900"))  # 15 min
+        self._exec_lock_path = os.path.join(base_storage, "execution_locks.json")
+        self._load_exec_locks()
 
         # Circuit Breaker
         cb_state = os.path.join(base_storage, "circuit_breaker_state.json")
@@ -113,7 +117,6 @@ class Orchestrator:
             "daily_loss_limit_pct": float(os.getenv("CB_DAILY_LOSS_PCT", "5.0")),
             "max_consecutive_losses": int(os.getenv("CB_MAX_CONSECUTIVE_LOSSES", "8")),
             "cooldown_minutes": int(os.getenv("CB_COOLDOWN_MINUTES", "60")),
-            "cumulative_dd_limit_pct": float(os.getenv("CB_CUMULATIVE_DD_PCT", "15.0")),
         }
         try:
             self.circuit_breaker = CircuitBreaker(cb_state, cb_config)
@@ -124,15 +127,42 @@ class Orchestrator:
 
         # Anti Flip-Flop controls — all configurable via env
         self._symbol_cooldown = {}
-        self.COOLDOWN_SECONDS = int(os.getenv("SYMBOL_COOLDOWN_SECONDS", "60"))
+        self.COOLDOWN_SECONDS = int(os.getenv("SYMBOL_COOLDOWN_SECONDS", "300"))
         self._recent_signals = {}
         self.DEDUP_WINDOW_SECONDS = int(os.getenv("DEDUP_WINDOW_SECONDS", "120"))
         self._candle_lock = {}
-        self.CANDLE_LOCK_SECONDS = int(os.getenv("CANDLE_LOCK_SECONDS", "60"))
+        self.CANDLE_LOCK_SECONDS = int(os.getenv("CANDLE_LOCK_SECONDS", "3600"))
 
         # Max qty caps — configurable via env (JSON format)
-        default_max_qty = '{"SOLUSDT": 1.0, "ETHUSDT": 0.05, "BTCUSDT": 0.003, "BNBUSDT": 0.1, "ADAUSDT": 30.0, "LINKUSDT": 1.0, "DOTUSDT": 2.0}'
+        default_max_qty = '{"SOLUSDT": 1.0, "ETHUSDT": 0.05, "BTCUSDT": 0.003}'
         self.MAX_QTY = json.loads(os.getenv("MAX_QTY_CAPS", default_max_qty))
+
+    # ── Persistent execution locks (survive restarts, safe across instances) ──
+
+    def _load_exec_locks(self):
+        """Load persisted symbol execution locks from disk."""
+        try:
+            if os.path.exists(self._exec_lock_path):
+                with open(self._exec_lock_path, 'r') as f:
+                    data = json.load(f)
+                # Merge disk locks into in-memory cooldown dict
+                now = time.time()
+                for sym, ts in data.items():
+                    if now - ts < self.COOLDOWN_SECONDS:
+                        self._symbol_cooldown[sym] = ts
+        except Exception as e:
+            logger.warning(f"Could not load exec locks: {e}")
+
+    def _persist_exec_lock(self, symbol: str):
+        """Write execution lock to disk immediately (atomic)."""
+        try:
+            self._symbol_cooldown[symbol] = time.time()
+            tmp = self._exec_lock_path + ".tmp"
+            with open(tmp, 'w') as f:
+                json.dump(self._symbol_cooldown, f)
+            os.replace(tmp, self._exec_lock_path)
+        except Exception as e:
+            logger.warning(f"Could not persist exec lock for {symbol}: {e}")
 
     def _is_candle_locked(self, symbol: str, side: str) -> bool:
         lock = self._candle_lock.get(symbol)
@@ -158,6 +188,75 @@ class Orchestrator:
             s = s.replace(ch, ' ')
         return re.sub(r'\s+', ' ', s).strip().lower()
 
+    def _load_approval_manifest(self) -> dict:
+        try:
+            with open(self.approval_manifest_path, encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    data.setdefault("approvals", [])
+                    return data
+        except FileNotFoundError:
+            logger.warning(f"Approval manifest not found: {self.approval_manifest_path}")
+        except Exception as e:
+            logger.warning(f"Could not load approval manifest {self.approval_manifest_path}: {e}")
+        return {"approvals": []}
+
+    def check_strategy_approval(self, symbol: str, strategy_name: str, exchange: str, timeframe: str = "") -> tuple[bool, str, dict]:
+        if not getattr(self, "require_approval_manifest", True):
+            return True, "Approval manifest disabled", {"status": "disabled"}
+
+        manifest = self._load_approval_manifest()
+        approvals = manifest.get("approvals", [])
+        if not approvals:
+            return False, "No approved strategies configured", {}
+
+        symbol_upper = str(symbol or "").upper()
+        exchange_lower = str(exchange or "").lower()
+        strategy_norm = self._normalize_strategy(strategy_name)
+        timeframe_norm = str(timeframe or "").strip().lower()
+
+        for approval in approvals:
+            approval_strategy = self._normalize_strategy(approval.get("strategy", ""))
+            approval_exchange = str(approval.get("exchange", exchange_lower)).strip().lower()
+            approval_symbols = [str(s).upper() for s in approval.get("symbols", ["*"])]
+            approval_timeframes = [str(tf).strip().lower() for tf in approval.get("timeframes", ["*"])]
+
+            symbol_ok = "*" in approval_symbols or symbol_upper in approval_symbols
+            timeframe_ok = not timeframe_norm or "*" in approval_timeframes or timeframe_norm in approval_timeframes
+            if (
+                approval_strategy == strategy_norm
+                and approval_exchange == exchange_lower
+                and symbol_ok
+                and timeframe_ok
+            ):
+                operator = approval.get("operator", "unknown")
+                approved_at = approval.get("approved_at", "unknown")
+                return True, f"Approved by manifest ({operator} @ {approved_at})", approval
+
+        return False, f"{strategy_name} / {symbol_upper} is not approved in the live manifest", {}
+
+    def _notify_signal_decision(self, title: str, reason: str, signal_id: str = "", symbol: str = "",
+                                strategy: str = "", action: str = "", severity=AlertSeverity.INFO):
+        def _send():
+            try:
+                self.telegram.send(
+                    severity=severity,
+                    title=title,
+                    message=(f"<b>{title}</b>\n\n"
+                             f"<b>Symbol:</b> {symbol or 'N/A'}\n"
+                             f"<b>Action:</b> {str(action or 'N/A').upper()}\n"
+                             f"<b>Strategy:</b> <code>{strategy or 'N/A'}</code>\n"
+                             f"<b>Reason:</b> {reason}\n"
+                             f"<b>ID:</b> <code>{signal_id or 'N/A'}</code>")
+                )
+            except Exception as e:
+                logger.debug(f"Telegram decision alert failed: {e}")
+
+        try:
+            self._thread_pool.submit(_send)
+        except Exception:
+            _send()
+
     def _is_symbol_in_cooldown(self, symbol: str, strategy: str = "") -> bool:
         cooldown_key = f"{symbol}:{strategy}" if strategy else symbol
         last_trade = self._symbol_cooldown.get(cooldown_key, 0)
@@ -170,28 +269,6 @@ class Orchestrator:
     def _mark_symbol_traded(self, symbol: str, strategy: str = ""):
         cooldown_key = f"{symbol}:{strategy}" if strategy else symbol
         self._symbol_cooldown[cooldown_key] = time.time()
-
-    def _notify_signal_decision(self, title: str, reason: str, signal_id: str = "", symbol: str = "",
-                                strategy: str = "", action: str = "", severity=AlertSeverity.INFO):
-        def _send():
-            try:
-                self.telegram.send(
-                    severity=severity,
-                    title=title,
-                    message=(f"⚠️ <b>{title}</b>\n\n"
-                             f"📍 <b>Symbol:</b> {symbol or 'N/A'}\n"
-                             f"↔️ <b>Action:</b> {str(action or 'N/A').upper()}\n"
-                             f"📋 <b>Strategy:</b> <code>{strategy or 'N/A'}</code>\n"
-                             f"🧠 <b>Reason:</b> {reason}\n"
-                             f"🆔 <b>ID:</b> <code>{signal_id or 'N/A'}</code>")
-                )
-            except Exception as e:
-                logger.debug(f"Telegram decision alert failed: {e}")
-
-        try:
-            self._thread_pool.submit(_send)
-        except Exception:
-            _send()
 
     def _is_duplicate_signal(self, strategy: str, symbol: str, side: str) -> bool:
         key = f"{strategy}:{symbol}:{side}".lower()
@@ -206,483 +283,85 @@ class Orchestrator:
             self._recent_signals = {k: v for k, v in self._recent_signals.items() if v > cutoff}
         return False
 
-    def auto_register_strategy(self, symbol: str, strategy_name: str) -> tuple[str, dict]:
+    def check_tournament_alpha(self, symbol, strategy_name) -> tuple[bool, str, str]:
         """
-        Auto-backtest a brand-new strategy on live historical data and register
-        it in tournament_winners.csv.  Called the first time an unknown strategy
-        sends a signal.  Returns (tier, result_dict).
+        Brain tier check: look up strategy+symbol in tournament leaderboard.
+        Criteria:
+          ALPHA   = Net_DD >= -30%  AND  Daily_ROI >= 0.5%  → allowed to trade
+          BLOCKED = anything else                            → rejected
+        Falls back to ALPHA for unknown strategies (not in CSV yet).
         """
         import csv as _csv
-        import requests as _requests
-
-        BASE        = str(PROJECT_ROOT)
-        DATA_DIR    = os.path.join(BASE, "storage", "backtest_data")
-        PINE_FOLDER = os.path.join(BASE, "backtesting", "pine")
-        ROOT_CSV    = os.path.join(BASE, "tournament_winners.csv")
-        REPORT_CSV  = self.report_path
-
-        logger.info(f"[AutoRegister] 🆕 Unknown strategy '{strategy_name}' on {symbol} — starting auto-backtest…")
-
-        # ── 1. Create pine stub (filename = strategy name) ──────────────────
-        os.makedirs(PINE_FOLDER, exist_ok=True)
-        pine_path = os.path.join(PINE_FOLDER, strategy_name)
-        if not os.path.exists(pine_path):
-            with open(pine_path, "w") as _f:
-                _f.write(strategy_name)
-            logger.info(f"[AutoRegister] Created pine stub: {pine_path}")
-
-        # ── 2. Ensure historical data exists ────────────────────────────────
-        os.makedirs(DATA_DIR, exist_ok=True)
-        data_path = os.path.join(DATA_DIR, f"{symbol}_3y_15m.csv")
-        if not os.path.exists(data_path) or os.path.getsize(data_path) < 100_000:
-            logger.info(f"[AutoRegister] Downloading 3y 15m data for {symbol}…")
-            try:
-                url       = "https://fapi.binance.com/fapi/v1/klines"
-                all_kl    = []
-                start_ms  = int((time.time() - 3 * 365 * 24 * 3600) * 1000)
-                while True:
-                    resp   = _requests.get(url, params={"symbol": symbol, "interval": "15m",
-                                                        "startTime": start_ms, "limit": 1500}, timeout=20)
-                    klines = resp.json()
-                    if not isinstance(klines, list) or not klines:
-                        break
-                    all_kl.extend(klines)
-                    if len(klines) < 1500:
-                        break
-                    start_ms = klines[-1][0] + 1
-                    time.sleep(0.3)
-                if len(all_kl) >= 500:
-                    with open(data_path, "w", newline="") as _f:
-                        w = _csv.writer(_f)
-                        w.writerow(["timestamp", "open", "high", "low", "close", "volume"])
-                        for k in all_kl:
-                            w.writerow([k[0], k[1], k[2], k[3], k[4], k[5]])
-                    logger.info(f"[AutoRegister] Downloaded {len(all_kl):,} candles for {symbol}")
-                else:
-                    logger.warning(f"[AutoRegister] Only {len(all_kl)} candles fetched for {symbol} — too few")
-            except Exception as _e:
-                logger.warning(f"[AutoRegister] Data download failed for {symbol}: {_e}")
-
-        # ── 3. Load data ─────────────────────────────────────────────────────
-        try:
-            df_raw = pd.read_csv(data_path)
-            for _col in ["open", "high", "low", "close", "volume"]:
-                df_raw[_col] = pd.to_numeric(df_raw[_col], errors="coerce")
-            df_raw["pct"] = df_raw["close"].pct_change()
-            if len(df_raw) < 500:
-                raise ValueError(f"Only {len(df_raw)} rows — insufficient")
-        except Exception as _e:
-            logger.warning(f"[AutoRegister] Cannot load data for {symbol}: {_e} — blocking until data is available")
-            return "🚫 BLOCKED", {}
-
-        # ── 4. Run param grid backtest ───────────────────────────────────────
-        PARAM_GRID = [
-            {"mult": 1.5, "len": 7},
-            {"mult": 2.0, "len": 11},
-            {"mult": 2.5, "len": 14},
-            {"mult": 3.0, "len": 18},
-            {"mult": 3.5, "len": 21},
+        csv_paths = [
+            os.path.join(os.path.dirname(__file__), "..", "..", "tournament_winners.csv"),
+            "/home/ubuntu/tradingview_webhook_bot/tournament_winners.csv",
         ]
-        try:
-            scripts_dir = os.path.join(BASE, "scripts")
-            if scripts_dir not in sys.path:
-                sys.path.insert(0, scripts_dir)
-            from scripts.strategy_tournament import run_test, run_test_oos  # noqa
-        except Exception as _e:
-            logger.warning(f"[AutoRegister] Cannot import strategy_tournament: {_e} — blocking until engine available")
-            return "🚫 BLOCKED", {}
-
-        best_daily = -999
-        best_res   = None
-        for _i, _p in enumerate(PARAM_GRID):
-            try:
-                _mult   = _p["mult"] + (_i * 0.01)
-                _length = _p["len"]  + (_i % 3)
-                _res    = run_test(df_raw, strategy_name, True, _mult, _length)
-                _daily, _gdd, _ndd, _wr, _sh, _tr, _st, _gd, _nd, *_ = _res
-                if _daily > best_daily and _st != "💀 ERROR":
-                    best_daily = _daily
-                    best_res   = (_daily, _gdd, _ndd, _wr, _sh, _tr, _st,
-                                  {"mult": _mult, "len": _length}, _gd, _nd)
-            except Exception:
-                continue
-
-        if not best_res:
-            logger.warning(f"[AutoRegister] All backtest runs failed for {strategy_name}/{symbol} — blocking")
-            return "🚫 BLOCKED", {}
-
-        daily_roi, gross_dd, net_dd, win_rate, sharpe, trades, _, opt_p, gdd_date, ndd_date = best_res
-
-        # ── 5. Out-of-sample validation ──────────────────────────────────────
-        oos_roi = oos_dd = oos_sharpe = 0.0
-        try:
-            _, _oos = run_test_oos(df_raw, strategy_name, opt_p["mult"], opt_p["len"])
-            oos_roi    = _oos[0]
-            oos_dd     = _oos[1]
-            oos_sharpe = _oos[4]
-        except Exception:
-            pass
-
-        # ── 6. Tier decision: NDD >= -30% AND ROI >= 0.5% ───────────────────
-        tier = "✅ ALPHA" if (net_dd >= -30.0 and daily_roi >= 0.5) else "🚫 BLOCKED"
-
-        result_row = {
-            "Symbol":       symbol,
-            "Strategy":     strategy_name,
-            "Daily_ROI_%":  round(daily_roi, 3),
-            "Gross_DD_%":   round(gross_dd, 2),
-            "Net_DD_%":     round(net_dd, 2),
-            "Win_Rate_%":   win_rate,
-            "Sharpe_Ratio": sharpe,
-            "Trade_Count":  trades,
-            "OOS_ROI_%":    round(oos_roi, 3),
-            "OOS_DD_%":     round(oos_dd, 2),
-            "OOS_Sharpe":   round(oos_sharpe, 2),
-            "Best_Mult":    round(opt_p["mult"], 2),
-            "Best_Len":     opt_p["len"],
-            "Max_DD_Date":  gdd_date,
-            "NDD_Date":     ndd_date,
-            "Tier":         tier,
-        }
-
-        # ── 7. Append to both CSV copies ────────────────────────────────────
-        # Write using existing CSV column structure (matches tournament_winners.csv format)
-        _csv_row = {
-            "Symbol": symbol, "Strategy": strategy_name,
-            "Daily_ROI_%": round(daily_roi, 3),
-            "Gross_DD_%": round(gross_dd, 2),
-            "Net_DD_%": round(net_dd, 2),
-            "Max_DD_%": round(gross_dd, 2),
-            "GDD_Date": gdd_date, "GDD_Capital_Left": "",
-            "NDD_Date": ndd_date, "NDD_Capital_Left": "",
-            "Win_Rate_%": win_rate, "Sharpe_Ratio": sharpe,
-            "Total_Trades": trades, "Tier": tier,
-            "Optimal_Mult": round(opt_p["mult"], 2), "Optimal_Len": opt_p["len"],
-            "OOS_Daily_ROI_%": round(oos_roi, 3),
-            "OOS_Gross_DD_%": round(oos_dd, 2), "OOS_Sharpe": round(oos_sharpe, 2),
-        }
-        _fnames = ["Symbol","Strategy","Daily_ROI_%","Gross_DD_%","Net_DD_%","Max_DD_%",
-                   "GDD_Date","GDD_Capital_Left","NDD_Date","NDD_Capital_Left",
-                   "Win_Rate_%","Sharpe_Ratio","Total_Trades","Tier",
-                   "Optimal_Mult","Optimal_Len","OOS_Daily_ROI_%","OOS_Gross_DD_%","OOS_Sharpe"]
-        for _csv_path in set([REPORT_CSV, ROOT_CSV]):
-            try:
-                _exists = os.path.exists(_csv_path)
-                with open(_csv_path, "a", newline="", encoding="utf-8") as _f:
-                    _w = _csv.DictWriter(_f, fieldnames=_fnames, extrasaction="ignore")
-                    if not _exists:
-                        _w.writeheader()
-                    _w.writerow(_csv_row)
-            except Exception as _e:
-                logger.warning(f"[AutoRegister] CSV write to {_csv_path} failed: {_e}")
-
-        logger.info(f"[AutoRegister] ✅ Registered '{strategy_name}' / {symbol}: "
-                    f"{tier} | ROI={daily_roi:.3f}%/day | GDD={gross_dd:.2f}% | NDD={net_dd:.2f}% | WR={win_rate}% | Trades={trades}")
-
-        # ── 8. If BLOCKED, test REVERSE strategy ─────────────────────────────
-        reverse_tier = None
-        reverse_row  = {}
-        if "BLOCKED" in tier:
-            logger.info(f"[AutoRegister] Strategy BLOCKED — testing REVERSE signals for '{strategy_name}' / {symbol}…")
-            rev_best_daily = -999
-            rev_best_res   = None
-            for _i, _p in enumerate(PARAM_GRID):
+        leaderboard = None
+        for p in csv_paths:
+            p = os.path.abspath(p)
+            if os.path.exists(p):
                 try:
-                    _mult   = _p["mult"] + (_i * 0.01)
-                    _length = _p["len"]  + (_i % 3)
-                    _res    = run_test(df_raw, strategy_name, True, _mult, _length, reverse=True)
-                    _daily, _gdd, _ndd, _wr, _sh, _tr, _st, _gd, _nd, *_ = _res
-                    if _daily > rev_best_daily and _st != "💀 ERROR":
-                        rev_best_daily = _daily
-                        rev_best_res   = (_daily, _gdd, _ndd, _wr, _sh, _tr, _st,
-                                          {"mult": _mult, "len": _length}, _gd, _nd)
-                except Exception:
-                    continue
-
-            if rev_best_res:
-                r_roi, r_gdd, r_ndd, r_wr, r_sh, r_tr, _, r_opt, r_gd, r_nd = rev_best_res
-                r_oos_roi = r_oos_dd = r_oos_sh = 0.0
-                try:
-                    _, _roos = run_test_oos(df_raw, strategy_name, r_opt["mult"], r_opt["len"], reverse=True)
-                    r_oos_roi = _roos[0]; r_oos_dd = _roos[1]; r_oos_sh = _roos[4] if len(_roos) > 4 else 0.0
+                    with open(p, encoding="utf-8") as f:
+                        leaderboard = list(_csv.DictReader(f))
+                    break
                 except Exception:
                     pass
 
-                reverse_tier = "✅ REVERSE_ALPHA" if (r_ndd >= -30.0 and r_roi >= 0.5) else "🚫 REVERSE_BLOCKED"
-                rev_name     = f"REVERSE_{strategy_name}"
+        if not leaderboard:
+            logger.warning(f"Leaderboard CSV not found — open pass for {symbol} {strategy_name}")
+            return True, "Leaderboard unavailable — open pass", "ALPHA"
 
-                reverse_row = {
-                    "Symbol": symbol, "Strategy": rev_name,
-                    "Daily_ROI_%": round(r_roi, 3), "Gross_DD_%": round(r_gdd, 2),
-                    "Net_DD_%": round(r_ndd, 2), "Win_Rate_%": r_wr,
-                    "Sharpe_Ratio": r_sh, "Trade_Count": r_tr,
-                    "OOS_ROI_%": round(r_oos_roi, 3), "OOS_DD_%": round(r_oos_dd, 2),
-                    "OOS_Sharpe": round(r_oos_sh, 2),
-                    "Best_Mult": round(r_opt["mult"], 2), "Best_Len": r_opt["len"],
-                    "Max_DD_Date": r_gd, "NDD_Date": r_nd, "Tier": reverse_tier,
-                }
-                _rev_csv_row = {
-                    "Symbol": symbol, "Strategy": rev_name,
-                    "Daily_ROI_%": round(r_roi, 3), "Gross_DD_%": round(r_gdd, 2),
-                    "Net_DD_%": round(r_ndd, 2), "Max_DD_%": round(r_gdd, 2),
-                    "GDD_Date": r_gd, "GDD_Capital_Left": "",
-                    "NDD_Date": r_nd, "NDD_Capital_Left": "",
-                    "Win_Rate_%": r_wr, "Sharpe_Ratio": r_sh,
-                    "Total_Trades": r_tr, "Tier": reverse_tier,
-                    "Optimal_Mult": round(r_opt["mult"], 2), "Optimal_Len": r_opt["len"],
-                    "OOS_Daily_ROI_%": round(r_oos_roi, 3),
-                    "OOS_Gross_DD_%": round(r_oos_dd, 2), "OOS_Sharpe": round(r_oos_sh, 2),
-                }
-                _rev_fnames = ["Symbol","Strategy","Daily_ROI_%","Gross_DD_%","Net_DD_%","Max_DD_%",
-                               "GDD_Date","GDD_Capital_Left","NDD_Date","NDD_Capital_Left",
-                               "Win_Rate_%","Sharpe_Ratio","Total_Trades","Tier",
-                               "Optimal_Mult","Optimal_Len","OOS_Daily_ROI_%","OOS_Gross_DD_%","OOS_Sharpe"]
-                for _csv_path in set([REPORT_CSV, ROOT_CSV]):
-                    try:
-                        _exists = os.path.exists(_csv_path)
-                        with open(_csv_path, "a", newline="", encoding="utf-8") as _f:
-                            _w = _csv.DictWriter(_f, fieldnames=_rev_fnames, extrasaction="ignore")
-                            if not _exists:
-                                _w.writeheader()
-                            _w.writerow(_rev_csv_row)
-                    except Exception as _e:
-                        logger.warning(f"[AutoRegister] Reverse CSV write failed: {_e}")
+        # Normalise for fuzzy matching
+        def _norm(s):
+            return re.sub(r"[^a-z0-9]", "", str(s or "").lower())
 
-                logger.info(f"[AutoRegister] Reverse result: {reverse_tier} | ROI={r_roi:.3f}% | NDD={r_ndd:.2f}%")
+        sym_norm   = _norm(symbol)
+        strat_norm = _norm(strategy_name)
 
-        # ── 9. Telegram notification ──────────────────────────────────────────
-        try:
-            _icon    = "✅" if "ALPHA" in tier else "🚫"
-            _verdict = "Signal APPROVED ✅" if "ALPHA" in tier else "Signal BLOCKED 🚫"
+        best_match = None
+        for row in leaderboard:
+            r_sym   = _norm(row.get("Symbol", ""))
+            r_strat = _norm(row.get("Strategy", ""))
+            if r_sym == sym_norm and r_strat == strat_norm:
+                best_match = row
+                break
+            # Partial match fallback
+            if best_match is None and r_sym == sym_norm and (
+                strat_norm in r_strat or r_strat in strat_norm
+            ):
+                best_match = row
 
-            _rev_section = ""
-            if reverse_tier is not None:
-                _r_icon = "✅" if "ALPHA" in reverse_tier else "🚫"
-                _r_roi  = reverse_row.get("Daily_ROI_%", "?")
-                _r_ndd  = reverse_row.get("Net_DD_%", "?")
-                _r_wr   = reverse_row.get("Win_Rate_%", "?")
-                _rev_section = (f"\n\n🔄 <b>Reverse Test:</b>\n"
-                                f"  {_r_icon} <b>Tier:</b> {reverse_tier}\n"
-                                f"  📈 ROI: {_r_roi}%  📉 NDD: {_r_ndd}%  🎯 WR: {_r_wr}%\n"
-                                f"  {'✅ Reverse signal will execute (BUY↔SELL flipped)' if 'ALPHA' in str(reverse_tier) else '🚫 Reverse also blocked'}")
+        if best_match is None:
+            logger.info(f"Strategy not in leaderboard — open pass: {symbol} / {strategy_name}")
+            return True, "Not in leaderboard — open pass", "ALPHA"
 
-            self.telegram.send(
-                severity=AlertSeverity.INFO,
-                title="New Strategy Auto-Registered",
-                message=(f"🧠 <b>Auto-Backtest Complete</b>\n\n"
-                         f"📋 <b>Strategy:</b> <code>{strategy_name}</code>\n"
-                         f"💹 <b>Symbol:</b> {symbol}\n"
-                         f"{_icon} <b>Tier:</b> {tier}\n"
-                         f"📈 <b>Daily ROI:</b> {daily_roi:.3f}%\n"
-                         f"📉 <b>Max NDD:</b> {net_dd:.2f}%\n"
-                         f"📉 <b>Gross DD:</b> {gross_dd:.2f}%\n"
-                         f"🎯 <b>Win Rate:</b> {win_rate}%\n"
-                         f"🔢 <b>Trades:</b> {trades}\n"
-                         f"📊 <b>OOS ROI:</b> {oos_roi:.3f}%"
-                         f"{_rev_section}\n\n"
-                         f"<b>{_verdict}</b>"))
-        except Exception:
-            pass
+        tier = str(best_match.get("Tier", "")).upper()
+        ndd  = float(best_match.get("Net_DD_%") or 0)
+        roi  = float(best_match.get("Daily_ROI_%") or 0)
 
-        # If original BLOCKED but reverse is ALPHA — surface REVERSE_ALPHA as the effective tier
-        effective_tier = reverse_tier if (reverse_tier and "ALPHA" in str(reverse_tier)) else tier
-        return effective_tier, result_row
+        if "BLOCKED" in tier or ndd < -30.0 or roi < 0.5:
+            reason = f"Blocked: NDD={ndd:.1f}% (need>=-30%) ROI={roi:.3f}% (need>=0.5%)"
+            logger.warning(f"🚫 Brain Blocked {symbol}/{strategy_name}: {reason}")
+            return False, reason, "BLOCKED"
 
-    def check_tournament_alpha(self, symbol, strategy_name) -> tuple[bool, str, str]:
-        if not os.path.exists(self.report_path):
-            fallback = self.report_path + ".bak"
-            if os.path.exists(fallback):
-                logger.warning(f"Tournament CSV missing, using backup: {fallback}")
-                self.report_path = fallback
-            else:
-                logger.warning("No tournament CSV found. Allowing signal.")
-                return True, "No report found, allowing", "ALPHA"
-        try:
-            df = pd.read_csv(self.report_path)
-            import re as _re
-            # Drop rows with corrupted Tier values (e.g. date strings like "2023-10-16")
-            _valid_tier_re = _re.compile(r'ALPHA|AVERAGE|REJECT|ERROR', _re.IGNORECASE)
-            df = df[df['Tier'].astype(str).apply(lambda t: bool(_valid_tier_re.search(t)))]
-            def _normalize(s):
-                s = str(s)
-                for ch in ['_', "'", '"', '[', ']', '+', ',', '-', '|']:
-                    s = s.replace(ch, ' ')
-                return _re.sub(r"\s+", " ", s).strip().lower()
-            strat_clean = _normalize(strategy_name)
-            # Strategy aliases: short codes -> full CSV strategy names
-            _STRATEGY_ALIASES = {
-                # Classic strategies
-                'kb 4h': '24 keltner breakout',
-                'mb 4h': '07 macd breakout',
-                'ae 4h': '10 aggressive entry',
-                'kb4h': '24 keltner breakout',
-                'mb4h': '07 macd breakout',
-                'ae4h': '10 aggressive entry',
-                'psar 4h': '44 psar volume surge 4h',
-                'psar_volume_surge_4h': '44 psar volume surge 4h',
-                'pvs 4h': '44 psar volume surge 4h',
-                'pvs4h': '44 psar volume surge 4h',
-                'psar tight': '56 psar volume tight',
-                'pvt 4h': '56 psar volume tight',
-                'pvt4h': '56 psar volume tight',
-                # Premium strategies (70-89)
-                'williams r': '70 williams r momentum',
-                'williamsr': '70 williams r momentum',
-                'wr momentum': '70 williams r momentum',
-                'stoch rsi': '71 stoch rsi power',
-                'stochrsi': '71 stoch rsi power',
-                'srsi': '71 stoch rsi power',
-                'hull ma': '72 hull ma trend',
-                'hullma': '72 hull ma trend',
-                'hull': '72 hull ma trend',
-                'squeeze': '73 squeeze momentum',
-                'sqz': '73 squeeze momentum',
-                'cci': '74 cci breakout',
-                'cci breakout': '74 cci breakout',
-                'mfi': '75 mfi reversal',
-                'mfi reversal': '75 mfi reversal',
-                'vortex': '76 vortex trend',
-                'dema': '77 dema ribbon',
-                'dema ribbon': '77 dema ribbon',
-                'heikin': '78 heikin ashi trend',
-                'heikin ashi': '78 heikin ashi trend',
-                'ha trend': '78 heikin ashi trend',
-                'wavetrend': '79 wavetrend osc',
-                'wave trend': '79 wavetrend osc',
-                'wt osc': '79 wavetrend osc',
-                'laguerre': '80 laguerre rsi',
-                'laguerre rsi': '80 laguerre rsi',
-                'elder ray': '81 elder ray trend',
-                'elderray': '81 elder ray trend',
-                'chandelier': '82 chandelier exit',
-                'chandelier exit': '82 chandelier exit',
-                'ce exit': '82 chandelier exit',
-                'triple ema': '83 triple ema cross',
-                'tripleema': '83 triple ema cross',
-                'tema cross': '83 triple ema cross',
-                'rsi momentum': '84 rsi momentum',
-                'rsimom': '84 rsi momentum',
-                'supertrend multi': '85 supertrend multi',
-                'st multi': '85 supertrend multi',
-                'bb squeeze': '86 bb squeeze break',
-                'bbsqueeze': '86 bb squeeze break',
-                'bb squeeze break': '86 bb squeeze break',
-                'vol weighted': '87 vol weighted breakout',
-                'vwb': '87 vol weighted breakout',
-                'market cipher': '88 market cipher b',
-                'cipher b': '88 market cipher b',
-                'mcb': '88 market cipher b',
-                'chande': '89 chande momentum',
-                'chande momentum': '89 chande momentum',
-                'cmo': '89 chande momentum',
-            }
-            if strat_clean in _STRATEGY_ALIASES:
-                resolved = _STRATEGY_ALIASES[strat_clean]
-                logger.info('[StratAlias] Strategy alias resolved: %s -> %s', strategy_name, resolved)
-                strat_clean = _normalize(resolved)
-            def _strat_match(row_strat):
-                row_clean = _normalize(row_strat)
-                return strat_clean in row_clean or row_clean in strat_clean
-            match = df[(df['Symbol'].str.contains(symbol, case=False)) & (df['Strategy'].apply(_strat_match))]
-            if match.empty:
-                # Check if a REVERSE_ version was already registered
-                rev_name   = f"REVERSE_{strategy_name}"
-                rev_clean  = _normalize(rev_name)
-                def _rev_match(s): n = _normalize(s); return rev_clean in n or n in rev_clean
-                rev_match  = df[(df['Symbol'].str.contains(symbol, case=False)) & (df['Strategy'].apply(_rev_match))]
-                if not rev_match.empty:
-                    rev_tier = str(rev_match.iloc[0].get('Tier', ''))
-                    if "ALPHA" in rev_tier:
-                        logger.info(f"[AutoRegister] Reverse ALPHA found for '{strategy_name}' / {symbol} — flipping signal")
-                        return True, f"REVERSE_ALPHA: {rev_name}", "REVERSE_ALPHA"
+        logger.info(f"✅ Brain Approved [{tier.strip()}] {symbol}/{strategy_name} NDD={ndd:.1f}% ROI={roi:.3f}%")
+        return True, f"Approved [{tier.strip()}]", tier.strip()
 
-                # ── AUTO-REGISTER: run instant backtest, add to CSV ──────────
-                logger.info(f"[AutoRegister] Strategy '{strategy_name}' not in leaderboard for {symbol}. "
-                            f"Triggering auto-backtest…")
-                tier, result = self.auto_register_strategy(symbol, strategy_name)
-                if "REVERSE_ALPHA" in tier or ("ALPHA" in tier and "REVERSE" not in tier):
-                    if "REVERSE" in tier:
-                        return True, f"Auto-registered ✅ REVERSE_ALPHA: {strategy_name}", "REVERSE_ALPHA"
-                    return True, f"Auto-registered ✅ ALPHA: {strategy_name}", "ALPHA"
-                else:
-                    roi = result.get("Daily_ROI_%", "?")
-                    ndd = result.get("Net_DD_%", "?")
-                    return False, (f"Auto-registered 🚫 BLOCKED: {strategy_name} "
-                                   f"| ROI={roi}%/day  NDD={ndd}%"), "BLOCKED"
-            row = match.iloc[0]
-            tier = str(row.get('Tier', ''))
-            if "ALPHA" in tier: return True, "Verified ALPHA: Direct Execution", "ALPHA"
-            if "AVERAGE" in tier: return True, "Verified AVERAGE: Human Approval Needed", "AVERAGE"
-            return False, f"Strategy Tier is {tier}. Blocked.", tier
-        except Exception as e:
-            logger.error(f"Leaderboard Check Error: {e}")
-            return False, f"Leaderboard check failed: {e}", "ERROR"
-
-    def check_safety_gate(self, symbol, qty, price, side, exchange="binance", strategy="") -> tuple[bool, str]:
+    def check_safety_gate(self, symbol, qty, price, side, exchange="binance") -> tuple[bool, str]:
         if not self.allow_real: return False, "ALLOW_REAL_TRADES is disabled"
-
-        # --- Realized PnL check ---
-        realized_pnl = self.ledger.get_daily_pnl()
-
-        # --- Unrealized PnL check (add open position mark-to-market loss) ---
-        unrealized_pnl = 0.0
-        try:
-            open_positions = self.exchange_binance.get_open_positions()
-            for pos in open_positions:
-                unrealized_pnl += float(pos.get("unrealizedProfit", 0) or 0)
-        except Exception as _e:
-            logger.debug(f"check_safety_gate: unrealized PnL fetch skipped: {_e}")
-
-        total_pnl = realized_pnl + unrealized_pnl
-        if total_pnl <= self.daily_loss_limit:
-            return False, (f"Daily loss limit hit: realized=${realized_pnl:.2f} "
-                           f"unrealized=${unrealized_pnl:.2f} total=${total_pnl:.2f}")
-
-        # --- Per-strategy position check ---
-        pos_key = f"{exchange}:{symbol}:{strategy}" if strategy else f"{exchange}:{symbol}"
-        current_pos = self.ledger.get_position(pos_key)
+        current_pnl = self.ledger.get_daily_pnl()
+        if current_pnl <= self.daily_loss_limit:
+            return False, f"Daily loss limit hit: ${current_pnl:.2f}"
+        current_pos = self.ledger.get_position(f"{exchange}:{symbol}")
         if (side == "BUY" and current_pos.quantity > 0) or (side == "SELL" and current_pos.quantity < 0):
-            return False, f"Already in {side} position for {symbol} ({strategy}) on {exchange}."
-
-        # --- Max strategies per symbol check ---
-        max_strats = int(os.getenv("MAX_STRATEGIES_PER_SYMBOL", "2"))
-        active_strat_count = sum(
-            1 for key, pos_obj in getattr(self.ledger, 'positions', {}).items()
-            if f"{exchange}:{symbol}" in key and abs(float(getattr(pos_obj, 'quantity', 0))) > 0
-        )
-        if active_strat_count >= max_strats:
-            return False, (f"Max strategies per symbol reached: {active_strat_count}/{max_strats} "
-                           f"already active on {symbol}")
-
-        # --- Global max open positions check ---
-        max_open = int(os.getenv("MAX_OPEN_POSITIONS", "16"))
-        total_open = sum(
-            1 for key, pos_obj in getattr(self.ledger, 'positions', {}).items()
-            if not key.count(':') > 1 and abs(float(getattr(pos_obj, 'quantity', 0))) > 0
-        )
-        if total_open >= max_open:
-            return False, f"Global position limit reached: {total_open}/{max_open} open positions"
-
+            return False, f"Already in {side} position for {symbol} on {exchange}."
         return True, "Safe"
 
     def handle_signal(self, event: dict) -> bool:
         try:
-            metrics.inc("bot_signals_received_total")
-            correlation_id = str(uuid.uuid4())[:8]
             signal_id = event.get("signal_id")
-            logger.info(f"[{correlation_id}] Processing signal {signal_id}")
             if self.idempotency.is_seen(signal_id):
-                dup_payload = event.get("payload", {})
-                self._notify_signal_decision(
-                    title="Signal Skipped",
-                    reason="Duplicate signal ID already processed",
-                    signal_id=signal_id,
-                    symbol=str(dup_payload.get("symbol") or event.get("symbol") or "N/A").upper(),
-                    strategy=self._normalize_strategy(dup_payload.get("strategy") or event.get("strategy") or "N/A"),
-                    action=str(dup_payload.get("action") or event.get("action") or "N/A").upper(),
-                    severity=AlertSeverity.INFO,
-                )
-                logger.info(f"[{correlation_id}] Skipping duplicate: {signal_id}")
+                logger.info(f"Skipping duplicate: {signal_id}")
                 return True
 
             payload_raw = event.get("payload", {})
@@ -691,46 +370,79 @@ class Orchestrator:
                 signal_data["secret"] = self.webhook_secret
 
             target_exchange = str(payload_raw.get("exchange") or event.get("exchange") or "binance").lower()
-            strat_name_raw = payload_raw.get("strategy") or event.get("strategy") or "SMC"
-            strat_name = self._normalize_strategy(strat_name_raw)
+            strat_name = payload_raw.get("strategy") or event.get("strategy") or "SMC"
             symbol_raw = str(payload_raw.get("symbol") or event.get("symbol") or "BTCUSDT").upper()
 
             # --- SYMBOL CLEANING ---
             symbol = symbol_raw.split('_')[0]
-            if target_exchange in ("lighter",):
-                pass  # lighter uses symbol as-is (no USDT suffix)
-            elif target_exchange == "hyperliquid":
-                symbol = symbol.replace("USDT", "").replace("USD", "")
+            if target_exchange in ("hyperliquid", "lighter"):
+                symbol = symbol.replace("USDT", "").replace("USD", "") if target_exchange == "hyperliquid" else symbol
             else:
                 if "USDT" not in symbol:
                     symbol = f"{symbol.replace('USD', '')}USDT"
 
-            # --- 0.5. ALLOWED SYMBOLS FILTER ---
+            side_hint = str(payload_raw.get("action") or event.get("action") or "").upper()
+            timeframe_hint = str(
+                payload_raw.get("timeframe")
+                or event.get("timeframe")
+                or payload_raw.get("interval")
+                or event.get("interval")
+                or ""
+            ).strip()
+            is_exit_hint = bool(payload_raw.get("is_exit", False))
+            if not is_exit_hint:
+                pos_size_hint = str(payload_raw.get("position_size", event.get("position_size", ""))).strip().lower()
+                if pos_size_hint in ("0", "0.0", "flat"):
+                    is_exit_hint = True
+                raw_body_hint = str(event.get("raw_body", ""))
+                if "position is 0" in raw_body_hint.lower():
+                    is_exit_hint = True
+
             _allowed_raw = os.getenv("ALLOWED_SYMBOLS", "").strip()
             if _allowed_raw:
                 _allowed_list = [s.strip().upper() for s in _allowed_raw.split(",") if s.strip()]
                 if _allowed_list and symbol not in _allowed_list:
-                    logger.info(f"[{correlation_id}] Symbol {symbol} not in ALLOWED_SYMBOLS {_allowed_list} — skipping")
+                    logger.info(f"Symbol {symbol} not in ALLOWED_SYMBOLS {_allowed_list} - skipping")
                     self._notify_signal_decision(
                         title="Signal Blocked",
                         reason=f"Symbol {symbol} not in ALLOWED_SYMBOLS",
                         signal_id=signal_id,
                         symbol=symbol,
                         strategy=strat_name,
-                        action=payload_raw.get("action") or event.get("action") or "N/A",
+                        action=side_hint,
                         severity=AlertSeverity.WARNING,
                     )
-                    metrics.inc("bot_signals_blocked_total", labels={"reason": "symbol_not_allowed"})
                     return True
 
-            # --- 1. DIRECT TRADINGVIEW EXECUTION ---
-            # Tournament/leaderboard filtering, auto-backtest, and REVERSE_ALPHA
-            # flipping are intentionally bypassed. TradingView action is preserved.
-            tier = "TV_DIRECT"
-            logger.info(f"[{correlation_id}] Tournament filter bypassed: executing TradingView signal directly for {strat_name}/{symbol}")
+            approval_label = "EXIT_ONLY"
+            if not is_exit_hint:
+                is_allowed, reason, approval = self.check_strategy_approval(
+                    symbol=symbol,
+                    strategy_name=strat_name,
+                    exchange=target_exchange,
+                    timeframe=timeframe_hint,
+                )
+                if not is_allowed:
+                    logger.warning(f"Approval Blocked: {reason}")
+                    self._notify_signal_decision(
+                        title="Signal Blocked",
+                        reason=reason,
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        strategy=strat_name,
+                        action=side_hint,
+                        severity=AlertSeverity.WARNING,
+                    )
+                    try:
+                        self.sheets_logger.log_blocked_trade(
+                            symbol=symbol, side="N/A", strategy=strat_name,
+                            reason=f"Approval Manifest: {reason}", signal_id=signal_id)
+                    except Exception as e:
+                        logger.debug(f"Sheets log failed: {e}")
+                    return True
+                approval_label = str(approval.get("label") or approval.get("status") or "APPROVED_MANIFEST")
 
             # --- 1.5. SIGNAL DEDUP CHECK ---
-            side_hint = str(payload_raw.get("action") or event.get("action") or "").upper()
             if self._is_duplicate_signal(strat_name, symbol, side_hint):
                 self._notify_signal_decision(
                     title="Signal Skipped",
@@ -745,8 +457,7 @@ class Orchestrator:
 
             # --- 1.6. SYMBOL COOLDOWN CHECK ---
             if self._is_symbol_in_cooldown(symbol, strat_name):
-                metrics.inc("bot_signals_blocked_total", labels={"reason": "cooldown"})
-                logger.info(f"[{correlation_id}] Cooldown block: {symbol} (strategy: {strat_name})")
+                logger.info(f"Cooldown block: {symbol} (strategy: {strat_name})")
                 self._notify_signal_decision(
                     title="Signal Blocked",
                     reason=f"Cooldown active for {symbol}/{strat_name}",
@@ -777,30 +488,31 @@ class Orchestrator:
                 )
                 return True
 
-            # --- 2. ROI GUARD ---
+            # --- 2. ROI GUARD (disabled: live path uses manifest approval, not research metadata) ---
             try:
-                strat_info = json.loads(payload_raw.get("strategy", "{}"))
-                incoming_roi = float(strat_info.get("ROI", "0").replace("%", ""))
-                if incoming_roi <= 0:
-                    logger.warning(f"[{correlation_id}] ROI Guard: Signal blocked ({incoming_roi}%)")
-                    try:
-                        self.sheets_logger.log_blocked_trade(
-                            symbol=symbol, side="N/A", strategy=strat_name,
-                            reason=f"ROI Guard: {incoming_roi}% (Negative)", signal_id=signal_id)
-                    except Exception as e:
-                        logger.debug(f"Sheets log failed: {e}")
-                    self._notify_signal_decision(
-                        title="Signal Blocked",
-                        reason=f"ROI guard blocked signal ({incoming_roi}%)",
-                        signal_id=signal_id,
-                        symbol=symbol,
-                        strategy=strat_name,
-                        action=side_hint,
-                        severity=AlertSeverity.WARNING,
-                    )
-                    return True
+                if False:
+                    strat_info = json.loads(payload_raw.get("strategy", "{}"))
+                    incoming_roi = float(strat_info.get("ROI", "0").replace("%", ""))
+                    if incoming_roi <= 0:
+                        logger.warning(f"ROI Guard: Signal blocked ({incoming_roi}%)")
+                        try:
+                            self.sheets_logger.log_blocked_trade(
+                                symbol=symbol, side="N/A", strategy=strat_name,
+                                reason=f"ROI Guard: {incoming_roi}% (Negative)", signal_id=signal_id)
+                        except Exception as e:
+                            logger.debug(f"Sheets log failed: {e}")
+                        return True
             except (json.JSONDecodeError, ValueError, TypeError):
                 pass  # ROI check is optional — strategy field is usually plain text
+
+            # --- 3. TIER-BASED INTERACTIVE GATE (disabled: manifest approval is canonical) ---
+            if False:
+                try:
+                    self.telegram.send(severity=AlertSeverity.WARNING, title="Manual Sync Needed",
+                        message=f"AVERAGE Strategy: {strat_name} for {symbol}. No auto-trade. ID: {signal_id}")
+                except Exception as e:
+                    logger.debug(f"Telegram failed: {e}")
+                return True
 
             # --- 4. PREPARE EXECUTION DATA ---
             try:
@@ -808,40 +520,48 @@ class Orchestrator:
                 signal_data["symbol"] = symbol
                 signal_data["quantity"] = float(payload_raw.get("quantity") or event.get("quantity") or 0.003)
 
-                raw_price = float(payload_raw.get("price") or event.get("price") or 0.0)
-                # Always fetch live price for sanity check (and as fallback when raw_price == 0)
-                live_price = self.exchange_binance.get_mainnet_mark_price(symbol)
-                if raw_price <= 0:
-                    if live_price and live_price > 0:
-                        raw_price = live_price
-                        logger.info(f"[{correlation_id}] Price=0 resolved via mainnet for {symbol}: ${raw_price:,.4f}")
-                    else:
-                        logger.warning(f"[{correlation_id}] Cannot resolve price for {symbol}. Skipping.")
-                        self._notify_signal_decision(
-                            title="Signal Skipped",
-                            reason="Cannot resolve price from signal or live market",
-                            signal_id=signal_id,
-                            symbol=symbol,
-                            strategy=strat_name,
-                            action=payload_raw.get("action") or event.get("action") or "N/A",
-                            severity=AlertSeverity.INFO,
-                        )
-                        return True
-                elif live_price and live_price > 0:
-                    deviation = abs(raw_price - live_price) / live_price
-                    if deviation > 0.20:  # More than 20% deviation from live market price
-                        logger.warning(
-                            f"[{correlation_id}] ⚠️ PRICE SANITY FAIL: signal ${raw_price:,.4f} vs live "
-                            f"${live_price:,.4f} ({deviation*100:.0f}% off) for {symbol}. Using live price."
-                        )
-                        raw_price = live_price
+                signal_price = float(payload_raw.get("price") or event.get("price") or 0.0)
+
+                # ── LIVE PRICE OVERRIDE (always use real Binance price) ──────────
+                # Signal price from TradingView may be wrong/stale/hardcoded.
+                # Prefer the target exchange price when available; otherwise
+                # fall back to Binance mainnet as a common market reference.
+                live_price = None
+                if target_exchange == "lighter" and self.exchange_lighter:
+                    live_price = self.exchange_lighter.get_mark_price(symbol)
+                if not live_price:
+                    live_price = self.exchange_binance.get_mainnet_mark_price(symbol)
+
+                if live_price and live_price > 0:
+                    if signal_price > 0:
+                        deviation = abs(signal_price - live_price) / live_price * 100
+                        if deviation > 5.0:
+                            logger.warning(
+                                f"⚠️ Price override [{symbol}]: signal=${signal_price:,.4f} → "
+                                f"live=${live_price:,.4f} (deviation={deviation:.1f}%)"
+                            )
+                        else:
+                            logger.debug(
+                                f"Price OK [{symbol}]: signal=${signal_price:,.4f} "
+                                f"live=${live_price:,.4f} ({deviation:.1f}% diff)"
+                            )
+                    raw_price = live_price  # ALWAYS use live price
+                elif signal_price > 0:
+                    # Live fetch failed — fallback to signal price with safety check
+                    logger.warning(f"Live price fetch failed for {symbol}. Using signal price ${signal_price:,.4f} as fallback.")
+                    raw_price = signal_price
+                else:
+                    logger.warning(f"Cannot resolve price for {symbol} (no live price, no signal price). Skipping.")
+                    return True
+                # ── END LIVE PRICE OVERRIDE ───────────────────────────────────────
+
                 signal_data["price"] = raw_price
                 signal_data["action"] = str(payload_raw.get("action") or event.get("action") or "BUY").upper()
 
                 valid_payload = SignalPayload(**signal_data)
                 payload = valid_payload.model_dump()
             except Exception as e:
-                logger.error(f"[{correlation_id}] Data Parsing Error: {e}")
+                logger.error(f"Data Parsing Error: {e}")
                 self._notify_signal_decision(
                     title="Signal Blocked",
                     reason=f"Data parsing error: {e}",
@@ -874,17 +594,13 @@ class Orchestrator:
                 if current_pos.quantity == 0:
                     aggregate_pos = self.ledger.get_position(aggregate_pos_key)
                     if aggregate_pos.quantity == 0:
-                        reason = (
-                            f"Exit signal received, but no open position exists on {strategy_pos_key} "
-                            f"or {aggregate_pos_key}"
-                        )
-                        logger.info(
-                            f"[{correlation_id}] Exit signal for {symbol} but no position open "
-                            f"on {strategy_pos_key} or {aggregate_pos_key}. Skipping."
-                        )
+                        logger.info(f"Exit signal for {symbol} but no position open. Skipping.")
                         self._notify_signal_decision(
                             title="Signal Skipped",
-                            reason=reason,
+                            reason=(
+                                f"Exit signal received, but no open position exists on "
+                                f"{strategy_pos_key} or {aggregate_pos_key}"
+                            ),
                             signal_id=signal_id,
                             symbol=symbol,
                             strategy=strat_name,
@@ -894,45 +610,24 @@ class Orchestrator:
                         return True
                     current_pos = aggregate_pos
                     ledger_pos_key = aggregate_pos_key
-                    logger.info(
-                        f"[{correlation_id}] Exit fallback: {strategy_pos_key} is flat; "
-                        f"closing aggregate {aggregate_pos_key} position instead."
-                    )
                 if current_pos.quantity > 0:
                     side = "SELL"
                     qty = abs(current_pos.quantity)
                 elif current_pos.quantity < 0:
                     side = "BUY"
                     qty = abs(current_pos.quantity)
-                logger.info(
-                    f"[{correlation_id}] Exit signal: closing {ledger_pos_key} "
-                    f"position ({current_pos.quantity}) with {side} {qty}"
-                )
-                # Cancel any open SL/TP orders BEFORE placing the close order to avoid
-                # double-fills: if SL hit first AND we then market-close, both execute.
-                if target_exchange == "binance":
-                    cancel_ok = self.exchange_binance.cancel_open_orders(symbol)
-                    logger.info(f"[{correlation_id}] SL/TP cancel before exit: {'OK' if cancel_ok else 'WARN — cancel may have failed'}")
+                logger.info(f"Exit signal: closing {ledger_pos_key} position ({current_pos.quantity}) with {side} {qty}")
 
             # --- 4.9. KILL SWITCH CHECK ---
             kill_file = os.path.join(os.path.dirname(self.ledger_path), "KILL_SWITCH")
             if os.path.exists(kill_file):
-                self._notify_signal_decision(
-                    title="Signal Blocked",
-                    reason="Kill switch is active",
-                    signal_id=signal_id,
-                    symbol=symbol,
-                    strategy=strat_name,
-                    action=payload.get("action", side),
-                    severity=AlertSeverity.WARNING,
-                )
-                logger.critical(f"[{correlation_id}] KILL SWITCH ACTIVE — blocking all trades")
+                logger.critical("KILL SWITCH ACTIVE — blocking all trades")
                 return True
 
             # --- 4.95. CIRCUIT BREAKER CHECK ---
             if self.circuit_breaker and not self.circuit_breaker.should_allow_trade():
                 cb_reason = self.circuit_breaker.get_status().get('trip_reason', 'Circuit breaker tripped')
-                logger.warning(f"[{correlation_id}] Circuit Breaker: {cb_reason}")
+                logger.warning(f"Circuit Breaker: {cb_reason}")
                 def _cb_alert():
                     try:
                         self.telegram.send(severity=AlertSeverity.CRITICAL, title="CIRCUIT BREAKER TRIPPED",
@@ -944,15 +639,6 @@ class Orchestrator:
                         reason=f"Circuit Breaker: {cb_reason}", signal_id=signal_id)
                 except Exception as e:
                     logger.debug(f"Sheets log failed: {e}")
-                self._notify_signal_decision(
-                    title="Signal Blocked",
-                    reason=f"Circuit breaker active: {cb_reason}",
-                    signal_id=signal_id,
-                    symbol=symbol,
-                    strategy=strat_name,
-                    action=payload.get("action", side),
-                    severity=AlertSeverity.WARNING,
-                )
                 return True
 
             # --- 5. RISK GATES ---
@@ -962,18 +648,14 @@ class Orchestrator:
                 else:
                     is_safe, risk_reason = True, "Exit signal - closing position"
             else:
-                is_safe, risk_reason = self.check_safety_gate(symbol, qty, price_signal, side, exchange=target_exchange, strategy=strat_name)
+                is_safe, risk_reason = self.check_safety_gate(symbol, qty, price_signal, side, exchange=target_exchange)
             if not is_safe:
-                logger.warning(f"[{correlation_id}] Safety Gate Block: {risk_reason}")
-                self._notify_signal_decision(
-                    title="Signal Blocked",
-                    reason=f"Safety gate blocked signal: {risk_reason}",
-                    signal_id=signal_id,
-                    symbol=symbol,
-                    strategy=strat_name,
-                    action=payload.get("action", side),
-                    severity=AlertSeverity.WARNING,
-                )
+                logger.warning(f"Safety Gate Block: {risk_reason}")
+                try:
+                    self.telegram.send(severity=AlertSeverity.WARNING, title="Risk Block",
+                        message=f"Safety Gate: {symbol} - {risk_reason}")
+                except Exception as e:
+                    logger.debug(f"Telegram failed: {e}")
                 try:
                     self.sheets_logger.log_blocked_trade(
                         symbol=symbol, side=side, strategy=strat_name,
@@ -987,64 +669,50 @@ class Orchestrator:
             if not is_exit and size_mode == "equity_pct":
                 equity_pct = float(os.getenv("EQUITY_PCT_PER_TRADE", "5.0")) / 100
                 try:
-                    health = self.exchange_binance.get_account_health()
-                    if health:
-                        avail = health.get("available_balance", 0)
-                        # Always use live market price for position sizing — signal price may be stale
-                        _sizing_price = self.exchange_binance.get_mainnet_mark_price(symbol) or price_signal
-                        if avail > 0 and _sizing_price > 0:
-                            qty = (avail * equity_pct) / _sizing_price
-                            logger.info(f"[{correlation_id}] Equity sizing: {equity_pct*100}% of ${avail:.2f} @ ${_sizing_price:.2f} = {qty:.6f} {symbol}")
+                    if target_exchange == "lighter" and self.exchange_lighter:
+                        avail = self.exchange_lighter.get_account_balance() or 0
+                        sizing_price = self.exchange_lighter.get_mark_price(symbol) or price_signal
+                    else:
+                        health = self.exchange_binance.get_account_health()
+                        avail = float(health.get("available_balance", 0)) if health else 0
+                        sizing_price = self.exchange_binance.get_mainnet_mark_price(symbol) or price_signal
+                    if avail > 0 and sizing_price > 0:
+                        qty = (avail * equity_pct) / sizing_price
+                        logger.info(f"Equity sizing [{target_exchange}]: {equity_pct*100}% of ${avail:.2f} @ ${sizing_price:.2f} = {qty:.6f} {symbol}")
                 except Exception as e:
-                    logger.warning(f"[{correlation_id}] Equity sizing failed, using signal qty: {e}")
+                    logger.warning(f"Equity sizing failed, using signal qty: {e}")
 
             # Max qty cap for new entries. Exits must be allowed to close full size.
             if not is_exit:
                 max_allowed = self.MAX_QTY.get(symbol, 1.0)
                 if qty > max_allowed:
-                    logger.warning(f"[{correlation_id}] Qty capped: {qty} -> {max_allowed} for {symbol}")
+                    logger.warning(f"Qty capped: {qty} -> {max_allowed} for {symbol}")
                     qty = max_allowed
 
             # --- 6. ACTUAL EXECUTION ---
+            # ⚡ Lock symbol BEFORE calling exchange — prevents duplicate orders from
+            # concurrent strategies firing the same candle close (race condition fix).
+            # Lock is persisted to disk so it survives service restarts.
+            self._persist_exec_lock(symbol)
+            self._set_candle_lock(symbol, side, strat_name)
+
             execution_res, fill_price = {}, price_signal
             if target_exchange == "lighter":
                 if not self.exchange_lighter:
-                    logger.warning("Lighter client not available")
-                    self._notify_signal_decision(
-                        title="Signal Skipped",
-                        reason="Lighter client not available",
-                        signal_id=signal_id,
-                        symbol=symbol,
-                        strategy=strat_name,
-                        action=payload.get("action", side),
-                        severity=AlertSeverity.INFO,
-                    )
+                    logger.warning(f"Lighter client not available, skipping {symbol}")
                     return True
-                try:
-                    is_buy = (side == "BUY")
-                    res = self.exchange_lighter.market_order(symbol, is_buy, qty, price_signal, signal_id)
-                    if res.get("status") == "ok":
-                        execution_res = {"status": "SUCCESS"}
-                        try:
-                            fill_price = float(res["response"]["data"]["statuses"][0]["filled"]["avgPx"])
-                        except (KeyError, IndexError, TypeError):
-                            fill_price = price_signal
-                    else:
-                        execution_res = {"status": "FAILED", "reason": str(res.get("msg",""))}
-                except Exception as e:
-                    execution_res = {"status": "FAILED", "reason": str(e)}
+                execution_res = self.exchange_lighter.execute_futures_order(
+                    symbol, side, qty, price=price_signal, signal_id=signal_id
+                )
+                if execution_res.get("status") == "SUCCESS":
+                    fill_price = float(
+                        execution_res.get("avg_price") or
+                        self.exchange_lighter.get_mark_price(symbol) or
+                        price_signal
+                    )
             elif target_exchange == "hyperliquid":
                 if not self.exchange_hl:
-                    logger.warning(f"[{correlation_id}] HL client not available, skipping {symbol}")
-                    self._notify_signal_decision(
-                        title="Signal Skipped",
-                        reason="Hyperliquid client not available",
-                        signal_id=signal_id,
-                        symbol=symbol,
-                        strategy=strat_name,
-                        action=payload.get("action", side),
-                        severity=AlertSeverity.INFO,
-                    )
+                    logger.warning(f"HL client not available, skipping {symbol}")
                     return True
                 try:
                     res = self.exchange_hl.market_order(symbol, (side == "BUY"), qty)
@@ -1057,110 +725,51 @@ class Orchestrator:
                     else:
                         execution_res = {"status": "FAILED", "reason": str(res)}
                 except Exception as e:
-                    logger.error(f"[{correlation_id}] HL execution error: {e}")
+                    logger.error(f"HL execution error: {e}")
                     execution_res = {"status": "FAILED", "reason": str(e)}
             else:
                 execution_res = self.exchange_binance.execute_futures_order(symbol, side, qty, price_signal, signal_id=signal_id)
-
-                # --- TIMEOUT RECOVERY: order may have been submitted but response lost ---
-                if execution_res.get("status") == "TIMEOUT":
-                    _coid = execution_res.get("client_order_id", signal_id)
-                    logger.warning(f"[{correlation_id}] Order timeout for {symbol} — querying order status (ID: {_coid})")
-                    time.sleep(3)  # brief wait for exchange to process
-                    _order_check = self.exchange_binance.get_order_status(symbol, _coid)
-                    _order_state = _order_check.get("status", "UNKNOWN")
-                    if _order_state == "FILLED":
-                        _avg = _order_check.get("avgPrice", 0)
-                        execution_res = {
-                            "status": "SUCCESS",
-                            "orderId": _order_check.get("orderId"),
-                            "avgPrice": _avg,
-                            "recovered_from_timeout": True
-                        }
-                        logger.info(f"[{correlation_id}] Timeout recovery: order FILLED @ ${_avg}")
-                    elif _order_state in ("NEW", "PARTIALLY_FILLED"):
-                        # Order exists but not fully filled — wait a bit more then re-check once
-                        time.sleep(5)
-                        _order_check2 = self.exchange_binance.get_order_status(symbol, _coid)
-                        if _order_check2.get("status") == "FILLED":
-                            execution_res = {
-                                "status": "SUCCESS",
-                                "orderId": _order_check2.get("orderId"),
-                                "avgPrice": _order_check2.get("avgPrice", 0),
-                                "recovered_from_timeout": True
-                            }
-                        else:
-                            logger.warning(f"[{correlation_id}] Timeout recovery: order still {_order_check2.get('status')} — treating as FAILED")
-                            execution_res = {"status": "FAILED", "reason": "timeout_unconfirmed", "msg": f"Order {_coid} state: {_order_check2.get('status')}"}
-                    elif _order_state == "NOT_FOUND":
-                        logger.warning(f"[{correlation_id}] Timeout recovery: order NOT_FOUND — trade did not execute")
-                        execution_res = {"status": "FAILED", "reason": "timeout_not_executed", "msg": "Order not found after timeout"}
-                    else:
-                        logger.warning(f"[{correlation_id}] Timeout recovery: unknown state {_order_state} — treating as FAILED")
-                        execution_res = {"status": "FAILED", "reason": "timeout_unknown", "msg": f"State: {_order_state}"}
-
                 if execution_res.get("status") == "SUCCESS":
-                    # Binance live response uses camelCase avgPrice; paper mode uses snake_case avg_price
-                    _raw_fill = float(execution_res.get("avg_price") or execution_res.get("avgPrice") or 0)
-                    fill_price = _raw_fill if _raw_fill > 0 else price_signal
-                    # Sanity check: if fill_price still matches signal price and deviates >20% from live,
-                    # use live price for SL/TP to avoid "would immediately trigger" errors.
-                    if fill_price == price_signal:
-                        try:
-                            _live = self.exchange_binance.get_mainnet_mark_price(symbol)
-                            if _live and _live > 0 and abs(fill_price - _live) / _live > 0.20:
-                                logger.warning(f"[{correlation_id}] fill_price ${fill_price} deviates >20% from live ${_live} — using live price for SL/TP")
-                                fill_price = _live
-                        except Exception:
-                            pass
+                    fill_price = float(
+                        execution_res.get("avg_price") or
+                        self.exchange_binance.get_mainnet_mark_price(symbol) or
+                        price_signal
+                    )
 
             # --- 7. LOGGING & ALERTS ---
             if execution_res.get("status") == "SUCCESS":
                 self.idempotency.mark_seen(signal_id)
                 try:
-                    pos_key = ledger_pos_key
-                    _pnl_before = self.ledger.get_position(pos_key).daily_realized_pnl
-                    pos_snapshot = self.ledger.apply_fill(pos_key, side, qty, fill_price)
-                    _this_trade_pnl = pos_snapshot.daily_realized_pnl - _pnl_before
+                    pos_snapshot = self.ledger.apply_fill(ledger_pos_key, side, qty, fill_price)
                 except Exception as e:
-                    logger.critical(f"[{correlation_id}] LEDGER WRITE FAILED: {e}. Trade OK but ledger desynced!")
+                    logger.critical(f"LEDGER WRITE FAILED: {e}. Trade OK but ledger desynced!")
                     def _alert_desync():
                         try:
                             self.telegram.send(severity=AlertSeverity.CRITICAL, title="LEDGER DESYNC",
                                 message=f"Ledger write failed for {side} {qty} {symbol} @ {fill_price}. MANUAL FIX NEEDED.", force=True)
                         except: pass
                     self._thread_pool.submit(_alert_desync)
-                    pos_snapshot = self.ledger.get_position(f"{target_exchange}:{symbol}:{strat_name}")
+                    pos_snapshot = self.ledger.get_position(ledger_pos_key)
 
                 self._mark_symbol_traded(symbol, strat_name)
-                self._set_candle_lock(symbol, side, strat_name)
 
                 # Place exchange-side stop-loss
+                if not is_exit and target_exchange == "lighter" and self.exchange_lighter:
+                    sl_pct = float(os.getenv("STOP_LOSS_PCT", "3.0"))
+                    sl_res = self.exchange_lighter.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
+                    if sl_res.get("status") == "SUCCESS":
+                        logger.info(f"Lighter SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
+                    else:
+                        logger.warning(f"Lighter SL failed for {symbol}: {sl_res.get('msg')}")
                 if not is_exit and target_exchange == "binance":
-                    # Use SL/TP from signal if Pine script provided them; fallback to env defaults
-                    _sig_sl = float(payload_raw.get("sl_pct", 0) or 0)
-                    _sig_tp = float(payload_raw.get("tp_pct", 0) or 0)
-                    _env_sl = float(os.getenv("STOP_LOSS_PCT", "1.5"))
-                    _env_tp = float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
-                    sl_pct = _sig_sl if 0 < _sig_sl < 20.0 else _env_sl
-                    tp_pct = _sig_tp if 0 < _sig_tp < 50.0 else _env_tp
-                    logger.info(f"[{correlation_id}] SL={sl_pct}% TP={tp_pct}% "
-                                f"({'signal' if 0 < _sig_sl < 20.0 else 'default'} / "
-                                f"{'signal' if 0 < _sig_tp < 50.0 else 'default'})")
+                    sl_pct = float(os.getenv("STOP_LOSS_PCT", "3.0"))
                     sl_res = self.exchange_binance.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
                     if sl_res.get("status") == "SUCCESS":
-                        logger.info(f"[{correlation_id}] SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
+                        logger.info(f"SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
                     else:
-                        logger.warning(f"[{correlation_id}] SL placement failed for {symbol}: {sl_res.get('msg')}")
-                    tp_res = self.exchange_binance.place_take_profit(symbol, side, qty, fill_price, tp_pct=tp_pct, signal_id=signal_id)
-                    if tp_res.get("status") == "SUCCESS":
-                        logger.info(f"[{correlation_id}] TP placed for {symbol} @ ${tp_res.get('tpPrice')}")
-                    else:
-                        logger.warning(f"[{correlation_id}] TP placement failed for {symbol}: {tp_res.get('msg')}")
+                        logger.warning(f"SL placement failed for {symbol}: {sl_res.get('msg')}")
 
                 self.processed_count += 1
-                metrics.inc("bot_trades_executed_total", labels={"symbol": symbol, "side": side})
-                metrics.set_gauge("bot_last_trade_price", fill_price, labels={"symbol": symbol})
                 # Async: non-blocking Sheets write
                 def _log_trade():
                     try:
@@ -1171,10 +780,9 @@ class Orchestrator:
                         logger.warning(f"Sheets trade log failed (async): {e}")
                 self._thread_pool.submit(_log_trade)
 
-                # Record win/loss for circuit breaker (use THIS trade's PnL, not cumulative day PnL)
-                metrics.set_gauge("bot_daily_pnl_usd", pos_snapshot.daily_realized_pnl)
+                # Record win/loss for circuit breaker
                 if self.circuit_breaker:
-                    self.circuit_breaker.record_trade_result(_this_trade_pnl >= 0)
+                    self.circuit_breaker.record_trade_result(pos_snapshot.daily_realized_pnl >= 0)
 
                 # Auto-update analytics on every trade
                 # Async: non-blocking analytics update
@@ -1185,47 +793,20 @@ class Orchestrator:
                         logger.warning(f"Analytics update skipped (async): {ae}")
                 self._thread_pool.submit(_update_analytics)
 
-                # Determine trade type: Open/Close Long/Short
-                current_pos_qty = pos_snapshot.quantity if pos_snapshot else 0
-                if is_exit:
-                    if side == "SELL":
-                        trade_type = "Close Long"
-                        emoji = "🔴"
-                    else:
-                        trade_type = "Close Short"
-                        emoji = "🟢"
-                else:
-                    if side == "BUY":
-                        trade_type = "Open Long"
-                        emoji = "🟢"
-                    else:
-                        trade_type = "Open Short"
-                        emoji = "🔴"
-
-                # Calculate SL/TP prices (for Telegram alert display)
+                emoji = "🟢" if side == "BUY" else "🔴"
                 sl_info = ""
-                tp_info = ""
-                if not is_exit and target_exchange == "binance":
-                    _sig_sl_tg = float(payload_raw.get("sl_pct", 0) or 0)
-                    _sig_tp_tg = float(payload_raw.get("tp_pct", 0) or 0)
-                    sl_pct_val = _sig_sl_tg if 0 < _sig_sl_tg < 20.0 else float(os.getenv("STOP_LOSS_PCT", "1.5"))
-                    tp_pct_val = _sig_tp_tg if 0 < _sig_tp_tg < 50.0 else float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
-                    if side == "BUY":
-                        sl_price_est = fill_price * (1 - sl_pct_val / 100)
-                        tp_price_est = fill_price * (1 + tp_pct_val / 100)
-                    else:
-                        sl_price_est = fill_price * (1 + sl_pct_val / 100)
-                        tp_price_est = fill_price * (1 - tp_pct_val / 100)
+                if not is_exit and target_exchange in ("binance", "lighter"):
+                    sl_pct_val = float(os.getenv("STOP_LOSS_PCT", "3.0"))
+                    sl_price_est = fill_price * (1 - sl_pct_val / 100) if side == "BUY" else fill_price * (1 + sl_pct_val / 100)
                     sl_info = f"\n🛡️ <b>Stop-Loss:</b> <code>${sl_price_est:,.2f}</code> ({sl_pct_val}%)"
-                    tp_info = f"\n🎯 <b>Take-Profit:</b> <code>${tp_price_est:,.2f}</code> ({tp_pct_val}%)"
                 try:
                     self.telegram.send(severity=AlertSeverity.INFO, title="Trade Success",
                         message=(f"{emoji} <b>Bot Alert: Trade Executed</b>\n\n"
-                                 f"✅ <b>Action:</b> {trade_type} {symbol}\n"
+                                 f"✅ <b>Executed:</b> {side} {symbol}\n"
                                  f"💰 <b>Price:</b> <code>${fill_price:,.2f}</code>\n"
                                  f"📊 <b>Quantity:</b> <code>{qty}</code>\n"
                                  f"📋 <b>Strategy:</b> <code>{strat_name}</code>\n"
-                                 f"📈 <b>BT Status:</b> Verified {tier}{sl_info}{tp_info}\n"
+                                 f"📈 <b>Approval:</b> {approval_label}{sl_info}\n"
                                  f"💵 <b>Today PnL:</b> <code>${pos_snapshot.daily_realized_pnl:.2f}</code>\n"
                                  f"🆔 <b>ID:</b> <code>{signal_id}</code>"))
                 except Exception as e:
@@ -1234,30 +815,34 @@ class Orchestrator:
             else:
                 exec_reason = execution_res.get('reason', 'Unknown API Error')
                 exec_msg = execution_res.get('msg', '')
-                metrics.inc("bot_execution_failures_total")
-                logger.error(f"[{correlation_id}] Execution Failure: {exec_reason} | Detail: {exec_msg}")
-                self._notify_signal_decision(
-                    title="Execution Failure",
-                    reason=f"{exec_reason}: {exec_msg}" if exec_msg else exec_reason,
-                    signal_id=signal_id,
-                    symbol=symbol,
-                    strategy=strat_name,
-                    action=payload.get("action", side),
-                    severity=AlertSeverity.WARNING,
-                )
+                logger.error(f"Execution Failure: {exec_reason} | Detail: {exec_msg}")
                 try:
                     self.sheets_logger.log_blocked_trade(
                         symbol=symbol, side=side, strategy=strat_name,
                         reason=f"Execution Failed: {exec_reason}", signal_id=signal_id)
                 except Exception as e:
                     logger.debug(f"Sheets log failed: {e}")
-                if exec_reason == "permanent":
+                if exec_reason in ("permanent", "timeout_unknown"):
+                    # timeout_unknown: order status unclear — mark seen to prevent double-fill
+                    if exec_reason == "timeout_unknown":
+                        try:
+                            self.telegram.send(
+                                severity=AlertSeverity.CRITICAL,
+                                title="⏱️ ORDER TIMEOUT — CHECK MANUALLY",
+                                message=(f"⚠️ <b>{side} {symbol}</b> via <code>{strat_name}</code>\n"
+                                         f"Order sent to Binance but response timed out.\n"
+                                         f"<b>Status unknown — verify on Binance NOW.</b>\n"
+                                         f"Signal NOT retried to avoid double-fill.\n"
+                                         f"🆔 <code>{signal_id}</code>"),
+                                force=True)
+                        except Exception:
+                            pass
                     self.idempotency.mark_seen(signal_id)
                     return True
                 return False
 
         except Exception as e:
-            logger.error(f"[{correlation_id}] Critical Error in handle_signal: {e}")
+            logger.error(f"Critical Error in handle_signal: {e}")
             try:
                 with open(self.dlq_path, 'a') as dlq:
                     dlq.write(json.dumps({"ts": datetime.utcnow().isoformat(), "err": str(e), "event": event}) + "\n")
@@ -1294,48 +879,6 @@ class Orchestrator:
                 self.durable_queue.poll(handler=self.handle_signal, batch_size=1)
             else:
                 self.consumer.poll(handler=self.handle_signal, batch_size=1)
-
-            # --- PERIODIC RECONCILER (every 15 min) ---
-            if time.time() - self.last_reconcile > self.RECONCILE_INTERVAL:
-                self.last_reconcile = time.time()
-                def _run_reconcile():
-                    try:
-                        exchange_positions = self.exchange_binance.get_open_positions()
-                        if exchange_positions:
-                            exchange_data = {}
-                            for pos in exchange_positions:
-                                sym = pos.get('symbol', '')
-                                qty = float(pos.get('positionAmt', 0))
-                                if abs(qty) > 0:
-                                    ep = float(pos.get('entryPrice') or pos.get('entry_price') or 0)
-                                    exchange_data[f"binance:{sym}"] = {
-                                        'quantity': qty,
-                                        'side': 'LONG' if qty > 0 else 'SHORT',
-                                        'entry_price': ep if ep > 0 else None,
-                                    }
-                            alerts = self.reconciler.reconcile_with_exchange(exchange_data)
-                            if alerts:
-                                # Batch all alerts into ONE Telegram message
-                                summary_lines = []
-                                for msg in alerts:
-                                    # Extract symbol name from message for compact display
-                                    import re as _re2
-                                    sym_match = _re2.search(r'binance:(\w+)', msg)
-                                    sym_label = sym_match.group(1) if sym_match else "?"
-                                    summary_lines.append(f"• {sym_label}: {msg.split('to')[-1].strip() if 'to' in msg else msg[:60]}")
-                                batch_msg = chr(10).join(summary_lines)
-                                self.telegram.send(
-                                    severity=AlertSeverity.WARNING,
-                                    title=f"🔧 Reconciler: {len(alerts)} drift(s) fixed",
-                                    message=batch_msg
-                                )
-                                logger.info(f"Reconciler: {len(alerts)} drift(s) fixed")
-                            else:
-                                logger.debug("Reconciler: Ledger synced with exchange")
-                    except Exception as e:
-                        logger.warning(f"Reconciler run failed: {e}")
-                self._thread_pool.submit(_run_reconcile)
-
             if time.time() - self.last_heartbeat > 900:
                 logger.info(f"Heartbeat: Orchestrator running. Processed: {self.processed_count}")
                 self.last_heartbeat = time.time()

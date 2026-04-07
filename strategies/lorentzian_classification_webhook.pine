@@ -1,5 +1,5 @@
 // This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// ©jdehorty - Modified for Webhook Strategy Integration
+// jdehorty - Modified for Webhook Strategy Integration
 
 //@version=5
 strategy('ML: Lorentzian Classification - Webhook', 
@@ -19,7 +19,7 @@ import jdehorty/KernelFunctions/2 as kernels
 // ========================================
 // WEBHOOK CONFIGURATION
 // ========================================
-grp_webhook = "🔔 Webhook Configuration"
+grp_webhook = " Webhook Configuration"
 enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
 webhook_url = input.string("http://13.236.143.201/webhook/tradingview", "Webhook URL", group=grp_webhook, tooltip="Your bot webhook endpoint")
 WEBHOOK_SECRET = input.string("hybrid_tradingview_cluster_2026_secure", "Webhook Secret", group=grp_webhook, tooltip="Must match bot configuration")

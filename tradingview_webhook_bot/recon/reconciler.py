@@ -118,15 +118,21 @@ class Reconciler:
         entry_price = report.get("entry_price")
         entry_text = "n/a" if entry_price in (None, "", 0, 0.0) else str(entry_price)
         return (
-            f"🚨 *RECONCILIATION DRIFT FIXED: {symbol}*\n"
+            f"RECONCILIATION DRIFT FIXED: {symbol}\n"
+            f"Type: {report['drift_type']}\n"
+            f"Severity: {report['severity']}\n"
+            f"Ledger Before: {report['ledger_qty']}\n"
+            f"Exchange Before: {report['exchange_qty']}\n"
+            f"Drift: {report['drift']}\n"
+            f"Exchange Entry: {entry_text}\n"
+            f"Correction: {report['correction']}\n"
+            f"Ledger After: {report['post_sync_qty']}"
+        )
+        return (
+            f"🚨 *RECONCILIATION FIX: {symbol}*\n"
             f"━━━━━━━━━━━━━━━━━━\n"
-            f"⚠️ *Type:* `{report['drift_type']}`\n"
-            f"🧭 *Severity:* `{report['severity']}`\n"
-            f"📈 *Ledger Before:* `{report['ledger_qty']}`\n"
-            f"📉 *Exchange Before:* `{report['exchange_qty']}`\n"
-            f"📏 *Drift:* `{report['drift']}`\n"
-            f"🎯 *Exchange Entry:* `{entry_text}`\n"
-            f"🔧 *Correction:* {report['correction']}\n"
-            f"✅ *Ledger After:* `{report['post_sync_qty']}`\n"
+            f"📈 *Old Ledger:* `{report['ledger_qty']}`\n"
+            f"📉 *Exchange:* `{report['exchange_qty']}`\n"
+            f"🔧 *Status:* Ledger Synced to Exchange\n"
             f"━━━━━━━━━━━━━━━━━━"
         )

@@ -198,6 +198,76 @@ def _classify_alpha(
     return True, "Meets alpha rule: ROI/day > 1% and |Gross DD|, |Net DD| < 20%"
 
 
+def merge_summary_metrics(all_results: pd.DataFrame, summary_csv: Optional[Path]) -> pd.DataFrame:
+    if all_results.empty or not summary_csv:
+        return all_results
+    summary_csv = Path(summary_csv)
+    if not summary_csv.exists():
+        return all_results
+
+    try:
+        summary = pd.read_csv(summary_csv)
+    except Exception:
+        return all_results
+    if summary.empty:
+        return all_results
+
+    left = all_results.copy()
+    right = summary.copy()
+
+    left["_strategy_key"] = left["Strategy"].map(_normalize_name)
+    left["_symbol_key"] = left["Symbol"].astype(str).str.upper()
+    left["_timeframe_key"] = left["Timeframe"].astype(str).str.lower()
+    right["_strategy_key"] = right["Strategy"].map(_normalize_name)
+    right["_symbol_key"] = right["Symbol"].astype(str).str.upper()
+    right["_timeframe_key"] = right["Timeframe"].astype(str).str.lower()
+
+    summary_cols = [
+        "Profit Factor",
+        "OOS ROI %",
+        "OOS Max DD %",
+        "WF Avg ROI %",
+        "WF Pass Rate %",
+        "WF Windows",
+        "Reality Score",
+        "Credibility Flags",
+        "Shortlist Eligible",
+        "Sizing Mode",
+        "Fixed Notional",
+        "Sizing Max Fraction",
+        "Slippage Bps",
+        "CSV File",
+    ]
+    summary_cols = [col for col in summary_cols if col in right.columns]
+
+    merged = left.merge(
+        right[["_strategy_key", "_symbol_key", "_timeframe_key", *summary_cols]],
+        on=["_strategy_key", "_symbol_key", "_timeframe_key"],
+        how="left",
+    )
+    return merged.drop(columns=["_strategy_key", "_symbol_key", "_timeframe_key"], errors="ignore")
+
+
+def build_alpha_shortlist(alpha_candidates: pd.DataFrame, limit: int = 5) -> pd.DataFrame:
+    if alpha_candidates.empty:
+        return alpha_candidates.copy()
+
+    shortlist = alpha_candidates.copy()
+    if "Shortlist Eligible" in shortlist.columns:
+        shortlist = shortlist[shortlist["Shortlist Eligible"].fillna("NO").astype(str).str.upper() == "YES"].copy()
+    if shortlist.empty:
+        shortlist = alpha_candidates.copy()
+
+    sort_cols = [col for col in ["Reality Score", "OOS ROI %", "ROI_Per_Day_Pct", "Sharpe_Ratio", "Net_Profit_USD"] if col in shortlist.columns]
+    ascending = [False] * len(sort_cols)
+    if sort_cols:
+        shortlist = shortlist.sort_values(by=sort_cols, ascending=ascending)
+    shortlist = shortlist.head(max(int(limit), 1)).copy()
+    shortlist["Shortlist Rank"] = range(1, len(shortlist) + 1)
+    shortlist["Shortlist Status"] = "PAPER_CANDIDATE"
+    return shortlist
+
+
 def evaluate_trade_csv(
     csv_path: Path,
     initial_capital: float = 10_000.0,
@@ -286,6 +356,7 @@ def build_alpha_reports(
     fees_exchange: str = "0.06%",
     data_source: str = "tv_backtester_jan_2024",
     criteria: AlphaCriteria = AlphaCriteria(),
+    summary_csv: Optional[Path] = None,
 ) -> dict[str, pd.DataFrame]:
     input_folder = Path(input_folder)
     report_dir = Path(report_dir)
@@ -316,6 +387,7 @@ def build_alpha_reports(
         by=["Alpha_Qualified", "ROI_Per_Day_Pct", "Net_Profit_USD"],
         ascending=[False, False, False],
     ).reset_index(drop=True)
+    all_results = merge_summary_metrics(all_results, summary_csv)
     all_results["Rank"] = range(1, len(all_results) + 1)
 
     alpha_candidates = all_results[all_results["Alpha_Qualified"] == "YES"].copy()
@@ -472,6 +544,7 @@ def write_pipeline_status(
     all_results: pd.DataFrame,
     alpha_candidates: pd.DataFrame,
     best_per_symbol: pd.DataFrame,
+    shortlist: pd.DataFrame,
     input_dir: Path,
     scripts_dir: Path,
 ) -> Path:
@@ -484,6 +557,7 @@ def write_pipeline_status(
         "all_results_count": int(len(all_results)),
         "alpha_candidates_count": int(len(alpha_candidates)),
         "best_symbol_count": int(len(best_per_symbol)),
+        "shortlist_count": int(len(shortlist)),
         "best_alpha_symbol": best_per_symbol.iloc[0]["Symbol"] if not best_per_symbol.empty else "",
         "best_alpha_strategy": best_per_symbol.iloc[0]["Strategy"] if not best_per_symbol.empty else "",
         "best_alpha_roi_per_day_pct": _safe_float(best_per_symbol.iloc[0]["ROI_Per_Day_Pct"]) if not best_per_symbol.empty else 0.0,

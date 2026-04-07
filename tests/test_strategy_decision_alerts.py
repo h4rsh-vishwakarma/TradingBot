@@ -1,87 +1,81 @@
-import os
-import tempfile
-from unittest.mock import MagicMock, patch
+import json
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 from tradingview_webhook_bot.core.orchestrator import Orchestrator
 
 
-def _build_orchestrator():
+def _build_orchestrator(tmp_path):
+    manifest_path = tmp_path / "approved_strategies.json"
+    manifest_path.write_text(json.dumps({
+        "version": 1,
+        "updated_at": "2026-04-06T00:00:00Z",
+        "approvals": [
+            {
+                "strategy": "LiveStrategy",
+                "exchange": "binance",
+                "symbols": ["BTCUSDT"],
+                "timeframes": ["*"],
+                "operator": "tester",
+                "approved_at": "2026-04-06T00:00:00Z",
+                "backtest_hash": "sha256:test",
+                "label": "APPROVED_MANIFEST",
+            }
+        ],
+    }), encoding="utf-8")
+
     orch = Orchestrator.__new__(Orchestrator)
     orch.idempotency = MagicMock()
     orch.idempotency.is_seen.return_value = False
     orch.telegram = MagicMock()
     orch.sheets_logger = MagicMock()
     orch.webhook_secret = "test_secret"
-    orch._thread_pool = None
+    orch._thread_pool = SimpleNamespace(submit=lambda fn: fn())
     orch._is_duplicate_signal = lambda *args, **kwargs: False
     orch._is_symbol_in_cooldown = lambda *args, **kwargs: False
     orch._is_candle_locked = lambda *args, **kwargs: False
+    orch.exchange_hl = None
+    orch.exchange_lighter = None
+    orch.exchange_binance = MagicMock()
+    orch.exchange_binance.get_mainnet_mark_price.return_value = 85000.0
+    orch.exchange_binance.execute_futures_order.return_value = {"status": "SUCCESS", "avg_price": 85000.0}
+    orch.analytics = MagicMock()
+    orch.circuit_breaker = None
+    orch.processed_count = 0
+    orch.DEDUP_WINDOW_SECONDS = 120
+    orch.MAX_QTY = {"BTCUSDT": 1.0}
+    orch.allow_real = True
+    orch.daily_loss_limit = -50.0
+    orch.ledger_path = str(tmp_path / "ledger_state.json")
+    orch.dlq_path = str(tmp_path / "dead_letter.jsonl")
+    orch.approval_manifest_path = str(manifest_path)
+    orch.require_approval_manifest = True
+    orch._notify_signal_decision = Orchestrator._notify_signal_decision.__get__(orch, Orchestrator)
     return orch
 
 
-def test_orchestrator_sends_auto_reject_alert_for_unranked_strategy():
-    orch = _build_orchestrator()
-    orch.check_tournament_alpha = lambda symbol, strategy: (
-        False,
-        "Strategy OtherStrategy for SOLUSDT not in Leaderboard.",
-        "NONE",
-    )
-
+def test_orchestrator_sends_signal_blocked_for_unapproved_strategy(tmp_path):
+    orch = _build_orchestrator(tmp_path)
     event = {
         "signal_id": "SIG-REJECT-001",
         "payload": {
             "strategy": "OtherStrategy",
-            "symbol": "SOLUSDT",
+            "symbol": "BTCUSDT",
             "action": "BUY",
-            "price": 92.5,
-            "quantity": 1.0,
+            "price": 85000.0,
+            "quantity": 0.01,
             "secret": "test_secret",
         },
     }
 
     assert orch.handle_signal(event) is True
-
     kwargs = orch.telegram.send.call_args.kwargs
-    assert kwargs["title"] == "Auto Rejected"
-    assert "OtherStrategy" in kwargs["message"]
-    assert "No auto-trade executed" in kwargs["message"]
+    assert kwargs["title"] == "Signal Blocked"
+    assert "not approved in the live manifest" in kwargs["message"]
 
 
-def test_orchestrator_sends_auto_reject_alert_for_average_strategy():
-    orch = _build_orchestrator()
-    orch.check_tournament_alpha = lambda symbol, strategy: (
-        True,
-        "ROI below 0.5% threshold.",
-        "AVERAGE",
-    )
-
-    event = {
-        "signal_id": "SIG-AVG-001",
-        "payload": {
-            "strategy": "AverageStrategy",
-            "symbol": "ETHUSDT",
-            "action": "SELL",
-            "price": 2010.0,
-            "quantity": 0.1,
-            "secret": "test_secret",
-        },
-    }
-
-    assert orch.handle_signal(event) is True
-
-    kwargs = orch.telegram.send.call_args.kwargs
-    assert kwargs["title"] == "Auto Rejected"
-    assert "Manual review required" in kwargs["message"]
-
-
-def test_orchestrator_sends_match_error_alert_for_payload_validation_failure():
-    orch = _build_orchestrator()
-    orch.check_tournament_alpha = lambda symbol, strategy: (
-        True,
-        "Verified ALPHA: Direct Execution",
-        "ALPHA",
-    )
-
+def test_orchestrator_sends_signal_blocked_for_payload_validation_failure(tmp_path):
+    orch = _build_orchestrator(tmp_path)
     event = {
         "signal_id": "SIG-PARSE-001",
         "payload": {
@@ -95,35 +89,71 @@ def test_orchestrator_sends_match_error_alert_for_payload_validation_failure():
     }
 
     assert orch.handle_signal(event) is True
-
     kwargs = orch.telegram.send.call_args.kwargs
-    assert kwargs["title"] == "Strategy Match Error"
-    assert "payload_validation" in kwargs["message"]
+    assert kwargs["title"] == "Signal Blocked"
+    assert "Data parsing error" in kwargs["message"]
 
 
-def test_webhook_sends_alert_for_unrecognized_plain_text_strategy():
-    with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
-        from tradingview_webhook_bot.core.webhook_server import WebhookServer
+def test_orchestrator_blocks_symbol_not_in_allowlist(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALLOWED_SYMBOLS", "ETHUSDT")
+    orch = _build_orchestrator(tmp_path)
+    event = {
+        "signal_id": "SIG-ALLOWLIST-001",
+        "payload": {
+            "strategy": "LiveStrategy",
+            "symbol": "BTCUSDT",
+            "action": "BUY",
+            "price": 85000.0,
+            "quantity": 0.01,
+            "secret": "test_secret",
+        },
+    }
 
-        tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
-        try:
-            server = WebhookServer(
-                config={"webhook": {"secret": "test_secret_123"}},
-                signals_queue_file=tf.name,
-            )
-            server.telegram.send = MagicMock(return_value=True)
-            client = server.app.test_client()
+    assert orch.handle_signal(event) is True
+    kwargs = orch.telegram.send.call_args.kwargs
+    assert kwargs["title"] == "Signal Blocked"
+    assert "ALLOWED_SYMBOLS" in kwargs["message"]
 
-            resp = client.post(
-                "/webhook/tradingview",
-                data="Broken TradingView alert format without bot fields",
-                content_type="text/plain",
-            )
 
-            assert resp.status_code == 200
-            kwargs = server.telegram.send.call_args.kwargs
-            assert kwargs["title"] == "TradingView Script Error"
-            assert "did not match the bot parser" in kwargs["message"]
-        finally:
-            tf.close()
-            os.unlink(tf.name)
+def test_orchestrator_skips_duplicate_signal_with_deterministic_reason(tmp_path, monkeypatch):
+    monkeypatch.delenv("ALLOWED_SYMBOLS", raising=False)
+    orch = _build_orchestrator(tmp_path)
+    orch._is_duplicate_signal = lambda *args, **kwargs: True
+    event = {
+        "signal_id": "SIG-DUP-001",
+        "payload": {
+            "strategy": "LiveStrategy",
+            "symbol": "BTCUSDT",
+            "action": "BUY",
+            "price": 85000.0,
+            "quantity": 0.01,
+            "secret": "test_secret",
+        },
+    }
+
+    assert orch.handle_signal(event) is True
+    kwargs = orch.telegram.send.call_args.kwargs
+    assert kwargs["title"] == "Signal Skipped"
+    assert "Duplicate BUY signal" in kwargs["message"]
+
+
+def test_orchestrator_blocks_strategy_cooldown_with_deterministic_reason(tmp_path, monkeypatch):
+    monkeypatch.delenv("ALLOWED_SYMBOLS", raising=False)
+    orch = _build_orchestrator(tmp_path)
+    orch._is_symbol_in_cooldown = lambda *args, **kwargs: True
+    event = {
+        "signal_id": "SIG-COOLDOWN-001",
+        "payload": {
+            "strategy": "LiveStrategy",
+            "symbol": "BTCUSDT",
+            "action": "BUY",
+            "price": 85000.0,
+            "quantity": 0.01,
+            "secret": "test_secret",
+        },
+    }
+
+    assert orch.handle_signal(event) is True
+    kwargs = orch.telegram.send.call_args.kwargs
+    assert kwargs["title"] == "Signal Blocked"
+    assert "Cooldown active" in kwargs["message"]

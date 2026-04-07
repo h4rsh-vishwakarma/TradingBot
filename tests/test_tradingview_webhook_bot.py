@@ -1298,7 +1298,7 @@ class TestReconciler:
         assert len(incidents) == 1
 
     def test_format_incident(self, reconciler):
-        report = {"ledger_qty": 1.0, "exchange_qty": 1.5, "drift": 0.5}
+        report = reconciler.detect_qty_drift(1.0, 1.5)
         msg = reconciler.format_incident("BTCUSDT", report)
         assert "BTCUSDT" in msg
         assert "RECONCILIATION" in msg

@@ -1,0 +1,98 @@
+//@version=5
+// 
+// Ichimoku_Trend_Pro [Webhook] v3  4H CHART
+// 
+// WHY 4H: 15m had 3100-3189 trades = -9971% to -9996% on TV
+//         4H has  ~200 trades = 0.025%/day fees  viable
+// Entry: Ichimoku cloud breakout + price above/below Kijun trend filter
+// 
+// SYMBOL PARAMS (from tournament optimization):
+//   FILUSDT   Tenkan=16, Mult=2.55
+//   LDOUSDT   Tenkan=13, Mult=2.05
+//   UNIUSDT   Tenkan=11, Mult=1.85
+//   OPUSDT    Tenkan=14, Mult=2.55
+// 
+strategy("Ichimoku Trend Pro [Webhook] v3  4H", shorttitle="ITP-4H",
+     overlay=true,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.06,
+     calc_on_order_fills=false, calc_on_every_tick=false)
+
+//  Inputs 
+grp_c = "Ichimoku Settings"
+grp_r = "Risk Management"
+grp_f = "Filters"
+
+tenkan_len = input.int(16,    "Tenkan Sen Length",     group=grp_c, minval=5,  maxval=30, tooltip="FILUSDT=16, LDOUSDT=13, UNIUSDT=11, OPUSDT=14")
+kijun_mult = input.float(2.55,"Kijun Multiplier",      group=grp_c, minval=1.0, maxval=5.0, step=0.01, tooltip="FILUSDT=2.55, LDOUSDT=2.05, UNIUSDT=1.85, OPUSDT=2.55")
+sl_pct     = input.float(2.0, "Stop Loss %",           group=grp_r, minval=0.5, maxval=10.0, step=0.1)
+tp_pct     = input.float(6.0, "Take Profit %",         group=grp_r, minval=1.0, maxval=20.0, step=0.1)
+adx_th     = input.int(20,    "ADX Threshold",         group=grp_f, minval=10, maxval=40)
+min_gap    = input.int(2,     "Min Bars Between Signals", group=grp_f, minval=1, maxval=10)
+
+//  Ichimoku Calculation 
+kijun_len   = math.round(tenkan_len * kijun_mult)
+senkou_len  = math.round(kijun_len * 2)
+
+tenkan   = (ta.highest(high, tenkan_len) + ta.lowest(low, tenkan_len)) / 2
+kijun    = (ta.highest(high, kijun_len)  + ta.lowest(low, kijun_len))  / 2
+senkouA  = (tenkan + kijun) / 2
+senkouB  = (ta.highest(high, senkou_len) + ta.lowest(low, senkou_len)) / 2
+
+// Cloud boundaries (shifted forward in Ichimoku convention)
+cloudTop    = math.max(senkouA[kijun_len], senkouB[kijun_len])
+cloudBottom = math.min(senkouA[kijun_len], senkouB[kijun_len])
+
+//  Filters 
+[_, _, adx] = ta.dmi(14, 14)
+atr14       = ta.atr(14)
+atrMa       = ta.sma(atr14, 100)
+adxOK       = adx > adx_th
+volOK       = atr14 < 2.5 * atrMa
+var int  consec = 0
+var int  cdBars = 0
+var bool inCool = false
+if strategy.closedtrades > 0
+    lastPnl = strategy.closedtrades.profit(strategy.closedtrades - 1)
+    consec  := lastPnl < 0 ? consec + 1 : 0
+    if consec >= 3
+        inCool := true
+        cdBars := 3
+        consec := 0
+if inCool
+    cdBars -= 1
+    if cdBars <= 0
+        inCool := false
+var int lastSigBar = 0
+gapOK  = bar_index - lastSigBar >= min_gap
+allF   = adxOK and volOK and (not inCool) and gapOK
+
+//  Signals 
+// Long: price breaks above cloud + Tenkan above Kijun
+longCond  = ta.crossover(close, cloudTop)    and tenkan > kijun and allF
+// Short: price breaks below cloud + Tenkan below Kijun
+shortCond = ta.crossunder(close, cloudBottom) and tenkan < kijun and allF
+
+//  Execute 
+if longCond
+    lastSigBar := bar_index
+    strategy.entry("Long", strategy.long)
+    strategy.exit("XL", "Long", loss=close*sl_pct/100, profit=close*tp_pct/100)
+if shortCond
+    lastSigBar := bar_index
+    strategy.entry("Short", strategy.short)
+    strategy.exit("XS", "Short", loss=close*sl_pct/100, profit=close*tp_pct/100)
+
+//  Plots 
+plot(tenkan,      "Tenkan",   color=color.red,   linewidth=1)
+plot(kijun,       "Kijun",    color=color.blue,  linewidth=2)
+k1 = plot(senkouA, "Senkou A", color=color.new(color.green,60), display=display.none)
+k2 = plot(senkouB, "Senkou B", color=color.new(color.red,60),   display=display.none)
+fill(k1, k2, color=senkouA >= senkouB ? color.new(color.green,80) : color.new(color.red,80), title="Cloud")
+bgcolor(inCool ? color.new(color.orange,90) : na, title="Cooldown")
+plotshape(longCond,  style=shape.triangleup,   location=location.belowbar, color=color.green, size=size.small)
+plotshape(shortCond, style=shape.triangledown, location=location.abovebar, color=color.red,   size=size.small)
+
+//  Alerts 
+alertcondition(longCond,  "LONG 4H", '{"symbol":"{{ticker}}","action":"buy","strategy":"Ichimoku_Trend_Pro","timeframe":"4h","price":"{{close}}","sl_pct":2.0,"tp_pct":6.0}')
+alertcondition(shortCond, "SHORT 4H", '{"symbol":"{{ticker}}","action":"sell","strategy":"Ichimoku_Trend_Pro","timeframe":"4h","price":"{{close}}","sl_pct":2.0,"tp_pct":6.0}')
