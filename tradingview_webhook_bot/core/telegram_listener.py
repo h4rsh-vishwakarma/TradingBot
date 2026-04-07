@@ -1,5 +1,6 @@
 import os, sys, time, subprocess, sqlite3
 import pandas as pd
+import json
 import telebot
 from pathlib import Path
 from dotenv import load_dotenv
@@ -22,6 +23,10 @@ DB_PATH = os.path.join(PROJECT_ROOT, "tradingview_webhook_bot/storage/idempotenc
 REPORT_PATH = os.path.join(PROJECT_ROOT, "storage/reports/tournament_winners.csv")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "http://127.0.0.1:5000/webhook/tradingview")
 STOP_FLAG_FILE = os.path.join(PROJECT_ROOT, "tradingview_webhook_bot/storage/STOP_DISPATCH")
+MANIFEST_PATH = os.path.join(PROJECT_ROOT, "config", "approved_strategies.json")
+
+# State tracker for /new_strat_mani conversations
+_pending_manifest_adds = {}
 
 bot = telebot.TeleBot(TOKEN)
 
@@ -86,6 +91,13 @@ def cmd_help(message):
         "📊 <b>/categories</b> — Strategy risk categories (High vs Safe)\n"
         "📊 <b>/status</b> — Live system health\n"
         "🔍 <b>/audit</b> — Tournament Leaderboard Top 10\n\n"
+
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "📋 <b>MANIFEST COMMANDS</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "📋 <b>/new_strat_mani</b> — Add strategy to approval manifest\n"
+        "📋 <b>/list_manifest</b> — Show all approved strategies\n"
+        "🗑️ <b>/remove_strat_mani</b> &lt;name&gt; — Remove strategy from manifest\n\n"
 
         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         "🛑 <b>STOP COMMANDS</b>\n"
@@ -489,6 +501,207 @@ def cmd_trade(message):
             bot.send_message(message.chat.id, f"❌ <b>FAILED</b>\nStatus: {response.status_code}\n{response.text}", parse_mode='HTML')
     except Exception as e:
         bot.send_message(message.chat.id, f"📡 <b>HUB OFFLINE</b>\n{e}", parse_mode='HTML')
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# /new_strat_mani — Add strategy to approval manifest
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@bot.message_handler(commands=['new_strat_mani'])
+def cmd_new_strat_manifest(message):
+    format_msg = (
+        "📋 <b>Add Strategy to Approval Manifest</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "Send the strategy details in this format:\n\n"
+        "<code>"
+        "strategy: CCI Trend\n"
+        "exchange: binance\n"
+        "symbols: ETHUSDT, BTCUSDT\n"
+        "timeframes: 240\n"
+        "operator: harsh\n"
+        "label: ALPHA\n"
+        "notes: ROI=5.91%, PF=1.14, DD=-2.82%"
+        "</code>\n\n"
+        "📌 <b>Rules:</b>\n"
+        "• <b>strategy</b> — exact name as TradingView sends\n"
+        "• <b>symbols</b> — comma separated, or <code>*</code> for all\n"
+        "• <b>timeframes</b> — comma separated, or <code>*</code> for all\n"
+        "• <b>exchange</b> — binance / lighter / hyperliquid\n"
+        "• <b>label</b> — ALPHA / PREMIUM / APPROVED\n\n"
+        "💡 Reply to THIS message with the details."
+    )
+    sent = bot.reply_to(message, format_msg, parse_mode='HTML')
+    _pending_manifest_adds[message.chat.id] = sent.message_id
+
+
+@bot.message_handler(func=lambda m: m.chat.id in _pending_manifest_adds and m.reply_to_message and m.reply_to_message.message_id == _pending_manifest_adds.get(m.chat.id))
+def handle_manifest_reply(message):
+    try:
+        text = message.text.strip()
+        lines = text.split("\n")
+        data = {}
+        for line in lines:
+            if ":" in line:
+                key, _, val = line.partition(":")
+                data[key.strip().lower()] = val.strip()
+
+        # Validate required fields
+        strategy = data.get("strategy", "").strip()
+        if not strategy:
+            bot.reply_to(message, "❌ <b>Missing 'strategy' field.</b> Please try again.", parse_mode='HTML')
+            return
+
+        exchange = data.get("exchange", "binance").strip().lower()
+        symbols_raw = data.get("symbols", "*").strip()
+        symbols = [s.strip().upper() for s in symbols_raw.split(",") if s.strip()] or ["*"]
+        timeframes_raw = data.get("timeframes", "*").strip()
+        timeframes = [t.strip() for t in timeframes_raw.split(",") if t.strip()] or ["*"]
+        operator = data.get("operator", "telegram").strip()
+        label = data.get("label", "APPROVED").strip()
+        notes = data.get("notes", "").strip()
+
+        from datetime import datetime, timezone
+
+        approval = {
+            "strategy": strategy,
+            "exchange": exchange,
+            "symbols": symbols,
+            "timeframes": timeframes,
+            "operator": operator,
+            "approved_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "backtest_hash": "telegram_approved",
+            "label": label,
+            "notes": notes,
+        }
+
+        # Load manifest
+        manifest_path = MANIFEST_PATH
+        if os.path.exists(manifest_path):
+            with open(manifest_path, 'r') as f:
+                manifest = json.load(f)
+        else:
+            manifest = {"version": 1, "approvals": []}
+
+        manifest.setdefault("approvals", [])
+
+        # Check for duplicate
+        strat_lower = strategy.lower()
+        for existing in manifest["approvals"]:
+            if existing.get("strategy", "").lower() == strat_lower and existing.get("exchange", "").lower() == exchange:
+                existing_syms = [s.upper() for s in existing.get("symbols", [])]
+                if existing_syms == symbols:
+                    bot.reply_to(message, f"⚠️ <b>{strategy}</b> already exists in manifest for {exchange} / {', '.join(symbols)}. Use /remove_strat_mani first to update.", parse_mode='HTML')
+                    _pending_manifest_adds.pop(message.chat.id, None)
+                    return
+
+        manifest["approvals"].append(approval)
+        manifest["updated_at"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+        with open(manifest_path, 'w') as f:
+            json.dump(manifest, f, indent=2)
+            f.write("\n")
+
+        total = len(manifest["approvals"])
+        confirm = (
+            f"✅ <b>Strategy Approved!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"📋 <b>Strategy:</b> <code>{strategy}</code>\n"
+            f"🏦 <b>Exchange:</b> <code>{exchange}</code>\n"
+            f"💎 <b>Symbols:</b> <code>{', '.join(symbols)}</code>\n"
+            f"⏰ <b>Timeframes:</b> <code>{', '.join(timeframes)}</code>\n"
+            f"👤 <b>Operator:</b> <code>{operator}</code>\n"
+            f"🏷️ <b>Label:</b> <code>{label}</code>\n"
+            f"📝 <b>Notes:</b> {notes or 'N/A'}\n\n"
+            f"📊 <b>Total approved strategies:</b> {total}\n\n"
+            f"⚡ <i>Live immediately — no restart needed.</i>"
+        )
+        bot.reply_to(message, confirm, parse_mode='HTML')
+        _pending_manifest_adds.pop(message.chat.id, None)
+
+    except Exception as e:
+        bot.reply_to(message, f"❌ <b>Error:</b> {e}", parse_mode='HTML')
+        _pending_manifest_adds.pop(message.chat.id, None)
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# /list_manifest — Show all approved strategies
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@bot.message_handler(commands=['list_manifest'])
+def cmd_list_manifest(message):
+    try:
+        if not os.path.exists(MANIFEST_PATH):
+            bot.reply_to(message, "📋 Manifest not found. No strategies approved yet.", parse_mode='HTML')
+            return
+
+        with open(MANIFEST_PATH, 'r') as f:
+            manifest = json.load(f)
+
+        approvals = manifest.get("approvals", [])
+        if not approvals:
+            bot.reply_to(message, "📋 <b>Manifest is empty.</b> No approved strategies.\n\nUse /new_strat_mani to add one.", parse_mode='HTML')
+            return
+
+        msg = f"📋 <b>Approved Strategies ({len(approvals)})</b>\n"
+        msg += "━━━━━━━━━━━━━━━━━━\n\n"
+
+        for i, a in enumerate(approvals):
+            symbols = ', '.join(a.get('symbols', ['*']))
+            tfs = ', '.join(a.get('timeframes', ['*']))
+            msg += (
+                f"<b>#{i+1} {a.get('strategy', 'N/A')}</b>\n"
+                f"  🏦 {a.get('exchange', 'N/A')} | 💎 {symbols} | ⏰ {tfs}\n"
+                f"  🏷️ {a.get('label', 'N/A')} | 👤 {a.get('operator', 'N/A')}\n"
+                f"  📅 {a.get('approved_at', 'N/A')}\n\n"
+            )
+
+        msg += f"<i>Updated: {manifest.get('updated_at', 'N/A')}</i>"
+        bot.reply_to(message, msg, parse_mode='HTML')
+
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error: {e}", parse_mode='HTML')
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# /remove_strat_mani — Remove strategy from manifest
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@bot.message_handler(commands=['remove_strat_mani'])
+def cmd_remove_manifest(message):
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        bot.reply_to(message, "❌ <b>Usage:</b> <code>/remove_strat_mani Strategy Name</code>\n\nExample: <code>/remove_strat_mani CCI Trend</code>\n\nUse /list_manifest to see current strategies.", parse_mode='HTML')
+        return
+
+    strategy_name = args[1].strip()
+    try:
+        if not os.path.exists(MANIFEST_PATH):
+            bot.reply_to(message, "📋 Manifest not found.", parse_mode='HTML')
+            return
+
+        with open(MANIFEST_PATH, 'r') as f:
+            manifest = json.load(f)
+
+        approvals = manifest.get("approvals", [])
+        original_count = len(approvals)
+        strat_lower = strategy_name.lower()
+
+        manifest["approvals"] = [a for a in approvals if a.get("strategy", "").lower() != strat_lower]
+        removed_count = original_count - len(manifest["approvals"])
+
+        if removed_count == 0:
+            bot.reply_to(message, f"⚠️ Strategy '<b>{strategy_name}</b>' not found in manifest.\n\nUse /list_manifest to see current strategies.", parse_mode='HTML')
+            return
+
+        from datetime import datetime, timezone
+        manifest["updated_at"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+        with open(MANIFEST_PATH, 'w') as f:
+            json.dump(manifest, f, indent=2)
+            f.write("\n")
+
+        remaining = len(manifest["approvals"])
+        bot.reply_to(message, f"🗑️ <b>Removed:</b> <code>{strategy_name}</code>\n\n✅ {removed_count} entry removed. {remaining} strategies remaining.\n\n⚡ <i>Live immediately — no restart needed.</i>", parse_mode='HTML')
+
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error: {e}", parse_mode='HTML')
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if __name__ == "__main__":
