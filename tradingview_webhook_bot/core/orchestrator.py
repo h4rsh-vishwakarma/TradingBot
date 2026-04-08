@@ -590,8 +590,18 @@ class Orchestrator:
             # --- AUTO-DETECT EXIT: if signal opposes current position, treat as exit ---
             if not is_exit:
                 try:
+                    # Check exact strategy key first
                     current_check = self.ledger.get_position(ledger_pos_key)
                     pos_qty = float(current_check.quantity)
+                    # If no position on exact key, check all positions on same exchange:symbol
+                    if pos_qty == 0:
+                        base_key = f"{target_exchange}:{symbol}"
+                        for lk, lp in self.ledger.positions.items():
+                            if lk.startswith(base_key) and float(lp.quantity) != 0:
+                                pos_qty = float(lp.quantity)
+                                ledger_pos_key = lk  # use the actual key with position
+                                logger.info(f"Exit match: no position on exact key, found {lk} with qty={pos_qty}")
+                                break
                     if pos_qty != 0:
                         is_long = pos_qty > 0
                         signal_is_sell = side == "SELL"
