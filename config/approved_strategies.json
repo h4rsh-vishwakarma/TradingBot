@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-04-08T07:26:04Z",
+  "updated_at": "2026-04-08T07:56:09Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -44,9 +44,9 @@
       ],
       "operator": "harsh",
       "approved_at": "2026-04-08T02:34:25Z",
-      "backtest_hash": "manual_approval_l_x_20260408",
+      "backtest_hash": "pine_only_no_batch_backtest_20260408",
       "label": "ALPHA",
-      "notes": "PENDING: backtest evidence required before go-live gate passes"
+      "notes": "Pine-only strategy (no Python backtest engine). Approved for paper validation only. Requires TradingView strategy tester evidence before go-live."
     },
     {
       "strategy": "Long",
@@ -60,9 +60,9 @@
       ],
       "operator": "harsh",
       "approved_at": "2026-04-08T02:36:24Z",
-      "backtest_hash": "manual_approval_long_20260408",
+      "backtest_hash": "pine_only_no_batch_backtest_20260408",
       "label": "ALPHA",
-      "notes": "PENDING: backtest evidence required before go-live gate passes"
+      "notes": "Pine-only strategy (no Python backtest engine). Approved for paper validation only. Requires TradingView strategy tester evidence before go-live."
     },
     {
       "strategy": "56_PSAR_Volume_Tight",
@@ -76,9 +76,9 @@
       ],
       "operator": "Garima",
       "approved_at": "2026-04-08T07:06:29Z",
-      "backtest_hash": "manual_approval_56_psar_volume_tight_20260408",
+      "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
       "label": "ALPHA",
-      "notes": "PENDING: backtest evidence required before go-live gate passes"
+      "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.148%, Gross_DD=-29.72%, Net_DD=-32.22%, Win_Rate=49.2%, Sharpe=5.35, Trades=60802, OOS_ROI=0.691%, OOS_DD=-20.66%, OOS_Sharpe=3.83, Tier=ALPHA"
     },
     {
       "strategy": "57_PSAR_Volume_Ultra",
@@ -91,9 +91,9 @@
       ],
       "operator": "Garima",
       "approved_at": "2026-04-08T07:07:29Z",
-      "backtest_hash": "manual_approval_57_psar_volume_ultra_20260408",
+      "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
       "label": "ALPHA",
-      "notes": "PENDING: backtest evidence required before go-live gate passes"
+      "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA"
     },
     {
       "strategy": "44_PSAR_Volume_Surge",
@@ -106,9 +106,9 @@
       ],
       "operator": "Garima",
       "approved_at": "2026-04-08T07:08:23Z",
-      "backtest_hash": "manual_approval_44_psar_volume_surge_20260408",
+      "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
       "label": "ALPHA",
-      "notes": "PENDING: backtest evidence required before go-live gate passes"
+      "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA"
     }
   ]
 }
