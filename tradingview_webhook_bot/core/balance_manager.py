@@ -193,8 +193,8 @@ class BalanceManager:
                 with open(self.balance_file, 'r') as f:
                     data = json.load(f)
                 
-                # Return position size + PnL (capital was deducted on reserve)
-                data['balance'] = data.get('balance', self.initial_balance) + position_size + realized_pnl
+                # Return PnL to balance
+                data["balance"] = data.get("balance", self.initial_balance) + realized_pnl
                 data['realized_pnl'] = data.get('realized_pnl', 0.0) + realized_pnl
                 data['total_trades'] = data.get('total_trades', 0) + 1
                 
