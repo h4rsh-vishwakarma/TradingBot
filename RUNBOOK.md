@@ -1,6 +1,6 @@
 # Trading Bot System Runbook
 
-**Version:** 3.0 | **Updated:** March 24, 2026 | **Server:** `ubuntu@15.207.152.119`
+**Version:** 4.0 | **Updated:** April 8, 2026 | **Server:** `ubuntu@15.207.152.119`
 
 ---
 
@@ -9,7 +9,7 @@
 ### Signal Flow
 
 ```
-TradingView (11 Pine Scripts on SOLUSDT/ETHUSDT)
+TradingView (7 Approved Strategies on ETHUSDT/BTCUSDT)
       |
       v  HTTPS POST (JSON + Plain Text alerts)
 +-----+------+
@@ -18,7 +18,7 @@ TradingView (11 Pine Scripts on SOLUSDT/ETHUSDT)
       |
       v  proxy_pass :5000
 +-----+------+
-|  Gunicorn  |  4 workers, gthread | trading_webhook.service
+|  Gunicorn  |  2 workers, 2 threads, gthread | trading_webhook.service
 | webhook_   |  Parses JSON & plain text formats
 | server.py  |  Validates secret, generates signal_id
 +-----+------+

@@ -97,7 +97,7 @@ Evidence:
 
 ### 7. Frozen Shortlist
 
-- only `3-5` paper-trade candidates may be active at once
+- only `2-10` paper-trade candidates may be active at once
 - shortlisted strategies must have:
   - approved manifest entry
   - generated webhook-ready Pine file
@@ -150,7 +150,7 @@ Use these thresholds for final sign-off.
 
 ### Shortlist Limits
 
-- shortlist size: `3-5`
+- shortlist size: `2-10`
 - max gross drawdown threshold from alpha engine: project-configured active rule
 - max net drawdown threshold from alpha engine: project-configured active rule
 

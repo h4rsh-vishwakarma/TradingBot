@@ -1,7 +1,7 @@
 # TradingView Webhook Bot
 
 **Production-Grade Multi-Strategy Cryptocurrency Trading System**
-**Version:** 3.0.0 | **Status:** Active | **Last Updated:** March 21, 2026
+**Version:** 4.0.0 | **Status:** Pre-production hardened / Paper validation active | **Last Updated:** April 8, 2026
 
 ---
 
@@ -11,9 +11,11 @@ Automated cryptocurrency trading system that receives trading signals from Tradi
 
 **Key Characteristics:**
 - **Signal-Driven:** Receives alerts from TradingView Pine Script indicators
-- **Multi-Strategy:** 8+ concurrent strategies running independently
+- **Multi-Strategy:** 7 approved strategies running independently
 - **Mainnet Price Authority:** All prices fetched from Binance mainnet (live spot/futures data)
-- **Testnet Execution:** All orders executed on Binance Futures Testnet (no real money risk)
+- **Testnet Execution:** Orders on Binance Futures Testnet (paper validation active)
+- **Approval Manifest:** Only strategies with backtest provenance can execute
+- **Auto Exit Detection:** SELL against open LONG auto-detected as exit
 - **Deterministic Ledger:** Accurate P&L tracking using Weighted Average Entry Price (WAEP)
 - **Crash-Safe:** Atomic JSONL queue storage with offset management
 - **Production Hardened:** Pydantic v2 schemas, CI/CD automation, reconciliation logic
@@ -94,14 +96,20 @@ Receives and validates trading signals from TradingView.
 
 Core trading logic that consumes signals and executes trades with multi-layer validation.
 
-**4-Layer Risk Gate System:**
+**10-Layer Safety Pipeline:**
 
 | Layer | Gate | Action |
 |-------|------|--------|
-| 1 | **Tournament Alpha** | Validates strategy against Leaderboard. ALPHA = auto-execute, AVERAGE = manual approval, NONE = blocked |
-| 2 | **ROI Guard** | Blocks signals with negative or zero historical ROI |
-| 3 | **Safety Gate** | Enforces `ALLOW_REAL_TRADES`, daily loss limit (-$50 default), prevents duplicate positions |
-| 4 | **Tier-Based Interactive Gate** | ALPHA executes immediately, AVERAGE requires Telegram approval |
+| 1 | **Webhook Auth** | Secret validation (strict mode) |
+| 2 | **Approval Manifest** | Strategy must be in approved_strategies.json with provenance |
+| 3 | **Idempotency** | SQLite dedup by signal_id |
+| 4 | **Signal Dedup** | Same strategy+symbol+side blocked within 120s |
+| 5 | **Symbol Cooldown** | 300s between trades per symbol |
+| 6 | **Candle Lock** | First signal wins per candle period |
+| 7 | **Auto Exit Detection** | SELL against LONG auto-detected as exit |
+| 8 | **Circuit Breaker** | Daily loss limit, consecutive losses, max drawdown |
+| 9 | **Safety Gate** | Position conflict, kill switch check |
+| 10 | **Qty Cap** | Per-symbol limits, equity-based sizing |
 
 **Execution Flow:**
 1. Parse signal (extract symbol, strategy, quantity, price, action)
@@ -156,6 +164,10 @@ Interactive command-based control and monitoring via Telegram bot.
 | `/buy SYMBOL` | Manual BUY signal (e.g., `/buy SOLUSDT`) |
 | `/sell SYMBOL` | Manual SELL signal |
 | `/override SYMBOL` | Force BUY (bypasses tier check) |
+| `/new_strat_mani` | Add strategy to approval manifest (requires notes) |
+| `/list_manifest` | Show all approved strategies |
+| `/remove_strat_mani` | Remove strategy from manifest |
+| `/stop` | Emergency stop — halt all dispatches |
 
 ---
 
@@ -247,20 +259,19 @@ Audits ledger against actual Binance positions.
 
 ---
 
-## Active Strategies
+## Approved Strategies (Manifest)
 
-| # | Strategy | Type |
-|---|----------|------|
-| 1 | Institutional Flow Hybrid | Volume profile + Smart money |
-| 2 | Squeeze Flow Expansion | Bollinger squeeze breakout |
-| 3 | SMA Crossover 9/21 | Moving average crossover |
-| 4 | Supertrend BTC 4H | ATR-based trend following |
-| 5 | OBV WaveTrend Scalper | Volume oscillator scalping |
-| 6 | Madrid Ribbon | Multi-timeframe EMA ribbon |
-| 7 | Institutional Matrix | Order flow analysis |
-| 8 | Lorentzian Classification | ML-based price prediction |
+| Strategy | Exchange | Symbols | Timeframe | Provenance |
+|----------|----------|---------|-----------|------------|
+| CCI Trend | Binance | ETHUSDT | 4h | Realistic backtest (ROI=5.91%, Sharpe=0.69) |
+| Donchian Trend | Binance | ETHUSDT | 4h | Realistic backtest (ROI=3.26%, Sharpe=0.41) |
+| 44_PSAR_Volume_Surge | Binance | BTCUSDT | 4h | Tournament (ROI=1.19%, Sharpe=5.53) |
+| 56_PSAR_Volume_Tight | Binance | ETHUSDT, BTCUSDT | 4h | Tournament (ROI=1.148%, Sharpe=5.35) |
+| 57_PSAR_Volume_Ultra | Binance | ETHUSDT | 4h | Tournament (ROI=1.19%, Sharpe=5.53) |
+| L_X | Binance | ETHUSDT, BTCUSDT | 4h | Pine-only (paper validation) |
+| Long | Binance | ETHUSDT, BTCUSDT | 4h | Pine-only (paper validation) |
 
-Pine Script source files are in `strategies/` directory.
+Manifest: `config/approved_strategies.json`. Managed via Telegram `/new_strat_mani` (requires backtest evidence).
 
 ---
 
@@ -439,18 +450,18 @@ cat storage/signals.offset
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/main.yml`):
-- **Triggers:** Push to `harsh` and `main` branches
-- **Steps:** Python 3.12 setup, dependency install, ledger math tests, schema integrity tests
+GitHub Actions (`.github/workflows/ci.yml`):
+- **Triggers:** Push/PR to `main`
+- **Steps:** Python 3.10, install requirements, run 335 tests (integration, orchestrator, strategy, lighter, exit, alpha, backtest realism, inventory, reconciler)
 
 ---
 
 ## Testing
 
 ```bash
-# Run all tests
-export PYTHONPATH=$PYTHONPATH:.
-pytest tests/
+# Run full test suite (335 tests)
+source venv/bin/activate
+python -m pytest -v tests/ tradingview_webhook_bot/recon/test_recon.py
 
 # Ledger math audit
 python3 ledger/test_ledger.py

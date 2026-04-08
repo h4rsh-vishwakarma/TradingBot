@@ -2,7 +2,7 @@
 
 **Automated Multi-Strategy Crypto Trading Platform**
 **Server:** `ubuntu@15.207.152.119` (AWS ap-south-1)
-**Status:** Operational (March 2026)
+**Status:** Pre-production hardened / Paper validation active (April 2026)
 
 ---
 
@@ -22,7 +22,7 @@ Production-grade automated trading system that receives TradingView webhook aler
 ## Architecture
 
 ```
-TradingView Alerts (11 Pine Scripts)
+TradingView Alerts (7 Approved Strategies)
           |
           v  HTTP POST (JSON / Plain Text)
 +---------+----------+
@@ -32,7 +32,7 @@ TradingView Alerts (11 Pine Scripts)
           |
           v  proxy_pass :5000
 +---------+----------+
-|  Gunicorn (4w/4t)  |    trading_webhook.service
+|  Gunicorn (2w/2t)  |    trading_webhook.service
 |  webhook_server.py |
 +---------+----------+
           |
@@ -67,21 +67,18 @@ TradingView Alerts (11 Pine Scripts)
 
 ## Active Strategies (Top 11 from Tournament)
 
-| Rank | Strategy | Symbol | Daily ROI | Gross DD | Net DD | Tier |
-|------|----------|--------|-----------|----------|--------|------|
-| 1 | OPTIMIZED_SOLUSDT (Bollinger) | SOLUSDT | 2.61% | -65.22% | -96.76% | ALPHA++ |
-| 2 | Reversed BarUpDn Strategy | SOLUSDT | 2.55% | -65.64% | -98.0% | ALPHA++ |
-| 3 | SMC Strategy [LuxAlgo] | SOLUSDT | 2.16% | -59.6% | -82.61% | ALPHA++ |
-| 4 | Reverse Liquidity Trap | SOLUSDT | 2.13% | -61.47% | -78.71% | ALPHA++ |
-| 5 | MVO Momentum Variance | SOLUSDT | 1.72% | -58.82% | -79.06% | ALPHA++ |
-| 6 | Institutional Flow Hybrid | SOLUSDT | 1.62% | -65.28% | -82.6% | ALPHA++ |
-| 7 | OBV + WaveTrend Volume Scalper | SOLUSDT | 1.56% | -63.61% | -89.91% | ALPHA++ |
-| 8 | ML Lorentzian Classification | SOLUSDT | 1.33% | -25.96% | -28.29% | ALPHA |
-| 9 | Reversed BarUpDn Strategy | ETHUSDT | 1.27% | -51.78% | -57.65% | ALPHA |
-| 10 | OPTIMIZED_SOLUSDT (Bollinger) | ETHUSDT | 1.25% | -47.33% | -60.36% | ALPHA |
-| 11 | Mean Reversion Scalper Hybrid | SOLUSDT | 1.22% | -22.23% | -24.16% | ALPHA |
+| Strategy | Symbol | Timeframe | Daily ROI | Gross DD | Sharpe | OOS ROI | Tier | Manifest |
+|----------|--------|-----------|-----------|----------|--------|---------|------|----------|
+| CCI Trend | ETHUSDT | 4h | 5.91% | -2.82% | 0.69 | 3.1% | ALPHA | Approved |
+| Donchian Trend | ETHUSDT | 4h | 3.26% | -5.77% | 0.41 | 4.65% | ALPHA | Approved |
+| 44_PSAR_Volume_Surge | BTCUSDT | 4h | 1.19% | -26.65% | 5.53 | 0.767% | ALPHA | Approved |
+| 56_PSAR_Volume_Tight | ETHUSDT, BTCUSDT | 4h | 1.148% | -29.72% | 5.35 | 0.691% | ALPHA | Approved |
+| 57_PSAR_Volume_Ultra | ETHUSDT | 4h | 1.19% | -26.65% | 5.53 | 0.767% | ALPHA | Approved |
+| L_X | ETHUSDT, BTCUSDT | 4h | - | - | - | - | Pine-only | Approved |
+| Long | ETHUSDT, BTCUSDT | 4h | - | - | - | - | Pine-only | Approved |
 
-Rankings update daily at 00:15 UTC via `strategy_tournament.py`.
+Tournament runs daily at 00:15 UTC (`strategy_tournament.py`), scanning 85+ strategies across 11 symbols.
+Top 3 per symbol dispatched to Telegram at 09:00 UTC (`script_vault.py`).
 
 ---
 
@@ -89,7 +86,7 @@ Rankings update daily at 00:15 UTC via `strategy_tournament.py`.
 
 | Service | Port | Description | Command |
 |---------|------|-------------|---------|
-| `trading_webhook` | 5000 | Gunicorn webhook receiver (4 workers, gthread) | `sudo systemctl status trading_webhook` |
+| `trading_webhook` | 5000 | Gunicorn webhook receiver (2 workers, 2 threads, gthread) | `sudo systemctl status trading_webhook` |
 | `trading_orchestrator` | - | Signal consumer + trade executor | `sudo systemctl status trading_orchestrator` |
 | `trading_dashboard` | 8501 | Streamlit health dashboard | `sudo systemctl status trading_dashboard` |
 | `hl_mirror` | - | Hyperliquid lead trader mirror (optional) | `sudo systemctl status hl_mirror` |
@@ -99,11 +96,18 @@ Rankings update daily at 00:15 UTC via `strategy_tournament.py`.
 
 | Schedule (UTC) | Script | Purpose |
 |:-:|--------|---------|
-| `0 0 * * *` | `fetch_historical_data.py` | Download 3-year OHLCV for BTC/ETH/SOL |
-| `0 0:15 * * *` | `strategy_tournament.py` | Grid-search optimization, output winners CSV |
-| `0 9 * * *` | `script_vault.py` | Deploy top strategies to Telegram |
+| `0 0 * * *` | `fetch_historical_data.py` | Download 3-year OHLCV (7 symbols) |
+| `0:15 * * *` | `strategy_tournament.py` | Grid-search tournament (85 strategies x 11 symbols) |
+| `0 1 * * *` | `generate_pine_scripts.py` | Auto-generate Pine scripts for ALPHA++ |
+| `0 9 * * *` | `script_vault.py` | Dispatch top 3 per symbol to Telegram |
 | `0 * * * *` | `auto_injector.py` | Hourly heartbeat health check |
-| `55 23 * * *` | `analytics_writer.py` | End-of-day analytics snapshot |
+| `*/15 * * * *` | `export_logs.py` | Refresh dashboard audit CSV |
+| `2:30 * * *` | `verify_tv_inventory.py` | Inventory verification against manifest |
+| `2:30 * * *` | `daily_paper_report.py` | Paper validation daily report |
+| `2:35 * * *` | `daily_recon_summary.py` | Reconciler incident summary |
+| `2:40 * * *` | `go_live_gate_check.py` | Go-live gate snapshot |
+| `23:50 * * *` | `backup_bot.sh` | Backup ledger + queue (7-day retention) |
+| `3:00 Sun` | SQLite VACUUM | Reclaim DB space |
 
 ---
 
@@ -266,13 +270,16 @@ The system also handles TradingView plain-text alerts and auto-extracts fields.
 
 Signals pass through 7 layers before execution:
 
-1. **Idempotency** - SQLite store prevents duplicate signal_id processing
-2. **Leaderboard Tier** - Strategy must be ALPHA or ALPHA++ in daily tournament
-3. **Signal Dedup** - Same strategy+symbol+side blocked within 120s window
-4. **Symbol Cooldown** - 300s minimum between trades on same symbol
-5. **Candle Lock** - First signal per hourly candle wins; opposite direction blocked
-6. **Safety Gate** - Daily PnL limit (-$50), no duplicate positions
-7. **Quantity Cap** - Hard limits: SOL 1.0, ETH 0.05, BTC 0.003
+1. **Webhook Auth** - Secret validation (strict mode), rejects missing/invalid secrets
+2. **Approval Manifest** - Strategy must be in `config/approved_strategies.json` with provenance
+3. **Idempotency** - SQLite store prevents duplicate signal_id processing
+4. **Signal Dedup** - Same strategy+symbol+side blocked within 120s window
+5. **Symbol Cooldown** - 300s minimum between trades on same symbol
+6. **Candle Lock** - First signal per hourly candle wins; opposite direction blocked
+7. **Auto Exit Detection** - SELL against open LONG auto-detected as exit (and vice versa)
+8. **Circuit Breaker** - Daily loss limit, consecutive loss limit, max drawdown
+9. **Safety Gate** - Daily PnL limit (-$50), position conflict check
+10. **Quantity Cap** - Hard limits per symbol, equity-based sizing optional
 
 ---
 
@@ -354,32 +361,42 @@ venv/bin/python3 scripts/strategy_tournament.py
 
 ## Recent Changes
 
+### April 8, 2026 (Current)
+- **CRITICAL FIX:** Auto-detect exit trades when SELL opposes open LONG (PnL was stuck at $0)
+- **FIX:** Circuit breaker only records win/loss on exit trades (was counting entries as wins)
+- **FIX:** Paper report now counts blocked/skipped/failed signals correctly
+- **FEAT:** Manifest provenance automation — `/new_strat_mani` requires backtest evidence
+- **FEAT:** Auto-generate backtest_hash with strategy+timestamp
+- **FEAT:** Go-live gate checker rejects PENDING provenance entries
+- **FEAT:** Decision memo template (NO_GO / PAPER_ONLY / READY_FOR_TINY_CAPITAL)
+- **FIX:** Tournament dispatch limited to top 3 per symbol (was 326, now 33)
+- All 7 manifest strategies have backtest provenance
+- Go-live gate: 18/18 PASS
+- Tests: 335 passed, 0 failed
+
+### April 7, 2026
+- Paper validation window started (Day 1 of 7)
+- Converted all Telegram timestamps to IST, crons to 8:00 AM IST
+- Paper validation monitoring: daily reports, stop conditions, reconciler summary
+- Inventory verifier checks signal queue for live TradingView verification
+- CEO audit fixes: reconciler cleanup, operational go-live gates
+- Telegram commands for manifest management (/new_strat_mani, /list_manifest, /remove_strat_mani)
+- Safety gate tests + automated go-live gate check script
+- Trade type labels (Open/Close Long/Short) with SL and TP in alerts
+
 ### March 24, 2026
-- Added real-time Google Sheets analytics (Daily Analytics, Backtest With/Without Safety)
-- All 3 analytics tabs auto-update on every trade (zero delay)
-- Added end-of-day cron (23:55 UTC) as analytics backup
-- Fixed TradingView webhook 400 errors (SOLUSDT_PREMIUM symbol, price=0, unknown formats)
-- Fixed TradingView webhook timeouts (async price fetching)
-- Fixed ETH min notional ($5.5 -> $21 for Binance Futures)
-- Added `/health` endpoint to fix false heartbeat alerts
-- Verified zero flip-flop trades post-fix (candle lock working)
-- Updated RUNBOOK.md with complete architecture and operations guide
+- Added real-time Google Sheets analytics (6 tabs, auto-updated on every trade)
+- Fixed TradingView webhook 400 errors and timeouts
+- Added `/health` endpoint
 
 ### March 23, 2026
-- Fixed flip-flop trading (multiple strategies contradicting on same candle)
-- Added candle lock system (first signal wins per hourly candle)
-- Added symbol cooldown (300s between trades per symbol)
-- Capped max quantity per symbol (prevents oversized positions)
-- Fixed strategy name matching (`_normalize()` strips all special chars)
-- Fixed heartbeat alert checking wrong process name
-- Cleaned stale ledger entries and freed disk space (91% -> 80%)
+- Fixed flip-flop trading with candle lock system
+- Added symbol cooldown (300s) and quantity caps
+- Cleaned stale ledger entries
 
 ### March 21, 2026
-- Deployed Alpha Engine v10.0 with 11 strategies
-- ADX > 25 filter + 4% trailing stop on all strategies
-- Grid-search tournament with 7-combo parameter optimization
-
----
+- Deployed Alpha Engine with grid-search tournament
+- ADX > 20 filter + 2% trailing stop on all strategies
 
 ## License
 
