@@ -518,7 +518,7 @@ def cmd_new_strat_manifest(message):
         "timeframes: 240\n"
         "operator: harsh\n"
         "label: ALPHA\n"
-        "notes: ROI=5.91%, PF=1.14, DD=-2.82%"
+        "notes: ROI=5.91%, PF=1.14, DD=-2.82% (REQUIRED)"
         "</code>\n\n"
         "📌 <b>Rules:</b>\n"
         "• <b>strategy</b> — exact name as TradingView sends\n"
@@ -557,6 +557,15 @@ def handle_manifest_reply(message):
         operator = data.get("operator", "telegram").strip()
         label = data.get("label", "APPROVED").strip()
         notes = data.get("notes", "").strip()
+        if not notes:
+            bot.reply_to(
+                message,
+                "❌ <b>Missing notes field.</b> Provide backtest evidence (ROI, PF, DD).\n"
+                "<code>notes: ROI=5.91%%, PF=1.14, DD=-2.82%%</code>",
+                parse_mode="HTML",
+            )
+            _pending_manifest_adds.pop(message.chat.id, None)
+            return
 
         from datetime import datetime, timezone
 
@@ -567,7 +576,7 @@ def handle_manifest_reply(message):
             "timeframes": timeframes,
             "operator": operator,
             "approved_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-            "backtest_hash": "telegram_approved",
+            "backtest_hash": "manual_approval_" + strategy.lower().replace(" ", "_") + "_" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M"),
             "label": label,
             "notes": notes,
         }

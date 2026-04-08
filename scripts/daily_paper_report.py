@@ -71,7 +71,7 @@ def get_signal_stats(hours=24):
                 except Exception:
                     pass
                 status = str(row[1] if len(row) > 1 and row[1] else "processed").lower()
-                if "block" in status or "reject" in status:
+                if "block" in status or "reject" in status or "skip" in status or "fail" in status:
                     stats["blocked"] += 1
                 else:
                     stats["executed"] += 1

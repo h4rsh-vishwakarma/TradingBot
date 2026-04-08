@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-04-07T10:23:28Z",
+  "updated_at": "2026-04-08T07:26:04Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -31,6 +31,84 @@
       "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
       "label": "ALPHA",
       "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS"
+    },
+    {
+      "strategy": "L_X",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "BTCUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-08T02:34:25Z",
+      "backtest_hash": "manual_approval_l_x_20260408",
+      "label": "ALPHA",
+      "notes": "PENDING: backtest evidence required before go-live gate passes"
+    },
+    {
+      "strategy": "Long",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "BTCUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-08T02:36:24Z",
+      "backtest_hash": "manual_approval_long_20260408",
+      "label": "ALPHA",
+      "notes": "PENDING: backtest evidence required before go-live gate passes"
+    },
+    {
+      "strategy": "56_PSAR_Volume_Tight",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "BTCUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "Garima",
+      "approved_at": "2026-04-08T07:06:29Z",
+      "backtest_hash": "manual_approval_56_psar_volume_tight_20260408",
+      "label": "ALPHA",
+      "notes": "PENDING: backtest evidence required before go-live gate passes"
+    },
+    {
+      "strategy": "57_PSAR_Volume_Ultra",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "Garima",
+      "approved_at": "2026-04-08T07:07:29Z",
+      "backtest_hash": "manual_approval_57_psar_volume_ultra_20260408",
+      "label": "ALPHA",
+      "notes": "PENDING: backtest evidence required before go-live gate passes"
+    },
+    {
+      "strategy": "44_PSAR_Volume_Surge",
+      "exchange": "binance",
+      "symbols": [
+        "BTCUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "Garima",
+      "approved_at": "2026-04-08T07:08:23Z",
+      "backtest_hash": "manual_approval_44_psar_volume_surge_20260408",
+      "label": "ALPHA",
+      "notes": "PENDING: backtest evidence required before go-live gate passes"
     }
   ]
 }

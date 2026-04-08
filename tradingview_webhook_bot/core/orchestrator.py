@@ -587,6 +587,16 @@ class Orchestrator:
                 raw_body = str(event.get("raw_body", ""))
                 if "position is 0" in raw_body.lower() or "position is -" in raw_body.lower():
                     is_exit = True
+            # --- AUTO-DETECT EXIT: if signal opposes current position, treat as exit ---
+            if not is_exit:
+                current_check = self.ledger.get_position(ledger_pos_key)
+                if current_check.quantity != 0:
+                    is_long = current_check.quantity > 0
+                    signal_is_sell = side == "SELL"
+                    if (is_long and signal_is_sell) or (not is_long and not signal_is_sell):
+                        is_exit = True
+                        logger.info(f"Auto-detected exit: {side} signal opposes open {LONG if is_long else SHORT} on {ledger_pos_key}")
+
             if is_exit:
                 strategy_pos_key = ledger_pos_key
                 aggregate_pos_key = f"{target_exchange}:{symbol}"
@@ -792,8 +802,8 @@ class Orchestrator:
                         logger.warning(f"Sheets trade log failed (async): {e}")
                 self._thread_pool.submit(_log_trade)
 
-                # Record win/loss for circuit breaker
-                if self.circuit_breaker:
+                # Record win/loss for circuit breaker (only on exit/close trades)
+                if self.circuit_breaker and is_exit:
                     self.circuit_breaker.record_trade_result(pos_snapshot.daily_realized_pnl >= 0)
 
                 # Auto-update analytics on every trade
