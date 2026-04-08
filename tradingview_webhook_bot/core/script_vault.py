@@ -60,6 +60,9 @@ def dispatch_top_strategies(force=False):
             .drop_duplicates(subset=['Symbol', 'Strategy'])
             .sort_values(by='Daily_ROI_%', ascending=False)
         )
+        # Limit to top 3 strategies per symbol to avoid Telegram flood
+        MAX_PER_SYMBOL = int(os.getenv("MAX_DISPATCH_PER_SYMBOL", "3"))
+        targets = targets.groupby('Symbol').head(MAX_PER_SYMBOL).reset_index(drop=True)
     except Exception as e:
         print(f"❌ Error: {e}")
         return
