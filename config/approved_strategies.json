@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-04-08T07:56:09Z",
+  "updated_at": "2026-04-09T06:07:55Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -15,7 +15,9 @@
       "approved_at": "2026-04-07T10:23:25Z",
       "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
       "label": "ALPHA",
-      "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS"
+      "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance."
     },
     {
       "strategy": "Donchian Trend",
@@ -30,7 +32,9 @@
       "approved_at": "2026-04-07T10:23:28Z",
       "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
       "label": "ALPHA",
-      "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS"
+      "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance."
     },
     {
       "strategy": "L_X",
@@ -46,7 +50,9 @@
       "approved_at": "2026-04-08T02:34:25Z",
       "backtest_hash": "pine_only_no_batch_backtest_20260408",
       "label": "ALPHA",
-      "notes": "Pine-only strategy (no Python backtest engine). Approved for paper validation only. Requires TradingView strategy tester evidence before go-live."
+      "notes": "Pine-only strategy (no Python backtest engine). Approved for paper validation only. Requires TradingView strategy tester evidence before go-live.",
+      "approval_class": "paper_only",
+      "class_reason": "Pine-only evidence; not promoted to tiny-capital scope."
     },
     {
       "strategy": "Long",
@@ -62,7 +68,9 @@
       "approved_at": "2026-04-08T02:36:24Z",
       "backtest_hash": "pine_only_no_batch_backtest_20260408",
       "label": "ALPHA",
-      "notes": "Pine-only strategy (no Python backtest engine). Approved for paper validation only. Requires TradingView strategy tester evidence before go-live."
+      "notes": "Pine-only strategy (no Python backtest engine). Approved for paper validation only. Requires TradingView strategy tester evidence before go-live.",
+      "approval_class": "paper_only",
+      "class_reason": "Pine-only evidence; not promoted to tiny-capital scope."
     },
     {
       "strategy": "56_PSAR_Volume_Tight",
@@ -78,7 +86,9 @@
       "approved_at": "2026-04-08T07:06:29Z",
       "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
       "label": "ALPHA",
-      "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.148%, Gross_DD=-29.72%, Net_DD=-32.22%, Win_Rate=49.2%, Sharpe=5.35, Trades=60802, OOS_ROI=0.691%, OOS_DD=-20.66%, OOS_Sharpe=3.83, Tier=ALPHA"
+      "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.148%, Gross_DD=-29.72%, Net_DD=-32.22%, Win_Rate=49.2%, Sharpe=5.35, Trades=60802, OOS_ROI=0.691%, OOS_DD=-20.66%, OOS_Sharpe=3.83, Tier=ALPHA",
+      "approval_class": "paper_only",
+      "class_reason": "Tournament approval retained for paper/research only because drawdown profile is too large for tiny-capital scope."
     },
     {
       "strategy": "57_PSAR_Volume_Ultra",
@@ -93,7 +103,9 @@
       "approved_at": "2026-04-08T07:07:29Z",
       "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
       "label": "ALPHA",
-      "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA"
+      "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA",
+      "approval_class": "paper_only",
+      "class_reason": "Tournament approval retained for paper/research only because drawdown profile is too large for tiny-capital scope."
     },
     {
       "strategy": "44_PSAR_Volume_Surge",
@@ -108,7 +120,9 @@
       "approved_at": "2026-04-08T07:08:23Z",
       "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
       "label": "ALPHA",
-      "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA"
+      "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA",
+      "approval_class": "paper_only",
+      "class_reason": "Tournament approval retained for paper/research only because drawdown profile is too large for tiny-capital scope."
     }
   ]
 }

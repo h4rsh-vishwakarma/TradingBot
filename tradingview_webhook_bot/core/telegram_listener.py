@@ -579,6 +579,8 @@ def handle_manifest_reply(message):
             "backtest_hash": "manual_approval_" + strategy.lower().replace(" ", "_") + "_" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M"),
             "label": label,
             "notes": notes,
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
         }
 
         # Load manifest
@@ -618,6 +620,7 @@ def handle_manifest_reply(message):
             f"⏰ <b>Timeframes:</b> <code>{', '.join(timeframes)}</code>\n"
             f"👤 <b>Operator:</b> <code>{operator}</code>\n"
             f"🏷️ <b>Label:</b> <code>{label}</code>\n"
+            f"Class: <code>{approval.get('approval_class', 'paper_only')}</code>\n"
             f"📝 <b>Notes:</b> {notes or 'N/A'}\n\n"
             f"📊 <b>Total approved strategies:</b> {total}\n\n"
             f"⚡ <i>Live immediately — no restart needed.</i>"
@@ -657,7 +660,7 @@ def cmd_list_manifest(message):
             msg += (
                 f"<b>#{i+1} {a.get('strategy', 'N/A')}</b>\n"
                 f"  🏦 {a.get('exchange', 'N/A')} | 💎 {symbols} | ⏰ {tfs}\n"
-                f"  🏷️ {a.get('label', 'N/A')} | 👤 {a.get('operator', 'N/A')}\n"
+                f"  Label={a.get('label', 'N/A')} | Class={a.get('approval_class', 'paper_only')} | Operator={a.get('operator', 'N/A')}\n"
                 f"  📅 {a.get('approved_at', 'N/A')}\n\n"
             )
 

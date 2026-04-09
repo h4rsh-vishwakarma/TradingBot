@@ -6,7 +6,7 @@ from tradingview_webhook_bot.core.orchestrator import Orchestrator
 from tradingview_webhook_bot.ledger.positions import PositionLedger
 
 
-def _approved_manifest(tmp_path):
+def _approved_manifest(tmp_path, approval_class="candidate_for_tiny_capital"):
     path = tmp_path / "approved_strategies.json"
     path.write_text(json.dumps({
         "version": 1,
@@ -21,13 +21,14 @@ def _approved_manifest(tmp_path):
                 "approved_at": "2026-04-06T00:00:00Z",
                 "backtest_hash": "sha256:test",
                 "label": "APPROVED_MANIFEST",
+                "approval_class": approval_class,
             }
         ],
     }), encoding="utf-8")
     return str(path)
 
 
-def _build_orchestrator(tmp_path):
+def _build_orchestrator(tmp_path, approval_class="candidate_for_tiny_capital"):
     orch = Orchestrator.__new__(Orchestrator)
     orch.idempotency = MagicMock()
     orch.idempotency.is_seen.return_value = False
@@ -60,7 +61,7 @@ def _build_orchestrator(tmp_path):
     orch.dlq_path = str(tmp_path / "dead_letter.jsonl")
     orch.ledger = PositionLedger(orch.ledger_path)
     orch.require_approval_manifest = True
-    orch.approval_manifest_path = _approved_manifest(tmp_path)
+    orch.approval_manifest_path = _approved_manifest(tmp_path, approval_class=approval_class)
     orch._notify_signal_decision = Orchestrator._notify_signal_decision.__get__(orch, Orchestrator)
     orch.check_strategy_approval = Orchestrator.check_strategy_approval.__get__(orch, Orchestrator)
     orch._load_approval_manifest = Orchestrator._load_approval_manifest.__get__(orch, Orchestrator)
@@ -124,3 +125,27 @@ def test_unapproved_strategy_is_blocked_by_manifest(tmp_path, monkeypatch):
     orch.exchange_binance.execute_futures_order.assert_not_called()
     assert orch.telegram.send.call_args.kwargs["title"] == "Signal Blocked"
     assert "not approved in the live manifest" in orch.telegram.send.call_args.kwargs["message"]
+
+
+def test_paper_only_strategy_is_blocked_from_execution(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALLOWED_SYMBOLS", "")
+    monkeypatch.setenv("POSITION_SIZE_MODE", "fixed")
+
+    orch = _build_orchestrator(tmp_path, approval_class="paper_only")
+    event = {
+        "signal_id": "SIG-PAPER-ONLY-001",
+        "payload": {
+            "exchange": "binance",
+            "strategy": "07_MACD_Breakout",
+            "symbol": "SOLUSDT",
+            "action": "BUY",
+            "price": 81.0,
+            "quantity": 0.1,
+            "secret": "test_secret",
+        },
+    }
+
+    assert orch.handle_signal(event) is True
+    orch.exchange_binance.execute_futures_order.assert_not_called()
+    assert orch.telegram.send.call_args.kwargs["title"] == "Signal Blocked"
+    assert "only candidate_for_tiny_capital is allowed for execution" in orch.telegram.send.call_args.kwargs["message"]

@@ -10,26 +10,16 @@
       "multi_strategy"
     ],
     "signal_expiry_seconds": 300,
-    "allow_opposite_signals": true
+    "allow_opposite_signals": false,
+    "max_concurrent_strategies_per_symbol": 1
   },
   "trading": {
     "symbols_allowed": [
-      "FILUSDT",
-      "OPUSDT",
-      "LDOUSDT",
-      "UNIUSDT",
-      "NEARUSDT",
-      "INJUSDT",
       "SUIUSDT",
-      "ARBUSDT",
-      "AAVEUSDT",
-      "DOGEUSDT",
-      "APTUSDT",
-      "ATOMUSDT",
-      "SOLUSDT",
-      "LINKUSDT",
-      "AVAXUSDT",
-      "DOTUSDT"
+      "INJUSDT",
+      "LDOUSDT",
+      "NEARUSDT",
+      "APTUSDT"
     ],
     "timeframes_allowed": [
       "1",
@@ -39,13 +29,13 @@
       "240",
       "D"
     ],
-    "leverage": 1,
+    "leverage": 2,
     "order_type": "LIMIT"
   },
   "risk": {
-    "max_positions": 16,
+    "max_positions": 5,
     "position_size_type": "PERCENT_OF_BALANCE",
-    "position_size_value": 10.0,
+    "position_size_value": 20.0,
     "min_position_usd": 10.0,
     "max_symbol_exposure": 50.0,
     "risk_per_trade_percent": 1.0,

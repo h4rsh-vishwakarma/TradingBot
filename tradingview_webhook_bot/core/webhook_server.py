@@ -681,27 +681,78 @@ class WebhookServer:
 
                 # Fire-and-forget Telegram notification (daemon thread)
                 _sym, _side, _price, _sig, _strat = symbol, side, price_val, signal_id, strategy
+                _is_exit = is_exit_signal
+                _sl_value = None
+                _tp_value = None
+                if is_json:
+                    _sl_value = payload.get('stop_loss') or payload.get('sl') or payload.get('sl_price')
+                    _tp_value = payload.get('take_profit') or payload.get('tp') or payload.get('tp_price')
+                _sl_pct_value = sig_sl_pct
+                _tp_pct_value = sig_tp_pct
                 def _notify_telegram():
                     try:
                         live_p = self._fetch_live_price(_sym)
                         if live_p and live_p > 0:
-                            price_display = "Live: ${:,.4f}".format(live_p)
+                            price_display = 'Live: ${:,.4f}'.format(live_p)
                         elif _price and _price > 0:
-                            price_display = "${:,.4f} (stale signal price)".format(_price)
+                            price_display = '${:,.4f} (stale signal price)'.format(_price)
                         else:
-                            price_display = "Resolving..."
+                            price_display = 'Resolving...'
+
+                        side_token = str(_side).strip().upper().replace("-", "_").replace(" ", "_")
+                        if side_token in {'CLOSE_LONG', 'EXIT_LONG', 'SELL_TO_CLOSE'}:
+                            action_display = 'Close Long'
+                        elif side_token in {'CLOSE_SHORT', 'EXIT_SHORT', 'BUY_TO_CLOSE'}:
+                            action_display = 'Close Short'
+                        elif _is_exit:
+                            action_display = 'Close Long' if side_token in {'SELL', 'SHORT'} else 'Close Short'
+                        else:
+                            action_display = 'Open Long' if side_token in {'BUY', 'LONG', 'OPEN_LONG'} else 'Open Short'
+
+                        def _format_level(label, value, pct_value):
+                            try:
+                                pct_num = float(pct_value or 0)
+                            except (TypeError, ValueError):
+                                pct_num = 0.0
+                            try:
+                                price_num = float(value)
+                            except (TypeError, ValueError):
+                                price_num = 0.0
+
+                            if price_num > 0 and pct_num > 0:
+                                return f'{label}: ${price_num:,.4f} ({pct_num:.2f}%)'
+                            if price_num > 0:
+                                return f'{label}: ${price_num:,.4f}'
+                            if pct_num > 0:
+                                return f'{label}: {pct_num:.2f}%'
+                            return None
+
+                        lines = [
+                            f'Action: {action_display}',
+                            f'Price: {price_display}',
+                        ]
+
+                        sl_line = _format_level('SL', _sl_value, _sl_pct_value)
+                        tp_line = _format_level('TP', _tp_value, _tp_pct_value)
+                        if sl_line:
+                            lines.append(sl_line)
+                        if tp_line:
+                            lines.append(tp_line)
+
+                        lines.extend([
+                            f'Strategy: {_strat}',
+                            f'ID: {_sig}',
+                            '',
+                            '⏳ Processing via Orchestrator...',
+                        ])
+
                         self.telegram.send(
                             severity=AlertSeverity.INFO,
-                            title=f"Signal Received: {_sym}",
-                            message=(f"Action: {str(_side).upper()}\n"
-                                     f"Price: {price_display}\n"
-                                     f"Strategy: {_strat}\n"
-                                     f"ID: {_sig}\n\n"
-                                     f"⏳ Processing via Orchestrator...")
+                            title=f'Signal Received: {_sym}',
+                            message='\n'.join(lines)
                         )
                     except Exception as e:
-                        logger.warning(f"Telegram notify failed (non-critical): {e}")
-
+                        logger.warning(f'Telegram notify failed (non-critical): {e}')
                 t = threading.Thread(target=_notify_telegram, daemon=True)
                 t.start()
 

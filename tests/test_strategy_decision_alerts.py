@@ -20,6 +20,7 @@ def _build_orchestrator(tmp_path):
                 "approved_at": "2026-04-06T00:00:00Z",
                 "backtest_hash": "sha256:test",
                 "label": "APPROVED_MANIFEST",
+                "approval_class": "candidate_for_tiny_capital",
             }
         ],
     }), encoding="utf-8")

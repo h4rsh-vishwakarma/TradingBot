@@ -4,10 +4,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+DEFAULT_CLASS_REASON = "Defaulted to paper_only until explicitly promoted after paper validation."
+
+
 def load_manifest(path: Path) -> dict:
     if path.exists():
-        with open(path, encoding="utf-8") as fh:
-            data = json.load(fh)
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
             if isinstance(data, dict):
                 data.setdefault("approvals", [])
                 return data
@@ -25,19 +28,19 @@ def upsert_approval(manifest: dict, approval: dict):
     match_key = (
         approval["strategy"].strip().lower(),
         approval["exchange"].strip().lower(),
-        tuple(sorted(s.upper() for s in approval["symbols"])),
-        tuple(sorted(tf.lower() for tf in approval["timeframes"])),
+        tuple(sorted(symbol.upper() for symbol in approval["symbols"])),
+        tuple(sorted(timeframe.lower() for timeframe in approval["timeframes"])),
     )
 
-    for idx, existing in enumerate(approvals):
+    for index, existing in enumerate(approvals):
         existing_key = (
             str(existing.get("strategy", "")).strip().lower(),
             str(existing.get("exchange", "")).strip().lower(),
-            tuple(sorted(str(s).upper() for s in existing.get("symbols", ["*"]))),
-            tuple(sorted(str(tf).lower() for tf in existing.get("timeframes", ["*"]))),
+            tuple(sorted(str(symbol).upper() for symbol in existing.get("symbols", ["*"]))),
+            tuple(sorted(str(timeframe).lower() for timeframe in existing.get("timeframes", ["*"]))),
         )
         if existing_key == match_key:
-            approvals[idx] = approval
+            approvals[index] = approval
             return "updated"
 
     approvals.append(approval)
@@ -55,6 +58,12 @@ def main():
     parser.add_argument("--backtest-hash", required=True)
     parser.add_argument("--label", default="APPROVED_MANIFEST")
     parser.add_argument("--notes", default="")
+    parser.add_argument(
+        "--approval-class",
+        default="paper_only",
+        choices=["paper_only", "candidate_for_tiny_capital"],
+    )
+    parser.add_argument("--class-reason", default=DEFAULT_CLASS_REASON)
     args = parser.parse_args()
 
     manifest_path = Path(args.manifest)
@@ -63,23 +72,25 @@ def main():
     approval = {
         "strategy": args.strategy,
         "exchange": args.exchange.lower(),
-        "symbols": [s.upper() for s in normalize_list(args.symbols)],
-        "timeframes": [tf.lower() for tf in normalize_list(args.timeframes)],
+        "symbols": [symbol.upper() for symbol in normalize_list(args.symbols)],
+        "timeframes": [timeframe.lower() for timeframe in normalize_list(args.timeframes)],
         "operator": args.operator,
         "approved_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "backtest_hash": args.backtest_hash,
         "label": args.label,
         "notes": args.notes,
+        "approval_class": args.approval_class,
+        "class_reason": args.class_reason,
     }
 
     result = upsert_approval(manifest, approval)
     manifest["updated_at"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(manifest_path, "w", encoding="utf-8") as fh:
-        json.dump(manifest, fh, indent=2)
-        fh.write("\n")
+    with open(manifest_path, "w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2)
+        handle.write("\n")
 
-    print(f"{result}: {approval['strategy']} -> {manifest_path}")
+    print(f"{result}: {approval['strategy']} [{approval['approval_class']}] -> {manifest_path}")
 
 
 if __name__ == "__main__":

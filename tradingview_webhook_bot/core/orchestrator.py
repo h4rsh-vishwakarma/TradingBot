@@ -215,11 +215,14 @@ class Orchestrator:
         strategy_norm = self._normalize_strategy(strategy_name)
         timeframe_norm = str(timeframe or "").strip().lower()
 
+        execution_class = "candidate_for_tiny_capital"
+
         for approval in approvals:
             approval_strategy = self._normalize_strategy(approval.get("strategy", ""))
             approval_exchange = str(approval.get("exchange", exchange_lower)).strip().lower()
             approval_symbols = [str(s).upper() for s in approval.get("symbols", ["*"])]
             approval_timeframes = [str(tf).strip().lower() for tf in approval.get("timeframes", ["*"])]
+            approval_class = str(approval.get("approval_class", "")).strip()
 
             symbol_ok = "*" in approval_symbols or symbol_upper in approval_symbols
             timeframe_ok = not timeframe_norm or "*" in approval_timeframes or timeframe_norm in approval_timeframes
@@ -229,6 +232,11 @@ class Orchestrator:
                 and symbol_ok
                 and timeframe_ok
             ):
+                if approval_class != execution_class:
+                    return False, (
+                        f"{strategy_name} / {symbol_upper} matched manifest as "
+                        f"{approval_class or 'unclassified'} but only {execution_class} is allowed for execution"
+                    ), approval
                 operator = approval.get("operator", "unknown")
                 approved_at = approval.get("approved_at", "unknown")
                 return True, f"Approved by manifest ({operator} @ {approved_at})", approval

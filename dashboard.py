@@ -137,136 +137,135 @@ st.set_page_config(
 if "page"          not in st.session_state: st.session_state.page          = "Home"
 if "range"         not in st.session_state: st.session_state.range         = "Today"
 if "bot"           not in st.session_state: st.session_state.bot           = "Binance"
-if "authenticated" not in st.session_state: st.session_state.authenticated = False
-
-# -- password gate ---------------------------------------------------------------
-def _load_dashboard_password():
-    _pw_file = os.path.join(PROJECT_ROOT, ".dashboard_password")
-    try:
-        with open(_pw_file) as _f:
-            return _f.read().strip()
-    except Exception:
-        return os.getenv("DASHBOARD_PASSWORD", "")
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
     st.markdown("""
     <style>
-    #MainMenu, footer, header { visibility: hidden; }
-    html, body,
-    [data-testid="stAppViewContainer"],
-    [data-testid="stMain"] {
-        background: #0d1117 !important;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    * { font-family: 'Inter', sans-serif !important; }
+    #MainMenu, footer, header, [data-testid="stToolbar"] { display: none !important; }
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+        background: linear-gradient(135deg, #0a0e1a 0%, #0d1525 40%, #111d2e 100%) !important;
     }
-    .block-container { padding: 0 !important; max-width: 100% !important; }
+    .block-container { padding-top: 0 !important; max-width: 100% !important; }
     [data-testid="stMainBlockContainer"] { padding: 0 !important; }
-
-    /* -- Card: style the middle column as the login card -- */
     div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child(2) > div {
-        background: #161b27;
-        border: 1px solid #30363d;
-        border-radius: 18px;
-        padding: 40px 36px 32px !important;
-        box-shadow: 0 12px 48px rgba(0,0,0,.6);
+        background: rgba(22, 27, 39, 0.85) !important;
+        backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(56, 139, 253, 0.15) !important;
+        border-radius: 24px !important;
+        padding: 48px 40px 36px !important;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 120px rgba(31,111,235,0.06) !important;
     }
-
-    /* -- Input -- */
     [data-testid="stTextInput"] input {
-        background: #0d1117 !important;
-        border: 1px solid #30363d !important;
-        border-radius: 10px !important;
+        background: rgba(13, 17, 23, 0.8) !important;
+        border: 1.5px solid rgba(48, 54, 61, 0.8) !important;
+        border-radius: 12px !important;
         color: #e6edf3 !important;
-        font-size: 14px !important;
-        height: 46px !important;
-        padding: 0 16px !important;
+        font-size: 15px !important;
+        height: 50px !important;
+        padding: 0 18px !important;
+        transition: all 0.2s ease !important;
     }
     [data-testid="stTextInput"] input:focus {
-        border-color: #1f6feb !important;
-        box-shadow: 0 0 0 3px rgba(31,111,235,.18) !important;
-        outline: none !important;
+        border-color: #388bfd !important;
+        box-shadow: 0 0 0 3px rgba(56,139,253,0.15), 0 0 20px rgba(56,139,253,0.1) !important;
     }
     [data-testid="stTextInput"] input::placeholder { color: #484f58 !important; }
     [data-testid="stTextInput"] label { display: none !important; }
-
-    /* -- Button -- */
     [data-testid="stButton"] > button {
-        background: linear-gradient(135deg,#1f6feb,#388bfd) !important;
+        background: linear-gradient(135deg, #1f6feb 0%, #388bfd 50%, #58a6ff 100%) !important;
         border: none !important;
-        border-radius: 10px !important;
+        border-radius: 12px !important;
         color: #fff !important;
-        font-size: 14px !important;
+        font-size: 15px !important;
         font-weight: 600 !important;
-        height: 46px !important;
+        height: 50px !important;
         width: 100% !important;
-        letter-spacing: .2px !important;
-        margin-top: 4px !important;
-        transition: opacity .15s !important;
+        letter-spacing: 0.3px !important;
+        margin-top: 8px !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 4px 15px rgba(31,111,235,0.3) !important;
     }
-    [data-testid="stButton"] > button:hover { opacity: .88 !important; }
-
-    /* -- Pulse dot -- */
-    .ldot {
-        display: inline-block;
-        width: 7px; height: 7px;
+    [data-testid="stButton"] > button:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 25px rgba(31,111,235,0.4) !important;
+    }
+    [data-testid="stButton"] > button:active { transform: translateY(0) !important; }
+    .pulse-dot {
+        display: inline-block; width: 8px; height: 8px;
         background: #3fb950; border-radius: 50%;
-        animation: lpulse 2s infinite;
+        animation: pulse 2s infinite ease-in-out;
+        box-shadow: 0 0 8px rgba(63,185,80,0.4);
     }
-    @keyframes lpulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.85)} }
+    .glow-line {
+        height: 2px; border-radius: 1px; margin: 28px 0 20px;
+        background: linear-gradient(90deg, transparent, rgba(56,139,253,0.3), transparent);
+    }
     </style>
     """, unsafe_allow_html=True)
 
-    # -- Vertical centering spacer --
-    st.markdown("<div style='height:18vh'></div>", unsafe_allow_html=True)
-
-    _l, _mid, _r = st.columns([1, 1.5, 1])
+    st.markdown("<div style='height:14vh'></div>", unsafe_allow_html=True)
+    _l, _mid, _r = st.columns([1, 1.4, 1])
     with _mid:
-        # Header inside card
         st.markdown("""
-        <div style="text-align:center;margin-bottom:24px">
+        <div style="text-align:center;margin-bottom:32px">
           <div style="display:inline-flex;align-items:center;justify-content:center;
-                      width:56px;height:56px;border-radius:16px;font-size:28px;
-                      background:linear-gradient(135deg,#1f6feb,#388bfd);margin-bottom:14px">
-            ?
+                      width:68px;height:68px;border-radius:20px;font-size:32px;
+                      background:linear-gradient(135deg,#1f6feb,#388bfd);
+                      box-shadow:0 8px 30px rgba(31,111,235,0.35);margin-bottom:18px">
+            \U0001f4c8
           </div>
-          <div style="font-size:22px;font-weight:700;color:#e6edf3;letter-spacing:-0.3px">
+          <div style="font-size:26px;font-weight:800;color:#e6edf3;letter-spacing:-0.5px">
             TradingBot
           </div>
-          <div style="font-size:13px;color:#6e7681;margin-top:4px;line-height:1.5">
-            Command Center &nbsp;·&nbsp; Enter password to continue
+          <div style="font-size:13px;color:#6e7681;margin-top:6px;line-height:1.6;letter-spacing:0.2px">
+            Automated Trading Command Center
           </div>
         </div>
         <div style="font-size:11px;font-weight:600;color:#8b949e;
-                    text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">
-          Password
+                    text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">
+            Password
         </div>
         """, unsafe_allow_html=True)
-
-        _pw_input  = st.text_input("pw", type="password",
-                                    label_visibility="collapsed",
-                                    placeholder="Enter your password…",
-                                    key="login_pw")
-        _login_btn = st.button("??  Unlock Dashboard", use_container_width=True)
-
-        if _login_btn:
-            if _pw_input == _load_dashboard_password():
+        _pw = st.text_input("pw", type="password", label_visibility="collapsed",
+                            placeholder="Enter your password...", key="login_pw")
+        _btn = st.button("\U0001f513  Unlock Dashboard", use_container_width=True)
+        if _btn:
+            _pw_file = os.path.join(PROJECT_ROOT, ".dashboard_password")
+            try:
+                with open(_pw_file) as _f:
+                    correct_pw = _f.read().strip()
+            except Exception:
+                correct_pw = os.getenv("DASHBOARD_PASSWORD", "trading2026")
+            if _pw == correct_pw:
                 st.session_state.authenticated = True
                 st.rerun()
             else:
                 st.markdown(
-                    "<div style='text-align:center;color:#f85149;font-size:13px;"
-                    "margin-top:10px;padding:8px;background:rgba(248,81,73,.08);"
-                    "border-radius:8px'>? Incorrect password</div>",
-                    unsafe_allow_html=True)
-
+                    "<div style='text-align:center;color:#f85149;font-size:13px;font-weight:500;"
+                    "margin-top:12px;padding:10px 16px;background:rgba(248,81,73,0.08);"
+                    "border:1px solid rgba(248,81,73,0.15);border-radius:10px'>"
+                    "\u274c &nbsp;Incorrect password</div>", unsafe_allow_html=True)
+        st.markdown('<div class="glow-line"></div>', unsafe_allow_html=True)
         st.markdown("""
-        <div style="border-top:1px solid #21262d;margin:24px 0 16px"></div>
-        <div style="text-align:center;font-size:11px;color:#3fb950;
-                    display:flex;align-items:center;justify-content:center;gap:6px">
-          <span class="ldot"></span>
-          System online &nbsp;·&nbsp; Binance Testnet
+        <div style="text-align:center;font-size:12px;color:#8b949e;
+                    display:flex;align-items:center;justify-content:center;gap:8px">
+          <span class="pulse-dot"></span>
+          <span style="color:#3fb950;font-weight:500">System Online</span>
+          <span style="color:#30363d">\u00b7</span>
+          <span>Binance Futures</span>
+          <span style="color:#30363d">\u00b7</span>
+          <span>Paper Validation Active</span>
         </div>
         """, unsafe_allow_html=True)
-
     st.stop()
+
+
+
 
 # -- non-blocking Binance client ------------------------------------------------
 @st.cache_resource(show_spinner=False)
