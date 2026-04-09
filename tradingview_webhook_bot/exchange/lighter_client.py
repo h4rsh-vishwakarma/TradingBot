@@ -446,6 +446,9 @@ class LighterClient:
                 "exchange": "lighter",
                 "symbol": market.symbol,
                 "market_id": market.market_id,
+                "reference_price": float(reference_price),
+                "order_type_used": "MARKET",
+                "estimated_fee_bps": float(os.getenv("LIGHTER_TAKER_FEE_BPS", "4.0")),
             }
 
         try:
@@ -477,6 +480,9 @@ class LighterClient:
                     "market_id": market.market_id,
                     "client_order_index": getattr(created_order, "client_order_index", None),
                     "tx_hash": getattr(response, "tx_hash", None),
+                    "reference_price": float(reference_price),
+                    "order_type_used": "MARKET",
+                    "estimated_fee_bps": float(os.getenv("LIGHTER_TAKER_FEE_BPS", "4.0")),
                 }
             return {
                 "status": "FAILED",

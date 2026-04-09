@@ -4,6 +4,8 @@ Daily Paper-Validation Report
 Generates a fixed-format daily summary and sends it to Telegram.
 Run via cron at 23:00 UTC daily during the 7-day paper window.
 """
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -19,6 +21,8 @@ from dotenv import load_dotenv
 IST = timezone(timedelta(hours=5, minutes=30))
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.execution_telemetry import execution_metrics_path, summarize_execution_metrics
 
 ENV_FILE = "/etc/tradingbot/env_vars"
 if os.path.exists(ENV_FILE):
@@ -36,7 +40,7 @@ MANIFEST_PATH = PROJECT_ROOT / "config" / "approved_strategies.json"
 PAPER_START = os.getenv("PAPER_WINDOW_START", "2026-04-07")
 
 
-def send_telegram(text):
+def send_telegram(text: str):
     if not TOKEN or not CHAT_ID:
         print(text)
         return
@@ -119,8 +123,7 @@ def _format_signal_marker(marker: dict | None) -> str:
     return " | ".join(parts)
 
 
-def get_signal_stats(hours=24):
-    """Get signal stats from the last N hours."""
+def get_signal_stats(hours: int = 24) -> dict:
     stats = {"total": 0, "strategies": {}, "blocked": 0, "executed": 0}
     if not SIGNAL_DB.exists():
         return stats
@@ -146,7 +149,7 @@ def get_signal_stats(hours=24):
     return stats
 
 
-def get_signal_timestamps():
+def get_signal_timestamps() -> dict:
     snapshot = {
         "last_bot_visible": None,
         "last_approved": None,
@@ -186,8 +189,7 @@ def get_signal_timestamps():
     return snapshot
 
 
-def get_ledger_state():
-    """Read current ledger state."""
+def get_ledger_state() -> dict:
     try:
         with open(LEDGER_PATH, encoding="utf-8") as handle:
             data = json.load(handle)
@@ -219,14 +221,14 @@ def get_ledger_state():
         }
 
 
-def get_dlq_count():
+def get_dlq_count() -> int:
     if DLQ_PATH.exists() and DLQ_PATH.stat().st_size > 0:
         with open(DLQ_PATH, encoding="utf-8", errors="replace") as handle:
             return sum(1 for _ in handle)
     return 0
 
 
-def get_manifest_count():
+def get_manifest_count() -> int:
     try:
         with open(MANIFEST_PATH, encoding="utf-8") as handle:
             return len(json.load(handle).get("approvals", []))
@@ -234,10 +236,32 @@ def get_manifest_count():
         return 0
 
 
-def calculate_paper_day():
+def calculate_paper_day() -> int:
     start = datetime.strptime(PAPER_START, "%Y-%m-%d")
     now = datetime.utcnow()
     return (now - start).days + 1
+
+
+def format_execution_quality() -> str:
+    summary = summarize_execution_metrics(hours=24, path=execution_metrics_path())
+    lines = [f"  Fill Count: {summary['fill_count']}"]
+    ratio = summary.get('round_trip_ratio')
+    ratio_text = f"{ratio:.2f}" if ratio is not None else "n/a"
+    lines.append(f"  Entry fills: {summary['entry_fills']} | Exit fills: {summary['exit_fills']}")
+    lines.append(f"  Round-trip Ratio: {ratio_text}")
+
+    if summary.get('gross_edge_total', 0.0) > 0:
+        impact_flag = " [RED]" if summary.get('impact_dominant') else ""
+        lines.append(f"  Gross edge (closed fills): ${summary['gross_edge_total']:.2f}")
+        lines.append(f"  Impact share of gross edge: {summary['impact_share_pct']:.1f}%{impact_flag}")
+        lines.append(f"  Fee share of gross edge: {summary['fee_share_pct']:.1f}%")
+        lines.append(f"  Slippage share of gross edge: {summary['slippage_share_pct']:.1f}%")
+        if summary.get('telemetry_coverage_pct') is not None:
+            lines.append(f"  Telemetry coverage: {summary['telemetry_coverage_pct']:.0f}% of exit fills")
+    else:
+        lines.append(f"  Cost shares: {summary['note']}")
+
+    return "\n".join(lines) + "\n"
 
 
 def main():
@@ -247,6 +271,7 @@ def main():
     ledger = get_ledger_state()
     dlq = get_dlq_count()
     manifest = get_manifest_count()
+    execution_quality = format_execution_quality()
 
     position_lines = ""
     for key, position in ledger["open_details"].items():
@@ -281,6 +306,8 @@ def main():
         f"  Today: ${ledger['daily_pnl']:.2f}\n"
         f"  Cumulative: ${ledger['total_pnl']:.2f}\n"
         f"  Total trades: {ledger['total_trades']}\n\n"
+        f"<b>EXECUTION QUALITY</b>\n"
+        f"{execution_quality}\n"
         f"<b>HEALTH</b>\n"
         f"  Manifest: {manifest} strategies approved\n"
         f"  Dead Letter Queue: {dlq} failed\n"

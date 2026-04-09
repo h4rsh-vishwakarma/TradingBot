@@ -189,6 +189,9 @@ class BinanceClient:
         if mainnet_price:
             logger.info(f"⚖️ Substituting Signal Price {price} with Mainnet Price {mainnet_price}")
             price = mainnet_price
+        reference_price = float(price or 0.0) if price not in (None, "") else 0.0
+        maker_fee_bps = float(os.getenv("BINANCE_MAKER_FEE_BPS", "2.0"))
+        taker_fee_bps = float(os.getenv("BINANCE_TAKER_FEE_BPS", "4.0"))
 
         # --- AUTO LIMIT ORDER: saves ~0.02%/side vs market orders ---
         use_limit = os.getenv("USE_LIMIT_ORDERS", "false").lower() == "true"
@@ -205,7 +208,10 @@ class BinanceClient:
                 "orderId": sim_id,
                 "avg_price": price,
                 "paper": True,
-                "msg": "Simulated fill"
+                "msg": "Simulated fill",
+                "reference_price": reference_price or float(price or 0.0),
+                "order_type_used": "LIMIT_GTX" if use_limit else "MARKET",
+                "estimated_fee_bps": maker_fee_bps if use_limit else taker_fee_bps
             }
 
         try:

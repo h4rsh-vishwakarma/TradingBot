@@ -40,6 +40,8 @@ except ImportError as e:
     logger.error(f"Import failed: {e}")
     sys.exit(1)
 
+from scripts.execution_telemetry import append_execution_metric, estimate_fee_bps, execution_metrics_path
+
 
 class Orchestrator:
     def __init__(self):
@@ -136,6 +138,7 @@ class Orchestrator:
         # Max qty caps — configurable via env (JSON format)
         default_max_qty = '{"SOLUSDT": 1.0, "ETHUSDT": 0.05, "BTCUSDT": 0.003}'
         self.MAX_QTY = json.loads(os.getenv("MAX_QTY_CAPS", default_max_qty))
+        self.execution_metrics_path = str(execution_metrics_path())
 
     # ── Persistent execution locks (survive restarts, safe across instances) ──
 
@@ -771,6 +774,7 @@ class Orchestrator:
             # --- 7. LOGGING & ALERTS ---
             if execution_res.get("status") == "SUCCESS":
                 self.idempotency.mark_seen(signal_id)
+                pre_snapshot = self.ledger.get_position(ledger_pos_key).model_copy(deep=True)
                 try:
                     pos_snapshot = self.ledger.apply_fill(ledger_pos_key, side, qty, fill_price)
                 except Exception as e:
@@ -784,6 +788,49 @@ class Orchestrator:
                     pos_snapshot = self.ledger.get_position(ledger_pos_key)
 
                 self._mark_symbol_traded(symbol, strat_name)
+
+                try:
+                    signal_price_used = float(price_signal or 0.0)
+                except (TypeError, ValueError):
+                    signal_price_used = 0.0
+                try:
+                    reference_price = float(execution_res.get("reference_price") or signal_price_used or fill_price or 0.0)
+                except (TypeError, ValueError):
+                    reference_price = float(fill_price or 0.0)
+                estimated_fee_bps = estimate_fee_bps(target_exchange, execution_res)
+                fill_notional = abs(float(qty) * float(fill_price or 0.0))
+                estimated_fee_usd = fill_notional * estimated_fee_bps / 10000 if fill_notional > 0 else 0.0
+                latency_impact_usd = abs(reference_price - signal_price_used) * abs(float(qty)) if reference_price > 0 and signal_price_used > 0 else 0.0
+                execution_slippage_usd = abs(float(fill_price or 0.0) - reference_price) * abs(float(qty)) if float(fill_price or 0.0) > 0 and reference_price > 0 else 0.0
+                realized_pnl_delta = float(pos_snapshot.realized_pnl - pre_snapshot.realized_pnl)
+                gross_edge_usd = None
+                if is_exit:
+                    gross_edge_usd = realized_pnl_delta + estimated_fee_usd + latency_impact_usd + execution_slippage_usd
+                try:
+                    append_execution_metric({
+                        "timestamp_epoch": time.time(),
+                        "signal_id": signal_id,
+                        "exchange": target_exchange,
+                        "symbol": symbol,
+                        "strategy": strat_name,
+                        "side": side,
+                        "is_exit": bool(is_exit),
+                        "qty": float(qty),
+                        "signal_price": signal_price_used,
+                        "reference_price": reference_price,
+                        "fill_price": float(fill_price or 0.0),
+                        "fill_notional_usd": fill_notional,
+                        "estimated_fee_bps": estimated_fee_bps,
+                        "estimated_fee_usd": estimated_fee_usd,
+                        "latency_impact_usd": latency_impact_usd,
+                        "execution_slippage_usd": execution_slippage_usd,
+                        "realized_pnl_usd": realized_pnl_delta,
+                        "gross_edge_usd": gross_edge_usd,
+                        "order_type_used": execution_res.get("order_type_used", ""),
+                        "paper": bool(execution_res.get("paper", False)),
+                    }, path=self.execution_metrics_path)
+                except Exception as telemetry_error:
+                    logger.warning(f"Execution telemetry append failed: {telemetry_error}")
 
                 # Place exchange-side stop-loss
                 if not is_exit and target_exchange == "lighter" and self.exchange_lighter:
