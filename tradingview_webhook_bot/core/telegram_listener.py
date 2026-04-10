@@ -4,6 +4,7 @@ import json
 import telebot
 from pathlib import Path
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Path Setup
 FILE_PATH = Path(__file__).resolve()
@@ -72,6 +73,60 @@ def _stop_all() -> list:
             stopped.append(name)
     return stopped
 
+def _load_ledger_state() -> dict:
+    ledger_path = PROJECT_ROOT / "tradingview_webhook_bot/storage/ledger_state.json"
+    if not ledger_path.exists():
+        return {"positions": {}, "trade_history": []}
+    try:
+        with open(ledger_path, encoding="utf-8") as f:
+            state = json.load(f)
+        if not isinstance(state, dict):
+            return {"positions": {}, "trade_history": []}
+        return state
+    except Exception:
+        return {"positions": {}, "trade_history": []}
+
+def _get_live_pnl_snapshot() -> dict:
+    state = _load_ledger_state()
+    positions = state.get("positions", {}) if isinstance(state.get("positions"), dict) else {}
+    trade_history = state.get("trade_history", []) if isinstance(state.get("trade_history"), list) else []
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+
+    daily_pnl = 0.0
+    for pos in positions.values():
+        if not isinstance(pos, dict):
+            continue
+        if str(pos.get("last_update_date", "")) == today:
+            try:
+                daily_pnl += float(pos.get("daily_realized_pnl", 0) or 0)
+            except (TypeError, ValueError):
+                pass
+
+    daily_trade_pnls = []
+    for trade in trade_history:
+        if not isinstance(trade, dict):
+            continue
+        if str(trade.get("timestamp", "")).startswith(today):
+            try:
+                daily_trade_pnls.append(float(trade.get("pnl", 0) or 0))
+            except (TypeError, ValueError):
+                pass
+
+    open_positions = {
+        key: pos for key, pos in positions.items()
+        if isinstance(pos, dict) and abs(float(pos.get("quantity", 0) or 0)) > 1e-12
+    }
+    trade_count = len(daily_trade_pnls)
+    avg_trade_pnl = (sum(daily_trade_pnls) / trade_count) if trade_count else 0.0
+
+    return {
+        "daily_pnl": daily_pnl,
+        "daily_trade_count": trade_count,
+        "avg_trade_pnl": avg_trade_pnl,
+        "open_positions": open_positions,
+    }
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # /help — Full Command Reference
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -121,8 +176,9 @@ def cmd_help(message):
     bot.reply_to(message, help_text, parse_mode='HTML')
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# /status — Live System Stats
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ??????????????????????????????
+# /status ? Live System Stats
+# ??????????????????????????????
 @bot.message_handler(commands=['status'])
 def cmd_status(message):
     net, count, strat = 0.0, 0, "System Ready"
@@ -132,21 +188,30 @@ def cmd_status(message):
             df_stats = pd.read_sql_query("SELECT SUM(realized_pnl) as net, COUNT(*) as cnt FROM trades", conn)
             df_strat = pd.read_sql_query("SELECT strategy_name FROM trades ORDER BY timestamp DESC LIMIT 1", conn)
             conn.close()
-            net = round(df_stats['net'].iloc[0] or 0.0, 2)
-            count = df_stats['cnt'].iloc[0] or 0
-            strat = df_strat['strategy_name'].iloc[0] if not df_strat.empty else "Waiting for Signal"
+            net = round(df_stats["net"].iloc[0] or 0.0, 2)
+            count = df_stats["cnt"].iloc[0] or 0
+            strat = df_strat["strategy_name"].iloc[0] if not df_strat.empty else "Waiting for Signal"
     except Exception:
         pass
 
-    msg = (f"📊 <b>SYSTEM STATUS: ACTIVE</b>\n"
-           f"━━━━━━━━━━━━━━━━━━\n"
-           f"🤖 <b>Strategy:</b> <code>{strat}</code>\n"
-           f"💰 <b>Net Profit:</b> <code>${net} USDT</code>\n"
-           f"🔄 <b>Total Trades:</b> <code>{count}</code>\n"
-           f"━━━━━━━━━━━━━━━━━━\n"
-           f"🟢 <b>System:</b> <code>Operational</code>\n"
-           f"🕒 <b>Uptime:</b> <code>Active</code>")
-    bot.send_message(message.chat.id, msg, parse_mode='HTML')
+    pnl_snapshot = _get_live_pnl_snapshot()
+    daily_pnl = float(pnl_snapshot["daily_pnl"])
+    daily_trade_count = int(pnl_snapshot["daily_trade_count"])
+    avg_trade_pnl = float(pnl_snapshot["avg_trade_pnl"])
+
+    msg = (f"?? <b>SYSTEM STATUS: ACTIVE</b>\n"
+           f"??????????????????\n"
+           f"?? <b>Strategy:</b> <code>{strat}</code>\n"
+           f"?? <b>Net Profit:</b> <code>${net:.2f} USDT</code>\n"
+           f"?? <b>Daily PnL:</b> <code>${daily_pnl:.2f}</code>\n"
+           f"?? <b>PnL / Trade:</b> <code>${avg_trade_pnl:.2f}</code>\n"
+           f"?? <b>Total Trades:</b> <code>{count}</code>\n"
+           f"?? <b>Today's Closed Trades:</b> <code>{daily_trade_count}</code>\n"
+           f"??????????????????\n"
+           f"?? <b>System:</b> <code>Operational</code>\n"
+           f"?? <b>Uptime:</b> <code>Active</code>")
+    bot.send_message(message.chat.id, msg, parse_mode="HTML")
+
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # /alpha — Deploy Top Strategies
@@ -280,7 +345,7 @@ def cmd_average_scripts(message):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 @bot.message_handler(commands=['stop', 'stop_alpha', 'stop_average_scripts', 'stop_buy', 'stop_sell'])
 def cmd_stop(message):
-    cmd = message.text.split()[0].replace('/', '').lower()
+    cmd = message.text.split()[0].split('@', 1)[0].replace('/', '').lower()
 
     if cmd == 'stop':
         # Stop EVERYTHING currently running
@@ -353,64 +418,31 @@ def cmd_strategy_search(message):
 @bot.message_handler(commands=['pnl'])
 def cmd_pnl(message):
     try:
-        import json
-        ledger_path = PROJECT_ROOT / "tradingview_webhook_bot/storage/ledger_state.json"
-        with open(ledger_path) as f:
-            state = json.load(f)
+        pnl_snapshot = _get_live_pnl_snapshot()
+        daily_pnl = float(pnl_snapshot["daily_pnl"])
+        open_pos = pnl_snapshot["open_positions"]
+        daily_trade_count = int(pnl_snapshot["daily_trade_count"])
+        avg_trade_pnl = float(pnl_snapshot["avg_trade_pnl"])
 
-        daily_pnl = state.get('daily_pnl', 0)
-        positions = state.get('positions', {})
-        open_pos = {k: v for k, v in positions.items() if v.get('quantity', 0) != 0}
-
-        msg = "💵 <b>TODAY'S PERFORMANCE</b>\n"
-        msg += "━━━━━━━━━━━━━━━━━━\n\n"
-        msg += f"📈 <b>Daily PnL:</b> <code>${daily_pnl:.2f}</code>\n"
-        msg += f"📊 <b>Open Positions:</b> {len(open_pos)}\n\n"
+        msg = "?? <b>TODAY'S PERFORMANCE</b>\n"
+        msg += "??????????????????\n\n"
+        msg += f"?? <b>Daily PnL:</b> <code>${daily_pnl:.2f}</code>\n"
+        msg += f"?? <b>PnL / Trade:</b> <code>${avg_trade_pnl:.2f}</code>\n"
+        msg += f"?? <b>Today's Closed Trades:</b> <code>{daily_trade_count}</code>\n"
+        msg += f"?? <b>Open Positions:</b> {len(open_pos)}\n\n"
 
         if open_pos:
             msg += "<b>Open Positions:</b>\n"
             for key, pos in open_pos.items():
-                qty = pos.get('quantity', 0)
-                avg = pos.get('avg_price', 0)
+                qty = float(pos.get("quantity", 0) or 0)
+                avg = float(pos.get("avg_price", 0) or 0)
                 side = "LONG" if qty > 0 else "SHORT"
-                msg += f"  {'🟢' if qty > 0 else '🔴'} {key} | {side} {abs(qty):.4f} @ ${avg:.2f}\n"
+                msg += f"  {'??' if qty > 0 else '??'} {key} | {side} {abs(qty):.4f} @ ${avg:.2f}\n"
 
-        bot.reply_to(message, msg, parse_mode='HTML')
+        bot.reply_to(message, msg, parse_mode="HTML")
     except Exception as e:
-        bot.reply_to(message, f"❌ Error: {e}")
+        bot.reply_to(message, f"? Error: {e}")
 
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-@bot.message_handler(commands=["categories"])
-# /categories — Strategy risk categories
-def cmd_categories(message):
-    try:
-        import pandas as pd
-        df = pd.read_csv('storage/reports/tournament_winners.csv')
-        cat1 = df[(df['Daily_ROI_%'] >= 1.5) & (df['Net_DD_%'].abs() >= 75)].sort_values('Daily_ROI_%', ascending=False)
-        cat2 = df[df['Daily_ROI_%'] > 0].sort_values('Net_DD_%', ascending=False).head(10)
-        lines = ["STRATEGY CATEGORIES", "=" * 20, ""]
-        lines.append("CAT 1: HIGH RETURN + HIGH RISK")
-        lines.append("(ROI >1.5%/day, DD >75%)")
-        lines.append("")
-        for _, r in cat1.head(5).iterrows():
-            nd = abs(r['Net_DD_%'])
-            cap = int(10000 * (1 - nd/100))
-            lines.append("  %s | %s" % (r['Symbol'], str(r['Strategy'])[:28]))
-            lines.append("  ROI: %.2f%% | DD: %.1f%% | Worst: $%d" % (r['Daily_ROI_%'], nd, cap))
-            lines.append("")
-        lines.append("CAT 2: SAFE + STEADY")
-        lines.append("(Lowest DD, capital >$8,000)")
-        lines.append("")
-        for _, r in cat2.head(5).iterrows():
-            nd = abs(r['Net_DD_%'])
-            cap = int(10000 * (1 - nd/100))
-            lines.append("  %s | %s" % (r['Symbol'], str(r['Strategy'])[:28]))
-            lines.append("  ROI: %.2f%% | DD: %.1f%% | Worst: $%d" % (r['Daily_ROI_%'], nd, cap))
-            lines.append("")
-        lines.append("Cat 1: %d | Cat 2: %d strategies" % (len(cat1), len(cat2)))
-        bot.send_message(message.chat.id, chr(10).join(lines))
-    except Exception as e:
-        bot.send_message(message.chat.id, "Error: %s" % str(e))
 
 @bot.message_handler(commands=['audit'])
 def cmd_audit(message):

@@ -368,13 +368,21 @@ class LighterClient:
         digest = hashlib.sha256(raw.encode("utf-8")).digest()
         return int.from_bytes(digest[:8], "big") & ((1 << 48) - 1)
 
-    async def _async_market_order(self, market: MarketSpec, is_buy: bool, base_amount: int, signal_id: Optional[str]):
+    async def _async_market_order(
+        self,
+        market: MarketSpec,
+        is_buy: bool,
+        base_amount: int,
+        signal_id: Optional[str],
+        reduce_only: bool = False,
+    ):
         return await self.signer.create_market_order_limited_slippage(
             market_index=market.market_id,
             client_order_index=self._client_order_index(signal_id),
             base_amount=base_amount,
             max_slippage=self.max_slippage,
             is_ask=not is_buy,
+            reduce_only=reduce_only,
         )
 
     async def _async_trigger_order(
@@ -412,9 +420,28 @@ class LighterClient:
         return self.execute_futures_order(symbol, side, size, price=price, signal_id=signal_id)
 
     def execute_futures_order(self, symbol, side, quantity, price=None, order_type="MARKET", signal_id=None):
-        market = self._resolve_market(symbol)
-        quantity_units, normalized_qty = self._normalize_base_amount(quantity, market)
-        reference_price = self._safe_decimal(price) or market.last_trade_price or Decimal("0")
+        try:
+            market = self._resolve_market(symbol)
+            reference_price = self._safe_decimal(price) or market.last_trade_price or Decimal("0")
+            quantity_units, normalized_qty = self._normalize_base_amount(quantity, market)
+            notional = normalized_qty * reference_price
+            if market.min_quote_amount > 0 and reference_price > 0 and notional < market.min_quote_amount:
+                return {
+                    "status": "FAILED",
+                    "reason": "permanent",
+                    "msg": (
+                        f"Notional {notional} is below Lighter minimum "
+                        f"{market.min_quote_amount} for {market.symbol}"
+                    ),
+                    "exchange": "lighter",
+                }
+        except Exception as exc:
+            return {
+                "status": "FAILED",
+                "reason": "permanent",
+                "msg": str(exc),
+                "exchange": "lighter",
+            }
 
         if order_type != "MARKET":
             return {
@@ -459,6 +486,7 @@ class LighterClient:
                     is_buy=side.upper() == "BUY",
                     base_amount=quantity_units,
                     signal_id=signal_id,
+                    reduce_only=False,
                 ),
                 timeout=30,
             )
@@ -585,9 +613,64 @@ class LighterClient:
             logger.error("Lighter TP error: %s", exc)
             return {"status": "FAILED", "msg": str(exc)}
 
-    def close_all_positions(self):
+    def _account_payload(self) -> Dict[str, Any]:
+        info = self.get_account_info() or {}
+        data = info.get("data", {}) if isinstance(info, dict) else {}
+        accounts = data.get("accounts", []) if isinstance(data, dict) else []
+        return accounts[0] if accounts else data
+
+    @staticmethod
+    def _external_symbol_for_market(symbol: str) -> str:
+        symbol = str(symbol or "").upper()
+        mapped = REVERSE_SYMBOL_MAP.get(symbol)
+        if mapped:
+            return mapped
+        base = symbol.split("-", 1)[0].replace("USDC", "").replace("USD", "")
+        return f"{base}USDT" if base else symbol
+
+    def get_open_positions(self):
+        """Return Lighter open positions normalized to the bot exchange schema."""
+        try:
+            account = self._account_payload()
+            positions = account.get("positions", []) if isinstance(account, dict) else []
+            open_positions = []
+            for pos in positions or []:
+                if not isinstance(pos, dict):
+                    continue
+                raw_qty = self._safe_decimal(pos.get("position"))
+                if raw_qty is None:
+                    continue
+                sign = int(pos.get("sign") or 1)
+                qty = raw_qty if sign >= 0 else -raw_qty
+                if abs(qty) <= Decimal("0"):
+                    continue
+                market_symbol = str(pos.get("symbol") or "").upper()
+                symbol = self._external_symbol_for_market(market_symbol)
+                entry = self._safe_decimal(pos.get("avg_entry_price")) or Decimal("0")
+                unrealized = self._safe_decimal(pos.get("unrealized_pnl")) or Decimal("0")
+                open_positions.append({
+                    "exchange": "lighter",
+                    "symbol": symbol,
+                    "market_symbol": market_symbol,
+                    "market_id": int(pos.get("market_id") or 0),
+                    "positionAmt": float(qty),
+                    "quantity": float(qty),
+                    "side": "LONG" if qty > 0 else "SHORT",
+                    "entryPrice": float(entry),
+                    "entry_price": float(entry),
+                    "unrealizedProfit": float(unrealized),
+                    "unrealized_pnl": float(unrealized),
+                })
+            return open_positions
+        except Exception as exc:
+            logger.error("Lighter position fetch failed: %s", exc)
+            return []
+
+    def cancel_open_orders(self, symbol: Optional[str] = None) -> bool:
+        """Cancel open Lighter orders. Lighter SDK cancel-all is account-wide."""
         if not self.allow_real:
-            return [{"exchange": "lighter", "action": "cancel_all", "paper": True}]
+            logger.info("Lighter cancel_open_orders skipped in paper mode")
+            return True
         try:
             _, response, err = self._run_async(
                 self.signer.cancel_all_orders(
@@ -598,12 +681,88 @@ class LighterClient:
             )
             if err:
                 logger.error("Lighter cancel all failed: %s", err)
-                return []
-            logger.critical("Lighter: All orders cancelled: %s", getattr(response, "tx_hash", response))
-            return [{"exchange": "lighter", "action": "cancel_all", "tx_hash": getattr(response, "tx_hash", None)}]
+                return False
+            logger.critical("Lighter: All open orders cancelled: %s", getattr(response, "tx_hash", response))
+            return True
         except Exception as exc:
             logger.error("Lighter cancel all failed: %s", exc)
-            return []
+            return False
+
+    def close_position(self, symbol: str, quantity: Optional[float] = None, signal_id: Optional[str] = None):
+        """Close a Lighter position with a reduce-only market order."""
+        market = self._resolve_market(symbol)
+        positions = self.get_open_positions()
+        target = None
+        external_symbol = self._external_symbol_for_market(market.symbol)
+        for pos in positions:
+            if pos.get("symbol") == external_symbol or pos.get("market_symbol") == market.symbol:
+                target = pos
+                break
+        if not target:
+            return {"exchange": "lighter", "symbol": external_symbol, "status": "SKIPPED", "msg": "No open position"}
+
+        position_qty = Decimal(str(target.get("quantity", 0)))
+        close_qty = Decimal(str(abs(quantity))) if quantity else abs(position_qty)
+        quantity_units, normalized_qty = self._normalize_base_amount(float(close_qty), market)
+        close_is_buy = position_qty < 0
+
+        if not self.allow_real:
+            return {
+                "exchange": "lighter",
+                "symbol": external_symbol,
+                "status": "SUCCESS",
+                "paper": True,
+                "side": "BUY" if close_is_buy else "SELL",
+                "qty": float(normalized_qty),
+                "action": "close_position",
+            }
+
+        try:
+            created_order, response, err = self._run_async(
+                self._async_market_order(
+                    market=market,
+                    is_buy=close_is_buy,
+                    base_amount=quantity_units,
+                    signal_id=signal_id or f"close:{external_symbol}:{time.time_ns()}",
+                    reduce_only=True,
+                ),
+                timeout=30,
+            )
+            if err:
+                return {"exchange": "lighter", "symbol": external_symbol, "status": "FAILED", "msg": str(err)}
+            if response and getattr(response, "code", None) == 200:
+                return {
+                    "exchange": "lighter",
+                    "symbol": external_symbol,
+                    "status": "SUCCESS",
+                    "side": "BUY" if close_is_buy else "SELL",
+                    "qty": float(normalized_qty),
+                    "tx_hash": getattr(response, "tx_hash", None),
+                    "client_order_index": getattr(created_order, "client_order_index", None),
+                }
+            return {
+                "exchange": "lighter",
+                "symbol": external_symbol,
+                "status": "FAILED",
+                "msg": getattr(response, "message", "Empty result") if response else "Empty result",
+            }
+        except Exception as exc:
+            logger.error("Lighter close position failed: %s", exc)
+            return {"exchange": "lighter", "symbol": external_symbol, "status": "FAILED", "msg": str(exc)}
+
+    def close_all_positions(self):
+        closed = []
+        cancel_ok = self.cancel_open_orders()
+        if not cancel_ok:
+            closed.append({"exchange": "lighter", "action": "cancel_all", "status": "FAILED"})
+        for pos in self.get_open_positions():
+            closed.append(self.close_position(
+                pos.get("symbol") or pos.get("market_symbol"),
+                signal_id=f"kill:{pos.get('symbol')}:{time.time_ns()}",
+            ))
+        if not closed:
+            closed.append({"exchange": "lighter", "action": "close_all_positions", "status": "SKIPPED", "msg": "No open positions"})
+        return closed
 
     def get_account_info(self):
         if not self.is_ready:
@@ -703,12 +862,14 @@ class LighterClient:
             return
         self._closed = True
         try:
-            # Close signer API client if available
-            if self.signer and getattr(self.signer, "api_client", None):
-                self._run_async(self.signer.api_client.close(), timeout=10)
-            # Close REST-only clients (order_api, account_api share the same api_client)
-            elif self.order_api and getattr(self.order_api, "api_client", None):
-                self._run_async(self.order_api.api_client.close(), timeout=10)
+            signer_api_client = getattr(self.signer, "api_client", None) if self.signer else None
+            rest_api_client = getattr(self.order_api, "api_client", None) if self.order_api else None
+            if self.signer and hasattr(self.signer, "close"):
+                self._run_async(self.signer.close(), timeout=10)
+            elif signer_api_client:
+                self._run_async(signer_api_client.close(), timeout=10)
+            if rest_api_client and rest_api_client is not signer_api_client:
+                self._run_async(rest_api_client.close(), timeout=10)
         except Exception as exc:
             logger.debug("Lighter client close warning: %s", exc)
         finally:

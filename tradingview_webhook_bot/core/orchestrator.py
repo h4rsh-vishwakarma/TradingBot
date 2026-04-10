@@ -110,6 +110,14 @@ class Orchestrator:
         self.processed_count = 0
         self._thread_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix='sheets')
         self.last_heartbeat = time.time()
+        self.last_reconcile = time.time()
+        self.RECONCILE_INTERVAL = int(os.getenv("RECONCILE_INTERVAL_SECONDS", "900"))
+        self._symbol_cooldown = {}
+        self.COOLDOWN_SECONDS = int(os.getenv("SYMBOL_COOLDOWN_SECONDS", "300"))
+        self._recent_signals = {}
+        self.DEDUP_WINDOW_SECONDS = int(os.getenv("DEDUP_WINDOW_SECONDS", "120"))
+        self._candle_lock = {}
+        self.CANDLE_LOCK_SECONDS = int(os.getenv("CANDLE_LOCK_SECONDS", "3600"))
         self._exec_lock_path = os.path.join(base_storage, "execution_locks.json")
         self._load_exec_locks()
 
@@ -134,6 +142,8 @@ class Orchestrator:
         self.DEDUP_WINDOW_SECONDS = int(os.getenv("DEDUP_WINDOW_SECONDS", "120"))
         self._candle_lock = {}
         self.CANDLE_LOCK_SECONDS = int(os.getenv("CANDLE_LOCK_SECONDS", "3600"))
+
+        self._load_exec_locks()
 
         # Max qty caps — configurable via env (JSON format)
         default_max_qty = '{"SOLUSDT": 1.0, "ETHUSDT": 0.05, "BTCUSDT": 0.003}'
@@ -218,8 +228,6 @@ class Orchestrator:
         strategy_norm = self._normalize_strategy(strategy_name)
         timeframe_norm = str(timeframe or "").strip().lower()
 
-        execution_class = "candidate_for_tiny_capital"
-
         for approval in approvals:
             approval_strategy = self._normalize_strategy(approval.get("strategy", ""))
             approval_exchange = str(approval.get("exchange", exchange_lower)).strip().lower()
@@ -235,14 +243,24 @@ class Orchestrator:
                 and symbol_ok
                 and timeframe_ok
             ):
-                if approval_class != execution_class:
+                allowed_classes = {
+                    cls.strip().lower()
+                    for cls in os.getenv(
+                        "LIVE_APPROVAL_CLASSES",
+                        "candidate_for_tiny_capital,live_approved,approved",
+                    ).split(",")
+                    if cls.strip()
+                }
+                approval_class_norm = approval_class.lower()
+                if approval_class_norm and approval_class_norm not in allowed_classes:
                     return False, (
-                        f"{strategy_name} / {symbol_upper} matched manifest as "
-                        f"{approval_class or 'unclassified'} but only {execution_class} is allowed for execution"
+                        f"Approval class '{approval_class}' is not live-enabled "
+                        f"(allowed: {', '.join(sorted(allowed_classes))})"
                     ), approval
                 operator = approval.get("operator", "unknown")
                 approved_at = approval.get("approved_at", "unknown")
-                return True, f"Approved by manifest ({operator} @ {approved_at})", approval
+                class_note = f", class={approval_class}" if approval_class else ""
+                return True, f"Approved by manifest ({operator} @ {approved_at}{class_note})", approval
 
         return False, f"{strategy_name} / {symbol_upper} is not approved in the live manifest", {}
 
@@ -358,14 +376,62 @@ class Orchestrator:
         logger.info(f"✅ Brain Approved [{tier.strip()}] {symbol}/{strategy_name} NDD={ndd:.1f}% ROI={roi:.3f}%")
         return True, f"Approved [{tier.strip()}]", tier.strip()
 
-    def check_safety_gate(self, symbol, qty, price, side, exchange="binance") -> tuple[bool, str]:
-        if not self.allow_real: return False, "ALLOW_REAL_TRADES is disabled"
-        current_pnl = self.ledger.get_daily_pnl()
-        if current_pnl <= self.daily_loss_limit:
-            return False, f"Daily loss limit hit: ${current_pnl:.2f}"
-        current_pos = self.ledger.get_position(f"{exchange}:{symbol}")
-        if (side == "BUY" and current_pos.quantity > 0) or (side == "SELL" and current_pos.quantity < 0):
-            return False, f"Already in {side} position for {symbol} on {exchange}."
+    def check_safety_gate(self, symbol, qty, price, side, exchange="binance", strategy="") -> tuple[bool, str]:
+        if not self.allow_real:
+            return False, "ALLOW_REAL_TRADES is disabled"
+
+        notional = abs(float(qty) * float(price or 0))
+        if self.max_notional > 0 and notional > self.max_notional:
+            return False, f"Max notional exceeded: ${notional:.2f} > ${self.max_notional:.2f}"
+
+        realized_pnl = self.ledger.get_daily_pnl()
+        unrealized_pnl = 0.0
+        try:
+            if exchange == "lighter" and self.exchange_lighter:
+                open_positions = self.exchange_lighter.get_open_positions()
+            else:
+                open_positions = self.exchange_binance.get_open_positions()
+            for pos in open_positions or []:
+                unrealized_pnl += float(pos.get("unrealizedProfit", pos.get("unrealized_pnl", 0)) or 0)
+        except Exception as exc:
+            logger.debug(f"Safety gate unrealized PnL fetch skipped: {exc}")
+
+        total_pnl = realized_pnl + unrealized_pnl
+        if total_pnl <= self.daily_loss_limit:
+            return False, (
+                f"Daily loss limit hit: realized=${realized_pnl:.2f} "
+                f"unrealized=${unrealized_pnl:.2f} total=${total_pnl:.2f}"
+            )
+
+        base_key = f"{exchange}:{symbol}"
+        strategy_key = f"{base_key}:{strategy}" if strategy else base_key
+        for key, pos_obj in getattr(self.ledger, "positions", {}).items():
+            if key != base_key and not key.startswith(f"{base_key}:"):
+                continue
+            open_qty = float(getattr(pos_obj, "quantity", 0) or 0)
+            if key == strategy_key and (
+                (side == "BUY" and open_qty > 0) or
+                (side == "SELL" and open_qty < 0)
+            ):
+                return False, f"Already in {side} position for {symbol} ({strategy or 'aggregate'}) on {exchange}."
+
+        max_strats = int(os.getenv("MAX_STRATEGIES_PER_SYMBOL", "2"))
+        active_strat_count = sum(
+            1 for key, pos_obj in getattr(self.ledger, "positions", {}).items()
+            if (key == base_key or key.startswith(f"{base_key}:"))
+            and abs(float(getattr(pos_obj, "quantity", 0) or 0)) > 0
+        )
+        if active_strat_count >= max_strats:
+            return False, f"Max strategies per symbol reached: {active_strat_count}/{max_strats} on {symbol}"
+
+        max_open = int(os.getenv("MAX_OPEN_POSITIONS", "16"))
+        total_open = sum(
+            1 for pos_obj in getattr(self.ledger, "positions", {}).values()
+            if abs(float(getattr(pos_obj, "quantity", 0) or 0)) > 0
+        )
+        if total_open >= max_open:
+            return False, f"Global position limit reached: {total_open}/{max_open} open positions"
+
         return True, "Safe"
 
     def handle_signal(self, event: dict) -> bool:
@@ -383,6 +449,21 @@ class Orchestrator:
             target_exchange = str(payload_raw.get("exchange") or event.get("exchange") or "binance").lower()
             strat_name = payload_raw.get("strategy") or event.get("strategy") or "SMC"
             symbol_raw = str(payload_raw.get("symbol") or event.get("symbol") or "BTCUSDT").upper()
+            allowed_exchanges_raw = os.getenv("ALLOWED_EXCHANGES", "").strip().lower()
+            if allowed_exchanges_raw:
+                allowed_exchanges = {ex.strip() for ex in allowed_exchanges_raw.split(",") if ex.strip()}
+                if target_exchange not in allowed_exchanges:
+                    logger.warning(f"Exchange {target_exchange} not in ALLOWED_EXCHANGES={sorted(allowed_exchanges)}")
+                    self._notify_signal_decision(
+                        title="Signal Blocked",
+                        reason=f"Exchange {target_exchange} is not enabled on this bot",
+                        signal_id=signal_id,
+                        symbol=symbol_raw,
+                        strategy=strat_name,
+                        action=payload_raw.get("action") or event.get("action") or "N/A",
+                        severity=AlertSeverity.WARNING,
+                    )
+                    return True
 
             # --- SYMBOL CLEANING ---
             symbol = symbol_raw.split('_')[0]
@@ -652,6 +733,16 @@ class Orchestrator:
                     side = "BUY"
                     qty = abs(current_pos.quantity)
                 logger.info(f"Exit signal: closing {ledger_pos_key} position ({current_pos.quantity}) with {side} {qty}")
+                try:
+                    if target_exchange == "binance":
+                        cancel_ok = self.exchange_binance.cancel_open_orders(symbol)
+                    elif target_exchange == "lighter" and self.exchange_lighter:
+                        cancel_ok = self.exchange_lighter.cancel_open_orders(symbol)
+                    else:
+                        cancel_ok = True
+                    logger.info(f"Protective order cancel before exit: {'OK' if cancel_ok else 'WARN'}")
+                except Exception as cancel_error:
+                    logger.warning(f"Protective order cancel before exit failed: {cancel_error}")
 
             # --- 4.9. KILL SWITCH CHECK ---
             kill_file = os.path.join(os.path.dirname(self.ledger_path), "KILL_SWITCH")
@@ -683,7 +774,9 @@ class Orchestrator:
                 else:
                     is_safe, risk_reason = True, "Exit signal - closing position"
             else:
-                is_safe, risk_reason = self.check_safety_gate(symbol, qty, price_signal, side, exchange=target_exchange)
+                is_safe, risk_reason = self.check_safety_gate(
+                    symbol, qty, price_signal, side, exchange=target_exchange, strategy=strat_name
+                )
             if not is_safe:
                 logger.warning(f"Safety Gate Block: {risk_reason}")
                 try:
@@ -723,6 +816,26 @@ class Orchestrator:
                 if qty > max_allowed:
                     logger.warning(f"Qty capped: {qty} -> {max_allowed} for {symbol}")
                     qty = max_allowed
+                final_notional = abs(float(qty) * float(price_signal or 0))
+                if self.max_notional > 0 and final_notional > self.max_notional:
+                    reason = f"Max notional exceeded after sizing: ${final_notional:.2f} > ${self.max_notional:.2f}"
+                    logger.warning(f"Safety Gate Block: {reason}")
+                    self._notify_signal_decision(
+                        title="Signal Blocked",
+                        reason=reason,
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        strategy=strat_name,
+                        action=side,
+                        severity=AlertSeverity.WARNING,
+                    )
+                    try:
+                        self.sheets_logger.log_blocked_trade(
+                            symbol=symbol, side=side, strategy=strat_name,
+                            reason=f"Safety Gate: {reason}", signal_id=signal_id)
+                    except Exception as e:
+                        logger.debug(f"Sheets log failed: {e}")
+                    return True
 
             # --- 6. ACTUAL EXECUTION ---
             # ⚡ Lock symbol BEFORE calling exchange — prevents duplicate orders from
@@ -834,29 +947,33 @@ class Orchestrator:
 
                 # Place exchange-side stop-loss
                 if not is_exit and target_exchange == "lighter" and self.exchange_lighter:
-                    sl_pct = float(os.getenv("STOP_LOSS_PCT", "3.0"))
+                    sig_sl = float(payload_raw.get("sl_pct", 0) or 0)
+                    sig_tp = float(payload_raw.get("tp_pct", 0) or 0)
+                    sl_pct = sig_sl if 0 < sig_sl < 20.0 else float(os.getenv("STOP_LOSS_PCT", "3.0"))
+                    tp_pct = sig_tp if 0 < sig_tp < 50.0 else float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
                     sl_res = self.exchange_lighter.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
                     if sl_res.get("status") == "SUCCESS":
                         logger.info(f"Lighter SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
                     else:
                         logger.warning(f"Lighter SL failed for {symbol}: {sl_res.get('msg')}")
-                    tp_pct = float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
                     tp_res = self.exchange_lighter.place_take_profit(symbol, side, qty, fill_price, tp_pct=tp_pct, signal_id=signal_id)
                     if tp_res.get("status") == "SUCCESS":
-                        logger.info(f"Lighter TP placed for {symbol} @ ${tp_res.get('stopPrice')}")
+                        logger.info(f"Lighter TP placed for {symbol} @ ${tp_res.get('tpPrice')}")
                     else:
                         logger.warning(f"Lighter TP failed for {symbol}: {tp_res.get('msg')}")
                 if not is_exit and target_exchange == "binance":
-                    sl_pct = float(os.getenv("STOP_LOSS_PCT", "3.0"))
+                    sig_sl = float(payload_raw.get("sl_pct", 0) or 0)
+                    sig_tp = float(payload_raw.get("tp_pct", 0) or 0)
+                    sl_pct = sig_sl if 0 < sig_sl < 20.0 else float(os.getenv("STOP_LOSS_PCT", "3.0"))
+                    tp_pct = sig_tp if 0 < sig_tp < 50.0 else float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
                     sl_res = self.exchange_binance.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
                     if sl_res.get("status") == "SUCCESS":
                         logger.info(f"SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
                     else:
                         logger.warning(f"SL placement failed for {symbol}: {sl_res.get('msg')}")
-                    tp_pct = float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
                     tp_res = self.exchange_binance.place_take_profit(symbol, side, qty, fill_price, tp_pct=tp_pct, signal_id=signal_id)
                     if tp_res.get("status") == "SUCCESS":
-                        logger.info(f"TP placed for {symbol} @ ${tp_res.get('stopPrice')}")
+                        logger.info(f"TP placed for {symbol} @ ${tp_res.get('tpPrice')}")
                     else:
                         logger.warning(f"TP placement failed for {symbol}: {tp_res.get('msg')}")
 
@@ -895,8 +1012,10 @@ class Orchestrator:
                 # Build SL/TP info for entry trades
                 sl_tp_info = ""
                 if not is_exit and target_exchange in ("binance", "lighter"):
-                    sl_pct_val = float(os.getenv("STOP_LOSS_PCT", "3.0"))
-                    tp_pct_val = float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
+                    sig_sl = float(payload_raw.get("sl_pct", 0) or 0)
+                    sig_tp = float(payload_raw.get("tp_pct", 0) or 0)
+                    sl_pct_val = sig_sl if 0 < sig_sl < 20.0 else float(os.getenv("STOP_LOSS_PCT", "3.0"))
+                    tp_pct_val = sig_tp if 0 < sig_tp < 50.0 else float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
                     if side == "BUY":
                         sl_price_est = fill_price * (1 - sl_pct_val / 100)
                         tp_price_est = fill_price * (1 + tp_pct_val / 100)
@@ -965,6 +1084,51 @@ class Orchestrator:
                 logger.error(f"DLQ write also failed for signal: {event.get('signal_id', 'unknown')}")
             return True
 
+    def _run_reconcile(self):
+        exchange_data = {}
+        try:
+            for pos in self.exchange_binance.get_open_positions() or []:
+                sym = pos.get("symbol", "")
+                qty = float(pos.get("positionAmt", 0) or 0)
+                if abs(qty) > 0:
+                    exchange_data[f"binance:{sym}"] = {
+                        "quantity": qty,
+                        "side": "LONG" if qty > 0 else "SHORT",
+                        "entry_price": float(pos.get("entryPrice") or 0),
+                    }
+        except Exception as exc:
+            logger.warning(f"Binance reconciler fetch failed: {exc}")
+
+        if self.exchange_lighter:
+            try:
+                for pos in self.exchange_lighter.get_open_positions() or []:
+                    sym = pos.get("symbol", "")
+                    qty = float(pos.get("quantity", pos.get("positionAmt", 0)) or 0)
+                    if abs(qty) > 0:
+                        exchange_data[f"lighter:{sym}"] = {
+                            "quantity": qty,
+                            "side": "LONG" if qty > 0 else "SHORT",
+                            "entry_price": float(pos.get("entry_price", pos.get("entryPrice", 0)) or 0),
+                        }
+            except Exception as exc:
+                logger.warning(f"Lighter reconciler fetch failed: {exc}")
+
+        if not exchange_data:
+            return
+
+        alerts = self.reconciler.reconcile_with_exchange(exchange_data)
+        for alert_msg in alerts:
+            try:
+                self.telegram.send(
+                    severity=AlertSeverity.WARNING,
+                    title="Reconciler Fix",
+                    message=alert_msg,
+                )
+            except Exception:
+                pass
+        if alerts:
+            logger.info(f"Reconciler: {len(alerts)} drift(s) fixed")
+
     def run(self):
         self._running = True
 
@@ -994,6 +1158,9 @@ class Orchestrator:
                 self.durable_queue.poll(handler=self.handle_signal, batch_size=1)
             else:
                 self.consumer.poll(handler=self.handle_signal, batch_size=1)
+            if time.time() - self.last_reconcile > self.RECONCILE_INTERVAL:
+                self.last_reconcile = time.time()
+                self._thread_pool.submit(self._run_reconcile)
             if time.time() - self.last_heartbeat > 900:
                 logger.info(f"Heartbeat: Orchestrator running. Processed: {self.processed_count}")
                 self.last_heartbeat = time.time()

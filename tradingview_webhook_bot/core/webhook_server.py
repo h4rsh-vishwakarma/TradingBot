@@ -375,6 +375,16 @@ class WebhookServer:
                 from tradingview_webhook_bot.exchange.binance_client import BinanceClient
                 client = BinanceClient()
                 closed = client.close_all_positions()
+                lighter_key = os.getenv("LIGHTER_API_PRIVATE_KEY") or os.getenv("LIGHTER_PRIVATE_KEY")
+                if lighter_key:
+                    try:
+                        from tradingview_webhook_bot.exchange.lighter_client import LighterClient
+                        lighter = LighterClient()
+                        closed.extend(lighter.close_all_positions())
+                        lighter.close()
+                    except Exception as lighter_error:
+                        logger.error(f"Lighter kill switch error: {lighter_error}")
+                        closed.append({"exchange": "lighter", "status": "FAILED", "msg": str(lighter_error)})
 
                 msg = f"\U0001F6A8 KILL SWITCH ACTIVATED\nClosed {len(closed)} positions"
                 try:
@@ -397,7 +407,7 @@ class WebhookServer:
 
         def _auth(data):
             secret = (data or {}).get("secret", "")
-            return not secret or secret == self.webhook_secret
+            return bool(secret) and secret == self.webhook_secret
 
         @self.app.route("/bot/status", methods=["GET"])
         def bot_status():
@@ -470,6 +480,16 @@ class WebhookServer:
                 from tradingview_webhook_bot.exchange.binance_client import BinanceClient
                 client = BinanceClient()
                 closed = client.close_all_positions()
+                lighter_key = os.getenv("LIGHTER_API_PRIVATE_KEY") or os.getenv("LIGHTER_PRIVATE_KEY")
+                if lighter_key:
+                    try:
+                        from tradingview_webhook_bot.exchange.lighter_client import LighterClient
+                        lighter = LighterClient()
+                        closed.extend(lighter.close_all_positions())
+                        lighter.close()
+                    except Exception as lighter_error:
+                        logger.error(f"Lighter emergency close error: {lighter_error}")
+                        closed.append({"exchange": "lighter", "status": "FAILED", "msg": str(lighter_error)})
                 closed_count = len(closed) if closed else 0
             except Exception as e:
                 logger.error(f"Emergency close error: {e}")
@@ -727,28 +747,24 @@ class WebhookServer:
                                 return f'{label}: {pct_num:.2f}%'
                             return None
 
+                        sl_line = _format_level('SL', _sl_value, _sl_pct_value) or 'SL: N/A'
+                        tp_line = _format_level('TP', _tp_value, _tp_pct_value) or 'TP: N/A'
+
                         lines = [
+                            f'Symbol: {_sym}',
                             f'Action: {action_display}',
                             f'Price: {price_display}',
-                        ]
-
-                        sl_line = _format_level('SL', _sl_value, _sl_pct_value)
-                        tp_line = _format_level('TP', _tp_value, _tp_pct_value)
-                        if sl_line:
-                            lines.append(sl_line)
-                        if tp_line:
-                            lines.append(tp_line)
-
-                        lines.extend([
+                            sl_line,
+                            tp_line,
                             f'Strategy: {_strat}',
                             f'ID: {_sig}',
                             '',
-                            '⏳ Processing via Orchestrator...',
-                        ])
+                            '? Processing via Orchestrator...',
+                        ]
 
                         self.telegram.send(
                             severity=AlertSeverity.INFO,
-                            title=f'Signal Received: {_sym}',
+                            title='Signal Received',
                             message='\n'.join(lines)
                         )
                     except Exception as e:

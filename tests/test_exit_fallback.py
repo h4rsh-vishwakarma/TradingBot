@@ -48,6 +48,8 @@ def _build_orchestrator(tmp_path, approval_class="candidate_for_tiny_capital"):
         "status": "SUCCESS",
         "avg_price": 81.0,
     }
+    orch.exchange_binance.place_stop_loss.return_value = {"status": "SUCCESS"}
+    orch.exchange_binance.place_take_profit.return_value = {"status": "SUCCESS"}
     orch.analytics = MagicMock()
     orch.circuit_breaker = None
     orch.processed_count = 0
@@ -59,6 +61,7 @@ def _build_orchestrator(tmp_path, approval_class="candidate_for_tiny_capital"):
     orch.daily_loss_limit = -50.0
     orch.ledger_path = str(tmp_path / "ledger_state.json")
     orch.dlq_path = str(tmp_path / "dead_letter.jsonl")
+    orch.execution_metrics_path = str(tmp_path / "execution_metrics.jsonl")
     orch.ledger = PositionLedger(orch.ledger_path)
     orch.require_approval_manifest = True
     orch.approval_manifest_path = _approved_manifest(tmp_path, approval_class=approval_class)
@@ -127,7 +130,7 @@ def test_unapproved_strategy_is_blocked_by_manifest(tmp_path, monkeypatch):
     assert "not approved in the live manifest" in orch.telegram.send.call_args.kwargs["message"]
 
 
-def test_paper_only_strategy_is_blocked_from_execution(tmp_path, monkeypatch):
+def test_paper_only_strategy_executes_when_present_in_manifest(tmp_path, monkeypatch):
     monkeypatch.setenv("ALLOWED_SYMBOLS", "")
     monkeypatch.setenv("POSITION_SIZE_MODE", "fixed")
 
@@ -146,6 +149,8 @@ def test_paper_only_strategy_is_blocked_from_execution(tmp_path, monkeypatch):
     }
 
     assert orch.handle_signal(event) is True
-    orch.exchange_binance.execute_futures_order.assert_not_called()
-    assert orch.telegram.send.call_args.kwargs["title"] == "Signal Blocked"
-    assert "only candidate_for_tiny_capital is allowed for execution" in orch.telegram.send.call_args.kwargs["message"]
+    orch.exchange_binance.execute_futures_order.assert_called_once_with(
+        "SOLUSDT", "BUY", 0.1, 81.0, signal_id="SIG-PAPER-ONLY-001"
+    )
+    if orch.telegram.send.call_args is not None:
+        assert orch.telegram.send.call_args.kwargs.get("title") != "Signal Blocked"

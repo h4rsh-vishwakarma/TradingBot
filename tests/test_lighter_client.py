@@ -81,7 +81,21 @@ class FakeAccountApi:
         self.api_client = api_client
 
     async def account(self, by, value):
-        return SimpleNamespace(to_dict=lambda: {"by": by, "value": value})
+        return SimpleNamespace(to_dict=lambda: {
+            "by": by,
+            "value": value,
+            "accounts": [{
+                "available_balance": "1234.50",
+                "positions": [{
+                    "market_id": 101,
+                    "symbol": "ETH-USDC",
+                    "sign": 1,
+                    "position": "0.0050",
+                    "avg_entry_price": "2500.50",
+                    "unrealized_pnl": "1.25",
+                }],
+            }],
+        })
 
 
 class FakeInfoApi:
@@ -178,8 +192,46 @@ def test_lighter_client_executes_market_order_with_scaled_amount(monkeypatch):
         client.close()
 
 
+def test_lighter_client_rejects_below_minimum_without_raising(monkeypatch):
+    client = _build_test_client(monkeypatch, allow_real="true")
+    try:
+        result = client.execute_futures_order(
+            symbol="ETHUSDT",
+            side="BUY",
+            quantity=0.0005,
+            price=2500.50,
+            signal_id="sig-small",
+        )
+
+        assert result["status"] == "FAILED"
+        assert result["reason"] == "permanent"
+        assert "below Lighter minimum" in result["msg"]
+        assert client.signer.market_order_calls == []
+    finally:
+        client.close()
+
+
+def test_lighter_client_reports_balance_positions_and_reduce_only_close(monkeypatch):
+    client = _build_test_client(monkeypatch, allow_real="true")
+    try:
+        assert client.get_account_balance() == 1234.5
+        positions = client.get_open_positions()
+        assert positions[0]["symbol"] == "ETHUSDT"
+        assert positions[0]["quantity"] == 0.005
+        assert positions[0]["unrealizedProfit"] == 1.25
+
+        closed = client.close_all_positions()
+        assert closed[0]["status"] == "SUCCESS"
+        close_call = client.signer.market_order_calls[0]
+        assert close_call["reduce_only"] is True
+        assert close_call["is_ask"] is True
+    finally:
+        client.close()
+
+
 def test_orchestrator_executes_lighter_via_normalized_client_contract(monkeypatch):
     monkeypatch.setenv("POSITION_SIZE_MODE", "fixed")
+    monkeypatch.setenv("ALLOWED_EXCHANGES", "lighter")
 
     orch = Orchestrator.__new__(Orchestrator)
     orch.idempotency = MagicMock()
@@ -206,7 +258,17 @@ def test_orchestrator_executes_lighter_via_normalized_client_contract(monkeypatc
     orch.exchange_binance = MagicMock()
     orch.exchange_binance.get_mainnet_mark_price.return_value = 2500.5
     orch.ledger = MagicMock()
-    orch.ledger.apply_fill.return_value = SimpleNamespace(quantity=0.5, daily_realized_pnl=10.0)
+    before_pos = SimpleNamespace(realized_pnl=0.0, daily_realized_pnl=0.0)
+    orch.ledger.get_position.return_value = SimpleNamespace(
+        realized_pnl=0.0,
+        daily_realized_pnl=0.0,
+        model_copy=lambda deep=False: before_pos,
+    )
+    orch.ledger.apply_fill.return_value = SimpleNamespace(
+        quantity=0.5,
+        realized_pnl=10.0,
+        daily_realized_pnl=10.0,
+    )
     orch.analytics = MagicMock()
     orch.circuit_breaker = None
     orch.processed_count = 0
@@ -215,6 +277,7 @@ def test_orchestrator_executes_lighter_via_normalized_client_contract(monkeypatc
     orch._set_candle_lock = MagicMock()
     orch._persist_exec_lock = MagicMock()
     orch.allow_real = True
+    orch.max_notional = 2000.0
     orch.daily_loss_limit = -50.0
     orch.ledger_path = "/tmp/test_lighter_ledger.json"
     orch.dlq_path = "/tmp/test_lighter_orchestrator_dlq.jsonl"
