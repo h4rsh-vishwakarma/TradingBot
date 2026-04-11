@@ -153,6 +153,10 @@ def cmd_help(message):
         "📋 <b>/new_strat_mani</b> — Add strategy to approval manifest\n"
         "📋 <b>/list_manifest</b> — Show all approved strategies\n"
         "🗑️ <b>/remove_strat_mani</b> &lt;name&gt; — Remove strategy from manifest\n\n"
+        "🔍 <b>/strategy_info</b> &lt;name&gt; — Full details for one strategy\n"
+        "⬆️ <b>/promote_strat</b> &lt;name&gt; — Upgrade paper_only → candidate_for_tiny_capital\n"
+        "⬇️ <b>/demote_strat</b> &lt;name&gt; — Downgrade candidate → paper_only\n"
+        "🚦 <b>/gate_status</b> — LIVE_APPROVAL_CLASSES, testnet/mainnet mode\n\n"
 
         "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         "🛑 <b>STOP COMMANDS</b>\n"
@@ -748,6 +752,215 @@ def cmd_remove_manifest(message):
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# /gate_status — Current LIVE_APPROVAL_CLASSES + testnet/mainnet + orchestrator state
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@bot.message_handler(commands=["gate_status"])
+def cmd_gate_status(message):
+    try:
+        classes_raw = os.getenv(
+            "LIVE_APPROVAL_CLASSES",
+            "candidate_for_tiny_capital,live_approved,approved",
+        )
+        classes = [c.strip() for c in classes_raw.split(",") if c.strip()]
+
+        binance_testnet = os.getenv("BINANCE_TESTNET", "true").strip().lower() == "true"
+        hl_testnet = os.getenv("HL_IS_TESTNET", "true").strip().lower() == "true"
+        lighter_url = os.getenv("LIGHTER_API_URL", "")
+        lighter_testnet = ("testnet" in lighter_url.lower()) or (not lighter_url)
+        lighter_real = os.getenv("LIGHTER_ALLOW_REAL_TRADES", "false").strip().lower() == "true"
+        all_testnet = binance_testnet and hl_testnet and lighter_testnet and not lighter_real
+
+        if all_testnet:
+            mode_label = "🧪 TESTNET (relaxed gate OK)"
+        elif "paper_only" in classes:
+            mode_label = "🚨 MAINNET + paper_only LEAK — orchestrator should refuse to start"
+        else:
+            mode_label = "🔴 MAINNET (strict)"
+
+        try:
+            r = subprocess.run(
+                ["systemctl", "is-active", "trading_orchestrator.service"],
+                capture_output=True, text=True, timeout=3,
+            )
+            orch_state = r.stdout.strip() or "unknown"
+        except Exception:
+            orch_state = "unknown"
+
+        counts = {}
+        try:
+            with open(MANIFEST_PATH, "r") as f:
+                manifest = json.load(f)
+            for a in manifest.get("approvals", []):
+                c = a.get("approval_class", "unknown")
+                counts[c] = counts.get(c, 0) + 1
+        except Exception:
+            pass
+
+        msg = (
+            "🚦 <b>Gate Status</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            f"<b>Mode:</b> {mode_label}\n"
+            f"<b>Orchestrator:</b> <code>{orch_state}</code>\n\n"
+            "<b>LIVE_APPROVAL_CLASSES:</b>\n"
+        )
+        for c in classes:
+            safe = c in ("candidate_for_tiny_capital", "live_approved", "approved")
+            msg += f"  {'✅' if safe else '🧪'} <code>{c}</code>\n"
+        msg += "\n<b>Exchange mode:</b>\n"
+        msg += f"  Binance: {'testnet' if binance_testnet else 'MAINNET'}\n"
+        msg += f"  Hyperliquid: {'testnet' if hl_testnet else 'MAINNET'}\n"
+        msg += f"  Lighter: {'testnet' if lighter_testnet else 'MAINNET'} (real_trades={lighter_real})\n"
+        msg += "\n<b>Manifest counts:</b>\n"
+        if counts:
+            for c, n in sorted(counts.items()):
+                msg += f"  {c}: {n}\n"
+            msg += f"\n<i>Total: {sum(counts.values())} approvals</i>"
+        else:
+            msg += "  <i>No manifest entries found</i>"
+
+        bot.reply_to(message, msg, parse_mode="HTML")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error: {e}", parse_mode="HTML")
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# /strategy_info <name> — Full manifest entry(ies) for a strategy
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@bot.message_handler(commands=["strategy_info"])
+def cmd_strategy_info(message):
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        bot.reply_to(
+            message,
+            "❌ <b>Usage:</b> <code>/strategy_info Strategy Name</code>\n\n"
+            "Example: <code>/strategy_info CCI Trend</code>",
+            parse_mode="HTML",
+        )
+        return
+
+    query = args[1].strip().lower()
+    try:
+        with open(MANIFEST_PATH, "r") as f:
+            manifest = json.load(f)
+        matches = [
+            a for a in manifest.get("approvals", [])
+            if query in a.get("strategy", "").lower()
+        ]
+        if not matches:
+            bot.reply_to(
+                message,
+                f"⚠️ No strategy matching <b>{query}</b> found.\n\nUse /list_manifest to see all.",
+                parse_mode="HTML",
+            )
+            return
+
+        plural = "entry" if len(matches) == 1 else "entries"
+        msg = f"🔍 <b>{len(matches)} matching {plural}</b>\n━━━━━━━━━━━━━━━━━━\n\n"
+        for i, a in enumerate(matches, 1):
+            symbols = ", ".join(a.get("symbols", ["*"]))
+            tfs = ", ".join(a.get("timeframes", ["*"]))
+            cls = a.get("approval_class", "paper_only")
+            emoji = "🟢" if cls == "candidate_for_tiny_capital" else "🟡" if cls == "paper_only" else "⭐"
+            notes = (a.get("notes") or "—")[:180]
+            reason = (a.get("class_reason") or "—")[:150]
+            msg += (
+                f"<b>#{i} {a.get('strategy', 'N/A')}</b> {emoji}\n"
+                f"  🏦 {a.get('exchange', 'N/A')}  |  💎 {symbols}  |  ⏰ {tfs}\n"
+                f"  <b>Class:</b> <code>{cls}</code>\n"
+                f"  <b>Label:</b> {a.get('label', 'N/A')}  |  <b>Operator:</b> {a.get('operator', 'N/A')}\n"
+                f"  <b>Approved:</b> {a.get('approved_at', 'N/A')}\n"
+                f"  <b>Backtest:</b> <code>{a.get('backtest_hash', 'N/A')}</code>\n"
+                f"  <b>Notes:</b> <i>{notes}</i>\n"
+                f"  <b>Class reason:</b> <i>{reason}</i>\n\n"
+            )
+        bot.reply_to(message, msg, parse_mode="HTML")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error: {e}", parse_mode="HTML")
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# /promote_strat /demote_strat — Change approval_class via Telegram
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def _reclassify_strategy(message, target_class, reason, command_label):
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        bot.reply_to(
+            message,
+            f"❌ <b>Usage:</b> <code>{command_label} Strategy Name</code>",
+            parse_mode="HTML",
+        )
+        return
+    query = args[1].strip().lower()
+    try:
+        with open(MANIFEST_PATH, "r") as f:
+            manifest = json.load(f)
+        approvals = manifest.get("approvals", [])
+        updated = []
+        for a in approvals:
+            if query in a.get("strategy", "").lower():
+                old = a.get("approval_class", "paper_only")
+                if old == target_class:
+                    continue
+                a["approval_class"] = target_class
+                a["class_reason"] = reason
+                updated.append(
+                    (a.get("strategy"), a.get("exchange"), a.get("symbols", []), old, target_class)
+                )
+        if not updated:
+            bot.reply_to(
+                message,
+                "⚠️ No matching entries changed (already at target class, or name not found).\n"
+                "Use /strategy_info &lt;name&gt; to inspect.",
+                parse_mode="HTML",
+            )
+            return
+
+        from datetime import datetime, timezone
+        manifest["updated_at"] = (
+            datetime.now(timezone.utc)
+            .replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        )
+        with open(MANIFEST_PATH, "w") as f:
+            json.dump(manifest, f, indent=2)
+            f.write("\n")
+
+        arrow_emoji = "⬆️" if target_class == "candidate_for_tiny_capital" else "⬇️"
+        plural = "entry" if len(updated) == 1 else "entries"
+        msg = f"{arrow_emoji} <b>Reclassified {len(updated)} {plural}</b>\n━━━━━━━━━━━━━━━━━━\n\n"
+        for name, ex, syms, old, new in updated:
+            sym_str = ", ".join(syms) if syms else "*"
+            msg += (
+                f"  <b>{name}</b> ({ex}, {sym_str})\n"
+                f"    <code>{old}</code> → <code>{new}</code>\n\n"
+            )
+        msg += "⚡ <i>Live immediately — no restart needed.</i>"
+        bot.reply_to(message, msg, parse_mode="HTML")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error: {e}", parse_mode="HTML")
+
+
+@bot.message_handler(commands=["promote_strat"])
+def cmd_promote_strat(message):
+    _reclassify_strategy(
+        message,
+        target_class="candidate_for_tiny_capital",
+        reason="Promoted via Telegram /promote_strat — tiny-capital live execution enabled",
+        command_label="/promote_strat",
+    )
+
+
+@bot.message_handler(commands=["demote_strat"])
+def cmd_demote_strat(message):
+    _reclassify_strategy(
+        message,
+        target_class="paper_only",
+        reason="Demoted via Telegram /demote_strat — back to paper_only",
+        command_label="/demote_strat",
+    )
+
+
+
 if __name__ == "__main__":
     print('Telegram Listener starting...')
     bot.infinity_polling(timeout=60, long_polling_timeout=60)
