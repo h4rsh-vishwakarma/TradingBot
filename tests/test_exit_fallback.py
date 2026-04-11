@@ -131,11 +131,16 @@ def test_unapproved_strategy_is_blocked_by_manifest(tmp_path, monkeypatch):
 
 
 def test_paper_only_strategy_is_blocked_from_execution(tmp_path, monkeypatch):
-    """paper_only manifest entries must NOT reach the exchange — only classes in
-    LIVE_APPROVAL_CLASSES (candidate_for_tiny_capital, live_approved, approved)
-    may execute live orders. Enforces M-10."""
+    """paper_only manifest entries must NOT reach the exchange when the gate
+    is in its strict default. Enforces M-10. Explicitly pins the env so the
+    test behavior is deterministic regardless of the shell-inherited value of
+    LIVE_APPROVAL_CLASSES (which is relaxed on testnet hosts)."""
     monkeypatch.setenv("ALLOWED_SYMBOLS", "")
     monkeypatch.setenv("POSITION_SIZE_MODE", "fixed")
+    monkeypatch.setenv(
+        "LIVE_APPROVAL_CLASSES",
+        "candidate_for_tiny_capital,live_approved,approved",
+    )
 
     orch = _build_orchestrator(tmp_path, approval_class="paper_only")
     event = {
