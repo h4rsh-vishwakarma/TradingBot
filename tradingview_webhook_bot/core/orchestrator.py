@@ -50,6 +50,29 @@ from scripts.execution_telemetry import append_execution_metric, estimate_fee_bp
 
 class Orchestrator:
     def __init__(self):
+        # Testnet/mainnet safety invariant: refuse to boot if paper_only is
+        # live-enabled while running against real-capital exchange endpoints.
+        try:
+            from scripts.check_testnet_invariant import check as _testnet_check
+            _ok, _msg = _testnet_check()
+            if not _ok:
+                logger.critical(_msg)
+                try:
+                    from alerts.telegram_alerts import TelegramAlert as _GuardTg, AlertSeverity as _GuardSev
+                    _GuardTg().send(
+                        severity=_GuardSev.CRITICAL,
+                        title="ORCHESTRATOR REFUSED TO START",
+                        message=_msg,
+                    )
+                except Exception:
+                    pass
+                raise SystemExit(1)
+            logger.info(f"[testnet-invariant OK] {_msg}")
+        except SystemExit:
+            raise
+        except Exception as _e:
+            logger.warning(f"testnet invariant check skipped: {_e}")
+
         self.allow_real = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
         self.run_mode = os.getenv("RUN_MODE", "production")
         self.webhook_secret = os.getenv("WEBHOOK_SECRET", "").strip()
