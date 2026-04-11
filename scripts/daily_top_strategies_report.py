@@ -75,6 +75,42 @@ def send_telegram(text: str, chunk_size: int = 3800) -> None:
             logger.error(f"Telegram send exception: {exc}")
 
 
+def run_explorer() -> bool:
+    """Run strategy_explorer.py to discover new single-indicator strategies."""
+    logger.info("Running strategy_explorer.py (4h timeframe) ...")
+    try:
+        r = subprocess.run(
+            [sys.executable, str(PROJECT_ROOT / "scripts" / "strategy_explorer.py"),
+             "--timeframe", "4h", "--min-roi", "-999", "--quiet"],
+            capture_output=True, text=True, timeout=300, cwd=str(PROJECT_ROOT),
+        )
+        if r.returncode != 0:
+            logger.warning(f"strategy_explorer.py failed (non-blocking): {r.stderr[:500]}")
+            return False
+        return True
+    except Exception as exc:
+        logger.warning(f"strategy_explorer.py exception (non-blocking): {exc}")
+        return False
+
+
+def run_ensemble() -> bool:
+    """Run ensemble_builder.py to discover strategy combinations."""
+    logger.info("Running ensemble_builder.py (4h timeframe) ...")
+    try:
+        r = subprocess.run(
+            [sys.executable, str(PROJECT_ROOT / "scripts" / "ensemble_builder.py"),
+             "--timeframe", "4h", "--min-roi", "-999", "--quiet"],
+            capture_output=True, text=True, timeout=600, cwd=str(PROJECT_ROOT),
+        )
+        if r.returncode != 0:
+            logger.warning(f"ensemble_builder.py failed (non-blocking): {r.stderr[:500]}")
+            return False
+        return True
+    except Exception as exc:
+        logger.warning(f"ensemble_builder.py exception (non-blocking): {exc}")
+        return False
+
+
 def run_enrichment() -> bool:
     """Run advanced_metrics.py. Returns True on success."""
     logger.info("Running advanced_metrics.py ...")
@@ -284,6 +320,11 @@ def main():
             "Check the tournament cron."
         )
         return 1
+
+    # Discovery: explorer + ensemble run first (non-blocking — if they fail
+    # the daily report still works with just tournament data).
+    run_explorer()
+    run_ensemble()
 
     if not run_enrichment():
         send_telegram(

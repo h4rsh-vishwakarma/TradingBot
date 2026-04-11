@@ -71,12 +71,49 @@ def apply_filter(df: pd.DataFrame, min_roi, max_dd, min_trades, min_wr) -> pd.Da
     return df[mask].copy()
 
 
+def _diversify_by_source(df: pd.DataFrame, top_n: int,
+                         min_per_source: int = 2) -> pd.DataFrame:
+    """Guarantee at least `min_per_source` rows from each Source in the
+    top-N selection, padding with the overall highest-score rows if fewer
+    sources are present. Within each bucket, sort by Risk_Adjusted_Score.
+    """
+    if "Source" not in df.columns or df.empty:
+        return df.head(top_n)
+
+    sources = df["Source"].dropna().unique().tolist()
+    picked_rows = []
+    picked_idx = set()
+    for src in sources:
+        sub = df[df["Source"] == src].sort_values("Risk_Adjusted_Score", ascending=False)
+        for _, row in sub.head(min_per_source).iterrows():
+            if row.name not in picked_idx:
+                picked_rows.append(row)
+                picked_idx.add(row.name)
+
+    # Pad remaining slots with the overall best not already picked
+    remaining = top_n - len(picked_rows)
+    if remaining > 0:
+        overall = df.sort_values("Risk_Adjusted_Score", ascending=False)
+        for _, row in overall.iterrows():
+            if row.name not in picked_idx:
+                picked_rows.append(row)
+                picked_idx.add(row.name)
+                remaining -= 1
+                if remaining <= 0:
+                    break
+
+    result = pd.DataFrame(picked_rows)
+    # Re-sort final top-N by score so highest appears first
+    return result.sort_values("Risk_Adjusted_Score", ascending=False).head(top_n)
+
+
 def rank_and_emit(
     input_path: Path,
     output_dir: Path,
     top_n: int,
     bypass_filter: bool,
     quiet: bool,
+    diversify: bool = True,
 ) -> int:
     if not input_path.exists():
         print(f"ERROR: enriched CSV not found: {input_path}", file=sys.stderr)
@@ -107,17 +144,32 @@ def rank_and_emit(
             filter_mode = "strict"
         else:
             soft = apply_filter(df, SOFT_MIN_ROI, SOFT_MAX_DD, SOFT_MIN_TRADES, SOFT_MIN_WR)
-            if len(soft) > 0:
+            if len(soft) >= 5:
                 filtered = soft
                 filter_mode = "soft"
             else:
-                # As a last resort, take top N by score regardless of filter
+                # Discovery mode — no filter, just rank everything.
+                # Diversification (per-source top N) ensures ensembles/explorer
+                # still appear even though they might fail strict/soft floors.
                 filtered = df
-                filter_mode = "unfiltered_fallback"
+                filter_mode = "discovery"
 
     filtered = filtered.sort_values("Risk_Adjusted_Score", ascending=False)
     filtered["Rank"] = range(1, len(filtered) + 1)
     filtered["Filter_Mode"] = filter_mode
+
+    # For top-N output, apply diversity pick over the FULL dataset (not the
+    # filtered one) so explorer/ensemble rows can always appear, even if
+    # they fail the quality floor. This gives the user visibility into the
+    # discovery pipeline output alongside the filter-passing rows.
+    if diversify and "Source" in df.columns:
+        # Full df, scored but not filtered — for diversity picking
+        df_scored = df.sort_values("Risk_Adjusted_Score", ascending=False).copy()
+        df_scored["Rank"] = range(1, len(df_scored) + 1)
+        df_scored["Filter_Mode"] = filter_mode
+        top_out = _diversify_by_source(df_scored, top_n=top_n, min_per_source=2)
+    else:
+        top_out = filtered.head(top_n)
 
     # Emit outputs
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -125,24 +177,27 @@ def rank_and_emit(
     top_path = output_dir / "candidates_top10.csv"
 
     filtered.to_csv(ranked_path, index=False)
-    filtered.head(top_n).to_csv(top_path, index=False)
+    top_out.to_csv(top_path, index=False)
 
     if not quiet:
         print(f"Input: {input_path}  ({total_rows} rows)")
         print(f"Filter mode: {filter_mode}")
-        print(f"Survivors: {len(filtered)}")
+        print(f"Survivors in ranked CSV: {len(filtered)}")
+        if "Source" in filtered.columns:
+            src_counts = filtered["Source"].value_counts().to_dict()
+            print(f"By source: {src_counts}")
         print(f"Ranked: {ranked_path}")
-        print(f"Top {top_n}: {top_path}")
+        print(f"Top {top_n} (diversified): {top_path}")
         print()
-        if len(filtered):
+        if len(top_out):
             cols = [
-                "Rank", "Strategy", "Symbol",
+                "Rank", "Strategy", "Symbol", "Source",
                 "Daily_ROI_%", "Gross_DD_%", "Win_Rate_%",
-                "Risk_Adjusted_Score", "Calmar_Ratio", "WFA_Consistency",
+                "Risk_Adjusted_Score", "Calmar_Ratio",
             ]
-            cols = [c for c in cols if c in filtered.columns]
-            print(f"Top {top_n}:")
-            print(filtered[cols].head(top_n).to_string(index=False))
+            cols = [c for c in cols if c in top_out.columns]
+            print(f"Top {top_n} (diversified by Source):")
+            print(top_out[cols].head(top_n).to_string(index=False))
 
     return 0
 
@@ -154,6 +209,8 @@ def main():
     parser.add_argument("--top", type=int, default=DEFAULT_TOP_N)
     parser.add_argument("--no-filter", action="store_true",
                         help="Skip hard filter, rank everything")
+    parser.add_argument("--no-diversify", action="store_true",
+                        help="Disable per-source top-N diversification")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
 
@@ -163,6 +220,7 @@ def main():
         top_n=args.top,
         bypass_filter=args.no_filter,
         quiet=args.quiet,
+        diversify=not args.no_diversify,
     )
 
 

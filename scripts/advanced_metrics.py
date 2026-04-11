@@ -49,6 +49,8 @@ MC_MAX_TRADES = 500     # cap per-strategy trade count for MC speed
 # ── Paths ────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = PROJECT_ROOT / "storage" / "reports" / "tournament_winners.csv"
+DEFAULT_EXPLORER_INPUT = PROJECT_ROOT / "storage" / "reports" / "explorer_winners.csv"
+DEFAULT_ENSEMBLE_INPUT = PROJECT_ROOT / "storage" / "reports" / "ensemble_winners.csv"
 DEFAULT_OUTPUT = PROJECT_ROOT / "storage" / "reports" / "tournament_winners_enriched.csv"
 
 
@@ -223,29 +225,69 @@ def annualize_daily_roi(daily_roi_pct: float) -> float:
     return round(daily_roi_pct * 252, 2)
 
 
+def _load_and_tag(path: Path, source_label: str) -> pd.DataFrame:
+    """Load a CSV if it exists, otherwise return empty DataFrame.
+    Tags every row with a Source column so downstream can distinguish."""
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(path)
+        if df.empty:
+            return pd.DataFrame()
+        df["Source"] = source_label
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default=str(DEFAULT_INPUT))
+    parser.add_argument("--explorer", default=str(DEFAULT_EXPLORER_INPUT))
+    parser.add_argument("--ensemble", default=str(DEFAULT_ENSEMBLE_INPUT))
+    parser.add_argument("--no-explorer", action="store_true",
+                        help="Skip merging explorer_winners.csv")
+    parser.add_argument("--no-ensemble", action="store_true",
+                        help="Skip merging ensemble_winners.csv")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
 
     input_path = Path(args.input)
+    explorer_path = Path(args.explorer)
+    ensemble_path = Path(args.ensemble)
     output_path = Path(args.output)
 
     if not input_path.exists():
         print(f"ERROR: tournament CSV not found: {input_path}", file=sys.stderr)
         return 1
 
-    df = pd.read_csv(input_path)
-    if df.empty:
+    tournament_df = pd.read_csv(input_path)
+    if tournament_df.empty:
         print(f"ERROR: tournament CSV is empty: {input_path}", file=sys.stderr)
         return 1
+    tournament_df["Source"] = "TOURNAMENT"
+
+    # Optionally merge explorer + ensemble CSVs
+    explorer_df = pd.DataFrame() if args.no_explorer else _load_and_tag(explorer_path, "EXPLORER")
+    ensemble_df = pd.DataFrame() if args.no_ensemble else _load_and_tag(ensemble_path, "ENSEMBLE")
+
+    frames = [tournament_df]
+    if not explorer_df.empty:
+        frames.append(explorer_df)
+    if not ensemble_df.empty:
+        frames.append(ensemble_df)
+
+    df = pd.concat(frames, ignore_index=True, sort=False)
 
     if not args.quiet:
-        print(f"Reading: {input_path}")
-        print(f"  rows: {len(df)}")
-        print(f"  columns: {len(df.columns)}")
+        print(f"Reading:")
+        print(f"  tournament: {input_path}  ({len(tournament_df)} rows)")
+        if not explorer_df.empty:
+            print(f"  explorer:   {explorer_path}  ({len(explorer_df)} rows)")
+        if not ensemble_df.empty:
+            print(f"  ensemble:   {ensemble_path}  ({len(ensemble_df)} rows)")
+        print(f"  merged total: {len(df)} rows, {len(df.columns)} columns")
 
     # ── Base columns (with fallbacks) ───────────────────────────────────────
     df["AbsDD"] = _col(df, "Gross_DD_%", "Max_DD_%").abs()
