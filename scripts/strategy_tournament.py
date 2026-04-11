@@ -253,11 +253,52 @@ def run_test(df_raw, name, optimize, mult, length, reverse=False):
         # Capital left after net DD (fixed size): start + start * dd/100
         net_dd_capital = round(100000 * (1 + net_dd / 100), 0)
 
-        # 📈 WIN RATE: Winning trades / Total trades
-        trades = df['daily_ret'][df['daily_ret'] != 0]
-        total_trades = len(trades)
-        winning_trades = len(trades[trades > 0])
-        win_rate = round((winning_trades / total_trades * 100), 1) if total_trades > 0 else 0.0
+        # 📈 WIN RATE — TRADE-LEVEL (fixed from bar-level bug)
+        # Previous implementation counted every non-zero-return bar as a
+        # "trade", which produced ~60k "trades" per strategy and a bar-level
+        # WR capped near 50% for any position held across multiple bars.
+        # This fix segments the return series into actual trades using the
+        # is_entry / is_exit masks already computed above.
+        try:
+            entry_idx = np.where(is_entry)[0]
+            exit_idx = np.where(is_exit)[0]
+
+            trade_pnls = []
+            rets = df['daily_ret'].values
+            # Walk entries in order; for each, find the next exit at or after
+            # the entry index and sum returns over [entry, exit] inclusive.
+            j = 0
+            for ei in entry_idx:
+                while j < len(exit_idx) and exit_idx[j] < ei:
+                    j += 1
+                if j >= len(exit_idx):
+                    # Open trade at end of history — close at last bar
+                    trade_pnls.append(rets[ei:].sum())
+                    break
+                xi = exit_idx[j]
+                trade_pnls.append(rets[ei:xi + 1].sum())
+                j += 1
+
+            total_trades_real = len(trade_pnls)
+            winning_trades_real = sum(1 for p in trade_pnls if p > 0)
+            win_rate_trade = (
+                round((winning_trades_real / total_trades_real * 100), 1)
+                if total_trades_real > 0
+                else 0.0
+            )
+        except Exception:
+            total_trades_real = 0
+            win_rate_trade = 0.0
+
+        # Keep legacy bar-level stats under new name for backward comparison
+        _bar_returns = df['daily_ret'][df['daily_ret'] != 0]
+        total_bars_nonzero = len(_bar_returns)
+        winning_bars = len(_bar_returns[_bar_returns > 0])
+        win_rate_bar = round((winning_bars / total_bars_nonzero * 100), 1) if total_bars_nonzero > 0 else 0.0
+
+        # Tournament ranking uses trade-level (true) WR from now on.
+        total_trades = total_trades_real
+        win_rate = win_rate_trade
 
         # 📊 SHARPE RATIO: Risk-adjusted return (annualized)
         mean_ret = df['daily_ret'].mean()

@@ -158,6 +158,17 @@ class Orchestrator:
         }
         try:
             self.circuit_breaker = CircuitBreaker(cb_state, cb_config)
+            # Pre-seed daily_start_balance so the daily-loss check is live
+            # from the very first signal, not lazy-initialized on the 2nd.
+            self._cb_balance_cache = None
+            self._cb_balance_cache_ts = 0.0
+            try:
+                _seed = self._get_cb_balance()
+                if _seed is not None:
+                    self.circuit_breaker.should_allow_trade(current_balance=_seed)
+                    logger.info(f"Circuit breaker baseline primed: ${_seed:.2f}")
+            except Exception as _e:
+                logger.debug(f"CB baseline prime skipped: {_e}")
             logger.info("Circuit Breaker initialized")
         except Exception as e:
             logger.warning(f"Circuit Breaker init failed: {e}")
@@ -349,6 +360,27 @@ class Orchestrator:
             return price_cache[cache_key]
 
         return build_position_snapshot(getattr(self.ledger, "positions", {}), price_lookup=_price_lookup)
+
+    def _get_cb_balance(self, max_age_sec: float = 60.0):
+        """Return the wallet balance for circuit breaker checks, cached for 60s.
+
+        Returns None if balance cannot be fetched (e.g., exchange API down).
+        The CB gracefully no-ops on None, preserving the previous behavior.
+        """
+        import time as _time
+        now = _time.time()
+        if (self._cb_balance_cache is not None
+                and (now - self._cb_balance_cache_ts) < max_age_sec):
+            return self._cb_balance_cache
+        try:
+            health = self.exchange_binance.get_account_health()
+            if health and health.get('total_wallet_balance') is not None:
+                self._cb_balance_cache = float(health['total_wallet_balance'])
+                self._cb_balance_cache_ts = now
+                return self._cb_balance_cache
+        except Exception as exc:
+            logger.debug(f"CB balance fetch failed: {exc}")
+        return None
 
     def _is_symbol_in_cooldown(self, symbol: str, strategy: str = "") -> bool:
         cooldown_key = f"{symbol}:{strategy}" if strategy else symbol
@@ -812,7 +844,8 @@ class Orchestrator:
                 return True
 
             # --- 4.95. CIRCUIT BREAKER CHECK ---
-            if self.circuit_breaker and not self.circuit_breaker.should_allow_trade():
+            if self.circuit_breaker and not self.circuit_breaker.should_allow_trade(
+                    current_balance=self._get_cb_balance()):
                 cb_reason = self.circuit_breaker.get_status().get('trip_reason', 'Circuit breaker tripped')
                 logger.warning(f"Circuit Breaker: {cb_reason}")
                 def _cb_alert():

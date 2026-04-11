@@ -258,6 +258,13 @@ class LighterClient:
 
     def _run_async(self, coro, timeout: float = 30):
         if not self._loop_runner:
+            # Loop runner torn down (likely during shutdown). Cancel the
+            # unstarted coroutine to suppress "coroutine was never awaited"
+            # RuntimeWarnings seen in orchestrator restart logs.
+            try:
+                coro.close()
+            except Exception:
+                pass
             raise RuntimeError("Lighter async runner not initialized")
         return self._loop_runner.run(coro, timeout=timeout)
 
