@@ -36,6 +36,11 @@ try:
     from tradingview_webhook_bot.core.circuit_breaker import CircuitBreaker
     from tradingview_webhook_bot.exchange.hl_client import HyperliquidClient
     from tradingview_webhook_bot.exchange.lighter_client import LighterClient
+    from tradingview_webhook_bot.utils.position_summary import (
+        build_position_snapshot,
+        format_positions_for_log,
+        format_positions_for_telegram,
+    )
 except ImportError as e:
     logger.error(f"Import failed: {e}")
     sys.exit(1)
@@ -201,6 +206,13 @@ class Orchestrator:
             s = s.replace(ch, ' ')
         return re.sub(r'\s+', ' ', s).strip().lower()
 
+    def _exchange_enabled(self, exchange: str) -> bool:
+        allowed_exchanges_raw = os.getenv("ALLOWED_EXCHANGES", "").strip().lower()
+        if not allowed_exchanges_raw:
+            return True
+        allowed_exchanges = {ex.strip() for ex in allowed_exchanges_raw.split(",") if ex.strip()}
+        return str(exchange or "").lower() in allowed_exchanges
+
     def _load_approval_manifest(self) -> dict:
         try:
             with open(self.approval_manifest_path, encoding="utf-8") as f:
@@ -285,6 +297,35 @@ class Orchestrator:
             self._thread_pool.submit(_send)
         except Exception:
             _send()
+
+    def _lookup_position_mark_price(self, exchange: str, asset: str) -> float | None:
+        try:
+            if exchange == "lighter" and self.exchange_lighter:
+                price = self.exchange_lighter.get_mark_price(asset)
+                if price and price > 0:
+                    return float(price)
+        except Exception as exc:
+            logger.debug(f"Lighter mark price lookup skipped for {asset}: {exc}")
+
+        try:
+            price = self.exchange_binance.get_mainnet_mark_price(asset)
+            if price and price > 0:
+                return float(price)
+        except Exception as exc:
+            logger.debug(f"Mark price lookup skipped for {asset}: {exc}")
+
+        return None
+
+    def _build_open_position_snapshot(self) -> dict:
+        price_cache = {}
+
+        def _price_lookup(exchange: str, asset: str) -> float | None:
+            cache_key = f"{exchange}:{asset}"
+            if cache_key not in price_cache:
+                price_cache[cache_key] = self._lookup_position_mark_price(exchange, asset)
+            return price_cache[cache_key]
+
+        return build_position_snapshot(getattr(self.ledger, "positions", {}), price_lookup=_price_lookup)
 
     def _is_symbol_in_cooldown(self, symbol: str, strategy: str = "") -> bool:
         cooldown_key = f"{symbol}:{strategy}" if strategy else symbol
@@ -449,21 +490,18 @@ class Orchestrator:
             target_exchange = str(payload_raw.get("exchange") or event.get("exchange") or "binance").lower()
             strat_name = payload_raw.get("strategy") or event.get("strategy") or "SMC"
             symbol_raw = str(payload_raw.get("symbol") or event.get("symbol") or "BTCUSDT").upper()
-            allowed_exchanges_raw = os.getenv("ALLOWED_EXCHANGES", "").strip().lower()
-            if allowed_exchanges_raw:
-                allowed_exchanges = {ex.strip() for ex in allowed_exchanges_raw.split(",") if ex.strip()}
-                if target_exchange not in allowed_exchanges:
-                    logger.warning(f"Exchange {target_exchange} not in ALLOWED_EXCHANGES={sorted(allowed_exchanges)}")
-                    self._notify_signal_decision(
-                        title="Signal Blocked",
-                        reason=f"Exchange {target_exchange} is not enabled on this bot",
-                        signal_id=signal_id,
-                        symbol=symbol_raw,
-                        strategy=strat_name,
-                        action=payload_raw.get("action") or event.get("action") or "N/A",
-                        severity=AlertSeverity.WARNING,
-                    )
-                    return True
+            if not self._exchange_enabled(target_exchange):
+                logger.warning(f"Exchange {target_exchange} not enabled by ALLOWED_EXCHANGES")
+                self._notify_signal_decision(
+                    title="Signal Blocked",
+                    reason=f"Exchange {target_exchange} is not enabled on this bot",
+                    signal_id=signal_id,
+                    symbol=symbol_raw,
+                    strategy=strat_name,
+                    action=payload_raw.get("action") or event.get("action") or "N/A",
+                    severity=AlertSeverity.WARNING,
+                )
+                return True
 
             # --- SYMBOL CLEANING ---
             symbol = symbol_raw.split('_')[0]
@@ -1031,6 +1069,10 @@ class Orchestrator:
                 pnl_info = f"\n💵 <b>Today PnL:</b> <code>${pos_snapshot.daily_realized_pnl:.2f}</code>"
                 if is_exit and pos_snapshot.realized_pnl != 0:
                     pnl_info += f"\n📊 <b>Realized PnL:</b> <code>${pos_snapshot.realized_pnl:.2f}</code>"
+                open_position_info = format_positions_for_telegram(
+                    self._build_open_position_snapshot(),
+                    limit=3,
+                )
 
                 try:
                     self.telegram.send(severity=AlertSeverity.INFO, title="Trade Success",
@@ -1041,7 +1083,8 @@ class Orchestrator:
                                  f"📋 <b>Strategy:</b> <code>{strat_name}</code>\n"
                                  f"📈 <b>Approval:</b> {approval_label}"
                                  f"{sl_tp_info}"
-                                 f"{pnl_info}\n"
+                                 f"{pnl_info}\n\n"
+                                 f"{open_position_info}\n"
                                  f"🆔 <b>ID:</b> <code>{signal_id}</code>"))
                 except Exception as e:
                     logger.debug(f"Telegram failed: {e}")
@@ -1086,32 +1129,40 @@ class Orchestrator:
 
     def _run_reconcile(self):
         exchange_data = {}
-        try:
-            for pos in self.exchange_binance.get_open_positions() or []:
-                sym = pos.get("symbol", "")
-                qty = float(pos.get("positionAmt", 0) or 0)
-                if abs(qty) > 0:
-                    exchange_data[f"binance:{sym}"] = {
-                        "quantity": qty,
-                        "side": "LONG" if qty > 0 else "SHORT",
-                        "entry_price": float(pos.get("entryPrice") or 0),
-                    }
-        except Exception as exc:
-            logger.warning(f"Binance reconciler fetch failed: {exc}")
-
-        if self.exchange_lighter:
+        if self._exchange_enabled("binance"):
             try:
-                for pos in self.exchange_lighter.get_open_positions() or []:
+                for pos in self.exchange_binance.get_open_positions() or []:
                     sym = pos.get("symbol", "")
-                    qty = float(pos.get("quantity", pos.get("positionAmt", 0)) or 0)
+                    qty = float(pos.get("positionAmt", 0) or 0)
                     if abs(qty) > 0:
-                        exchange_data[f"lighter:{sym}"] = {
+                        exchange_data[f"binance:{sym}"] = {
                             "quantity": qty,
                             "side": "LONG" if qty > 0 else "SHORT",
-                            "entry_price": float(pos.get("entry_price", pos.get("entryPrice", 0)) or 0),
+                            "entry_price": float(pos.get("entryPrice") or 0),
                         }
             except Exception as exc:
-                logger.warning(f"Lighter reconciler fetch failed: {exc}")
+                logger.warning(f"Binance reconciler fetch failed: {exc}")
+        else:
+            logger.debug("Binance reconciler skipped by ALLOWED_EXCHANGES")
+
+        if self.exchange_lighter and self._exchange_enabled("lighter"):
+            if not getattr(self.exchange_lighter, "can_trade", False):
+                logger.debug("Lighter reconciler skipped in paper mode")
+            else:
+                try:
+                    for pos in self.exchange_lighter.get_open_positions() or []:
+                        sym = pos.get("symbol", "")
+                        qty = float(pos.get("quantity", pos.get("positionAmt", 0)) or 0)
+                        if abs(qty) > 0:
+                            exchange_data[f"lighter:{sym}"] = {
+                                "quantity": qty,
+                                "side": "LONG" if qty > 0 else "SHORT",
+                                "entry_price": float(pos.get("entry_price", pos.get("entryPrice", 0)) or 0),
+                            }
+                except Exception as exc:
+                    logger.warning(f"Lighter reconciler fetch failed: {exc}")
+        elif self.exchange_lighter:
+            logger.debug("Lighter reconciler skipped by ALLOWED_EXCHANGES")
 
         if not exchange_data:
             return
@@ -1162,7 +1213,12 @@ class Orchestrator:
                 self.last_reconcile = time.time()
                 self._thread_pool.submit(self._run_reconcile)
             if time.time() - self.last_heartbeat > 900:
-                logger.info(f"Heartbeat: Orchestrator running. Processed: {self.processed_count}")
+                heartbeat_snapshot = self._build_open_position_snapshot()
+                logger.info(
+                    "Heartbeat: Orchestrator running. Processed: %s | %s",
+                    self.processed_count,
+                    format_positions_for_log(heartbeat_snapshot, limit=5),
+                )
                 self.last_heartbeat = time.time()
             time.sleep(1)
 

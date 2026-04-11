@@ -28,6 +28,10 @@ try:
     from alerts.telegram_alerts import TelegramAlert, AlertSeverity
 except ImportError:
     from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert, AlertSeverity
+try:
+    from utils.position_summary import build_position_snapshot, format_positions_for_telegram
+except ImportError:
+    from tradingview_webhook_bot.utils.position_summary import build_position_snapshot, format_positions_for_telegram
 
 logger = setup_logger('webhook_server')
 
@@ -50,54 +54,87 @@ TV_ORDER_FILL_PATTERN = re.compile(
     re.IGNORECASE | re.DOTALL
 )
 
-# TradingView simple key=value format (sent by some Pine script alert templates):
-# "action=close symbol=UNIUSDT.P size=3579.3"
-# "action=buy symbol=SOLUSDT size=10"
-TV_KV_PATTERN = re.compile(
-    r'^action=(?P<action>\w+)\s+symbol=(?P<symbol>[A-Z0-9]+)(?:\.P|\.PERP|\.\w+)?'
-    r'(?:\s+size=(?P<size>[\d.]+))?',
-    re.IGNORECASE
-)
 
-INVALID_SECRET_VALUES = {"your_secret_key", "test", "secret"}
-OPEN_AUTH_MODES = {"open", "none", "disabled", "off"}
-
-
-def parse_tv_kv_alert(text):
-    """Parse TradingView simple key=value alert, optionally with secret=..."""
-    parts = dict((k.lower(), v.strip()) for k, v in re.findall(r'(\w+)=([^\s]+)', text.strip()))
-    if "action" not in parts or "symbol" not in parts:
+def _safe_float(value):
+    try:
+        if value in (None, ""):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
         return None
-    action_raw = parts.get("action", "").strip().upper()
-    symbol_raw = parts.get("symbol", "").strip().upper()
-    symbol_raw = symbol_raw.split('.')[0]
-    size_raw = parts.get("size") or parts.get("quantity") or '0'
-    secret = parts.get("secret", "").strip()
 
-    # Normalise symbol
-    if 'USDT' not in symbol_raw:
-        symbol_raw = symbol_raw + 'USDT'
 
-    is_exit = action_raw in ('CLOSE', 'EXIT') or float(size_raw) == 0
-    if action_raw == 'BUY':
-        side = 'BUY'
+def _is_truthy(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _normalize_signal_token(value):
+    return re.sub(r"[\s\-]+", "_", str(value or "").strip().upper())
+
+
+def _resolve_trade_signal(signal_value, is_exit_hint=False, position_hint=None):
+    token = _normalize_signal_token(signal_value)
+    pos_text = str(position_hint or "").strip().lower()
+    is_exit = (
+        bool(is_exit_hint)
+        or token in {"CLOSE", "EXIT", "CLOSE_LONG", "CLOSE_SHORT", "EXIT_LONG", "EXIT_SHORT", "BUY_TO_CLOSE", "SELL_TO_CLOSE"}
+        or pos_text in {"0", "0.0", "flat"}
+    )
+
+    if token in {"CLOSE_LONG", "EXIT_LONG", "SELL_TO_CLOSE"}:
+        action = "SELL"
+        is_exit = True
+    elif token in {"CLOSE_SHORT", "EXIT_SHORT", "BUY_TO_CLOSE"}:
+        action = "BUY"
+        is_exit = True
+    elif token in {"SELL", "SHORT", "OPEN_SHORT"}:
+        action = "SELL"
     else:
-        side = 'SELL'
+        action = "BUY"
+
+    if is_exit:
+        trade_label = "Close Long" if action == "SELL" else "Close Short"
+    else:
+        trade_label = "Open Long" if action == "BUY" else "Open Short"
 
     return {
-        "secret": secret,
-        "strategy":  action_raw,
-        "symbol":    symbol_raw,
-        "side":      side,
-        "quantity":  0.003,
-        "indicator": "TradingView_KV",
-        "is_exit":   is_exit,
-        "price":     0.0,
+        "action": action,
+        "is_exit": is_exit,
+        "trade_label": trade_label,
     }
 
 
+def _derive_risk_levels(payload, entry_price, action):
+    stop_loss = _safe_float(payload.get("stop_loss") or payload.get("sl") or payload.get("sl_price"))
+    take_profit = _safe_float(payload.get("take_profit") or payload.get("tp") or payload.get("tp_price"))
+    sl_pct = _safe_float(payload.get("sl_pct") or payload.get("stop_loss_pct"))
+    tp_pct = _safe_float(payload.get("tp_pct") or payload.get("take_profit_pct"))
 
-def parse_tv_order_fill_alert(text):
+    if entry_price and entry_price > 0:
+        if action == "BUY":
+            if stop_loss and stop_loss > 0 and stop_loss < entry_price and not (sl_pct and sl_pct > 0):
+                sl_pct = abs(entry_price - stop_loss) / entry_price * 100
+            if take_profit and take_profit > 0 and take_profit > entry_price and not (tp_pct and tp_pct > 0):
+                tp_pct = abs(take_profit - entry_price) / entry_price * 100
+        else:
+            if stop_loss and stop_loss > entry_price and not (sl_pct and sl_pct > 0):
+                sl_pct = abs(stop_loss - entry_price) / entry_price * 100
+            if take_profit and 0 < take_profit < entry_price and not (tp_pct and tp_pct > 0):
+                tp_pct = abs(entry_price - take_profit) / entry_price * 100
+
+    return {
+        "stop_loss": stop_loss or 0.0,
+        "take_profit": take_profit or 0.0,
+        "sl_pct": sl_pct or 0.0,
+        "tp_pct": tp_pct or 0.0,
+    }
+
+
+def parse_tv_order_fill_alert(text, webhook_secret):
     """Parse TradingView default strategy order-fill plain-text alert (no secret field)."""
     text = text.strip()
     m = TV_ORDER_FILL_PATTERN.match(text)
@@ -115,10 +152,8 @@ def parse_tv_order_fill_alert(text):
     if 'USDT' not in symbol:
         symbol = f"{symbol.replace('USD', '')}USDT"
 
-    # position=0 means strategy is flat â€” this is a CLOSE signal
-    is_exit = (position == 0)
-
     # Determine side from action word
+    is_exit = False
     if action_raw == 'BUY':
         side = 'BUY'
     elif action_raw == 'SELL':
@@ -126,16 +161,14 @@ def parse_tv_order_fill_alert(text):
     else:
         side = 'BUY'
 
-    # Discard price if it equals the position size (common TV bug: position value injected as price)
-    parsed_price = float(price_str)
-    if abs(parsed_price - position) < 1.0 or parsed_price > 100_000:
-        parsed_price = 0.0  # orchestrator will resolve via mainnet
-
     return {
+        # Secret is intentionally NOT injected here: plain-text TradingView order-fill
+        # alerts do not carry a secret, and strict auth modes must reject them.
+        "secret":    None,
         "strategy":  strategy,
         "symbol":    symbol,
         "side":      side,
-        "price":     parsed_price,
+        "price":     float(price_str),
         "quantity":  0.003,            # Default qty; live price override corrects price
         "indicator": strategy,
         "is_exit":   is_exit,
@@ -171,7 +204,7 @@ def parse_plain_text_alert(text):
     elif position < 0:
         side = "SELL"
     else:
-        # position=0 means flat â€” this is a CLOSE/EXIT, not a new entry
+        # position=0 means flat — this is a CLOSE/EXIT, not a new entry
         # Use the order action to determine which side to close
         is_exit = True
         side = "SELL" if action_raw in ("SELL", "SHORT") else "BUY"
@@ -217,7 +250,7 @@ class BacktestIngestor:
 
         self.telegram.send(
             severity=AlertSeverity.INFO,
-            title="\U0001F4CA Strategy Report Synced",
+            title="📊 Strategy Report Synced",
             message=(f"<b>Strategy:</b> <code>{strategy_name}</code>\n"
                      f"<b>Symbol:</b> <code>{symbol}</code>\n"
                      f"<b>Profit:</b> {row['net_profit']}\n"
@@ -237,14 +270,6 @@ class WebhookServer:
         # Resolve ${ENV_VAR} references in secret
         import re as _re
         self.webhook_secret = _re.sub(r'\$\{(\w+)\}', lambda m: os.environ.get(m.group(1), m.group(0)), raw_secret)
-        self.auth_mode = str(
-            config.get("webhook", {}).get("auth_mode") or os.getenv("TRADINGVIEW_AUTH_MODE", "secret")
-        ).strip().lower()
-        valid_auth_modes = {"secret", "signature", "secret_and_signature", *OPEN_AUTH_MODES}
-        if self.auth_mode not in valid_auth_modes:
-            logger.warning(f"Invalid TRADINGVIEW auth mode '{self.auth_mode}', defaulting to 'secret'")
-            self.auth_mode = "secret"
-        logger.info(f"TradingView auth mode: {self.auth_mode}")
         self.queue = AtomicJsonlQueue(signals_queue_file)
         # Durable SQLite queue (primary)
         db_path = signals_queue_file.replace('.jsonl', '_queue.db').replace('signals_queue', 'signal_queue')
@@ -252,6 +277,7 @@ class WebhookServer:
             db_path = os.path.join(os.path.dirname(signals_queue_file), 'signal_queue.db')
         self.durable_queue = DurableSignalQueue(db_path)
         self.telegram = TelegramAlert()
+        self.ledger_path = os.path.join(os.path.dirname(signals_queue_file), "ledger_state.json")
 
         # Rate limiting state
         self._request_times = []
@@ -265,44 +291,7 @@ class WebhookServer:
         self.setup_health_route()
         self.setup_metrics_route()
         self.setup_kill_switch()
-        self.setup_bot_control()
         self.setup_routes()
-
-    def _validate_tradingview_secret(self, secret, source):
-        configured_secret = str(self.webhook_secret or "").strip()
-        received_secret = str(secret or "").strip()
-
-        if not configured_secret:
-            logger.error(f"TradingView secret enforcement enabled but webhook secret is not configured for {source}")
-            return jsonify({'status': 'error', 'message': 'Webhook secret not configured'}), 503
-        if not received_secret:
-            logger.warning(f"Unauthorized {source} attempt - missing secret")
-            return jsonify({'status': 'error', 'message': 'Missing secret'}), 401
-        if received_secret in INVALID_SECRET_VALUES:
-            logger.warning(f"Unauthorized {source} attempt - placeholder secret provided")
-            return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
-        if received_secret != configured_secret:
-            logger.warning(f"Unauthorized {source} attempt - wrong secret provided")
-            return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
-
-        return None
-
-    def _authorize_tradingview_request(self, payload_bytes: bytes, secret, signature, source):
-        if self.auth_mode in OPEN_AUTH_MODES:
-            return None
-
-        if self.auth_mode in {"signature", "secret_and_signature"}:
-            if not signature:
-                logger.warning(f"Unauthorized {source} attempt - missing signature")
-                return jsonify({'status': 'error', 'message': 'Missing signature'}), 401
-            if not self._verify_hmac(payload_bytes, signature):
-                logger.warning(f"Unauthorized {source} attempt - invalid signature")
-                return jsonify({'status': 'error', 'message': 'Invalid signature'}), 401
-
-        if self.auth_mode in {"secret", "secret_and_signature"}:
-            return self._validate_tradingview_secret(secret, source)
-
-        return None
 
     def _check_rate_limit(self):
         """Returns True if request should be rejected (rate limited)."""
@@ -335,6 +324,26 @@ class WebhookServer:
             logger.warning(f"Binance API fallback failed: {e}")
 
         return 0.0
+
+    def _load_open_position_snapshot(self):
+        positions = {}
+        try:
+            with open(self.ledger_path, encoding="utf-8") as handle:
+                state = json.load(handle)
+            if isinstance(state, dict):
+                positions = state.get("positions", {}) or {}
+        except Exception as exc:
+            logger.debug(f"Ledger snapshot unavailable for Telegram summary: {exc}")
+
+        price_cache = {}
+
+        def _price_lookup(_exchange, asset):
+            if asset not in price_cache:
+                live_price = self._fetch_live_price(asset)
+                price_cache[asset] = live_price if live_price and live_price > 0 else None
+            return price_cache[asset]
+
+        return build_position_snapshot(positions, price_lookup=_price_lookup)
 
 
     def setup_health_route(self):
@@ -386,13 +395,9 @@ class WebhookServer:
                         logger.error(f"Lighter kill switch error: {lighter_error}")
                         closed.append({"exchange": "lighter", "status": "FAILED", "msg": str(lighter_error)})
 
-                msg = f"\U0001F6A8 KILL SWITCH ACTIVATED\nClosed {len(closed)} positions"
+                msg = f"🚨 KILL SWITCH ACTIVATED\nClosed {len(closed)} positions"
                 try:
-                    self.telegram.send(
-                        severity=AlertSeverity.WARNING,
-                        title="\U0001F6A8 KILL SWITCH",
-                        message=msg,
-                    )
+                    self.telegram.send(severity=AlertSeverity.WARNING, title="KILL SWITCH", message=msg)
                 except Exception:
                     pass
 
@@ -402,119 +407,8 @@ class WebhookServer:
                 logger.error(f"Kill switch error: {e}")
                 return jsonify({"error": str(e)}), 500
 
-    def setup_bot_control(self):
-        """Bot start/stop control endpoints for dashboard."""
-
-        def _auth(data):
-            secret = (data or {}).get("secret", "")
-            return bool(secret) and secret == self.webhook_secret
-
-        @self.app.route("/bot/status", methods=["GET"])
-        def bot_status():
-            import subprocess
-            try:
-                r = subprocess.run(["/usr/bin/sudo", "systemctl", "is-active", "trading_orchestrator"],
-                                   capture_output=True, text=True, timeout=5)
-                active = r.stdout.strip() == "active"
-                allow_trades = os.getenv("ALLOW_REAL_TRADES", "false").lower() == "true"
-                return jsonify({"orchestrator": "running" if active else "stopped",
-                                "allow_real_trades": allow_trades}), 200
-            except Exception as e:
-                return jsonify({"error": str(e)}), 500
-
-        @self.app.route("/bot/stop", methods=["POST"])
-        def bot_stop():
-            data = request.get_json(silent=True) or {}
-            if not _auth(data):
-                return jsonify({"error": "Unauthorized"}), 401
-            import subprocess
-            try:
-                subprocess.run(["/usr/bin/sudo", "systemctl", "stop", "trading_orchestrator"],
-                               capture_output=True, text=True, timeout=10)
-                msg = "\U0001F6D1 Bot stopped via dashboard kill switch"
-                try:
-                    self.telegram.send(
-                        severity=AlertSeverity.WARNING,
-                        title="\U0001F6D1 Bot Stopped",
-                        message=msg,
-                    )
-                except Exception:
-                    pass
-                logger.warning("Bot STOPPED via /bot/stop endpoint")
-                return jsonify({"status": "stopped"}), 200
-            except Exception as e:
-                return jsonify({"error": str(e)}), 500
-
-        @self.app.route("/bot/start", methods=["POST"])
-        def bot_start():
-            data = request.get_json(silent=True) or {}
-            if not _auth(data):
-                return jsonify({"error": "Unauthorized"}), 401
-            import subprocess
-            try:
-                subprocess.run(["/usr/bin/sudo", "systemctl", "start", "trading_orchestrator"],
-                               capture_output=True, text=True, timeout=10)
-                msg = "\U0001F680 Bot started via dashboard kill switch"
-                try:
-                    self.telegram.send(
-                        severity=AlertSeverity.INFO,
-                        title="\U0001F680 Bot Started",
-                        message=msg,
-                    )
-                except Exception:
-                    pass
-                logger.info("Bot STARTED via /bot/start endpoint")
-                return jsonify({"status": "started"}), 200
-            except Exception as e:
-                return jsonify({"error": str(e)}), 500
-
-        @self.app.route("/bot/emergency", methods=["POST"])
-        def bot_emergency():
-            """Emergency: close ALL positions AND stop the bot."""
-            data = request.get_json(silent=True) or {}
-            if not _auth(data):
-                return jsonify({"error": "Unauthorized"}), 401
-            import subprocess
-            closed_count = 0
-            try:
-                from tradingview_webhook_bot.exchange.binance_client import BinanceClient
-                client = BinanceClient()
-                closed = client.close_all_positions()
-                lighter_key = os.getenv("LIGHTER_API_PRIVATE_KEY") or os.getenv("LIGHTER_PRIVATE_KEY")
-                if lighter_key:
-                    try:
-                        from tradingview_webhook_bot.exchange.lighter_client import LighterClient
-                        lighter = LighterClient()
-                        closed.extend(lighter.close_all_positions())
-                        lighter.close()
-                    except Exception as lighter_error:
-                        logger.error(f"Lighter emergency close error: {lighter_error}")
-                        closed.append({"exchange": "lighter", "status": "FAILED", "msg": str(lighter_error)})
-                closed_count = len(closed) if closed else 0
-            except Exception as e:
-                logger.error(f"Emergency close error: {e}")
-            try:
-                subprocess.run(["/usr/bin/sudo", "systemctl", "stop", "trading_orchestrator"],
-                               capture_output=True, text=True, timeout=10)
-            except Exception as e:
-                logger.error(f"Emergency stop error: {e}")
-            msg = (
-                f"\U0001F6A8 Emergency kill activated\n"
-                f"Closed {closed_count} positions\n"
-                f"Bot stopped"
-            )
-            try:
-                self.telegram.send(
-                    severity=AlertSeverity.WARNING,
-                    title="\U0001F6A8 Emergency Kill",
-                    message=msg,
-                )
-            except Exception:
-                pass
-            logger.critical(msg)
-            return jsonify({"status": "emergency_killed", "positions_closed": closed_count}), 200
-
     def _verify_hmac(self, payload_bytes, sig):
+        if not sig: return True
         expected = _hmac.new(self.webhook_secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
         return _hmac.compare_digest(expected, sig)
 
@@ -528,14 +422,23 @@ class WebhookServer:
                     return jsonify({'status': 'error', 'message': 'Rate limit exceeded'}), 429
 
                 raw_body = request.get_data(as_text=True).strip()
-                raw_body_bytes = raw_body.encode()
                 hmac_sig = request.headers.get('X-Signature', '')
+                auth_mode = os.getenv('TRADINGVIEW_AUTH_MODE', 'secret').strip().lower()
+                if auth_mode == 'secret_and_signature' and not hmac_sig:
+                    logger.warning('Rejected request: signature required in secret_and_signature mode')
+                    return jsonify({'status': 'error', 'message': 'Signature required'}), 401
+                if hmac_sig and not self._verify_hmac(raw_body.encode(), hmac_sig):
+                    return jsonify({'status': 'error', 'message': 'Invalid signature'}), 401
                 metrics.inc("bot_webhook_requests_total")
                 logger.info(f"📨 Webhook received: {raw_body[:200]}")
 
                 # --- DETECT FORMAT: JSON or Plain Text ---
                 parsed = None
+                payload = {}
                 is_json = False
+                trade_label = "Open Long"
+                risk_levels = {"stop_loss": 0.0, "take_profit": 0.0, "sl_pct": 0.0, "tp_pct": 0.0}
+                is_exit_signal = False
 
                 # Try JSON first
                 try:
@@ -549,54 +452,52 @@ class WebhookServer:
                     # === JSON FORMAT (existing flow) ===
                     payload = data.get('payload', data)
                     received_secret = str(data.get('secret', payload.get('secret', ''))).strip()
-                    auth_error = self._authorize_tradingview_request(raw_body_bytes, received_secret, hmac_sig, "JSON")
-                    if auth_error:
-                        return auth_error
 
-                    raw_symbol = str(
-                        payload.get('symbol')
-                        or payload.get('ticker')
-                        or payload.get('tickerid')
-                        or ''
-                    ).upper().strip()
-                    side = (
-                        payload.get('side')
-                        or payload.get('action')
-                        or payload.get('signal')
-                        or payload.get('order_action')
+                    if received_secret in ("your_secret_key", "test", "secret", ""):
+                        logger.warning(f'Rejected placeholder secret from {request.remote_addr}')
+                        return jsonify({'status': 'error', 'message': 'Placeholder secret rejected'}), 401
+                    if received_secret != self.webhook_secret:
+                        logger.warning(f"❌ Unauthorized JSON attempt")
+                        return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
+
+                    signal_meta = _resolve_trade_signal(
+                        payload.get('side') or payload.get('action') or payload.get('signal'),
+                        is_exit_hint=(
+                            _is_truthy(payload.get("is_exit"))
+                            or _is_truthy(payload.get("close"))
+                            or _is_truthy(payload.get("reduce_only"))
+                        ),
+                        position_hint=payload.get("position_size") or payload.get("position"),
                     )
-                    price = payload.get('price', payload.get('close', payload.get('entry_price', 0)))
+                    raw_symbol = str(payload.get('symbol', '')).upper().strip()
+                    side = signal_meta["action"]
+                    price = payload.get('price') or payload.get('entry_price')
+                    is_exit_signal = signal_meta["is_exit"]
+                    trade_label = signal_meta["trade_label"]
 
-                    if not raw_symbol or not side:
-                        return jsonify({'status': 'error', 'message': 'Missing symbol or action'}), 400
+                    if not all([raw_symbol, price]):
+                        return jsonify({'status': 'error', 'message': 'Missing symbol, action, or price'}), 400
 
                     # Clean symbol (remove _PREMIUM, _PERP, etc)
-                    symbol = raw_symbol.split(':')[-1]
-                    symbol = symbol.replace("_PREMIUM", "").replace("_PERP", "").replace("_INDEX", "")
-                    symbol = symbol.split('.')[0]
+                    symbol = raw_symbol.replace("_PREMIUM", "").replace("_PERP", "").replace("_INDEX", "")
                     symbol = symbol.split('_')[0]
                     if symbol and "USDT" not in symbol:
                         symbol = f"{symbol.replace('USD', '')}USDT"
 
                     # Validate price
                     try:
-                        price_val = float(price) if price not in (None, "", "null") else 0.0
+                        price_val = float(price)
                     except (ValueError, TypeError):
-                        logger.warning(f"Invalid JSON price '{price}' for {symbol}; orchestrator will resolve via mainnet")
-                        price_val = 0.0
+                        return jsonify({'status': 'error', 'message': f'Invalid price: {price}'}), 400
 
                     if price_val <= 0:
                         logger.info(f"⚠️ Price={price_val} for {symbol}, orchestrator will resolve via mainnet")
 
-                    strategy = payload.get("strategy") or payload.get("indicator") or "SMC"
-                    indicator = payload.get("indicator") or strategy or "SMC_LuxAlgo"
-                    quantity_raw = payload.get("quantity") or payload.get("qty") or 0.003
-                    try:
-                        quantity = float(quantity_raw)
-                    except (ValueError, TypeError):
-                        logger.warning(f"Invalid JSON quantity '{quantity_raw}' for {symbol}; defaulting to 0.003")
-                        quantity = 0.003
-                    exchange = payload.get("exchange") or payload.get("broker") or "binance"
+                    strategy = payload.get("strategy", "SMC")
+                    indicator = payload.get("indicator", "SMC_LuxAlgo")
+                    quantity = float(payload.get("quantity") or 0.003)
+                    exchange = payload.get("exchange", "binance")
+                    risk_levels = _derive_risk_levels(payload, price_val, side)
 
                 else:
                     # === PLAIN TEXT FORMAT (TradingView default alerts) ===
@@ -604,31 +505,35 @@ class WebhookServer:
 
                     # Fallback: try TradingView built-in order-fill format
                     # e.g. "10_Aggressive_Entry: order buy @ 12345 filled on SOLUSDT..."
-                    plain_text_source = "plain text"
                     _is_tv_order_fill = False
                     if not parsed:
-                        parsed = parse_tv_order_fill_alert(raw_body)
+                        parsed = parse_tv_order_fill_alert(raw_body, self.webhook_secret)
                         if parsed:
-                            plain_text_source = "TradingView order-fill plain text"
                             _is_tv_order_fill = True
                             logger.info(f"📋 Parsed as TV order-fill alert: {parsed['strategy']} / {parsed['symbol']}")
 
-                    # Fallback 2: simple key=value format (action=X symbol=Y size=Z)
-                    if not parsed:
-                        parsed = parse_tv_kv_alert(raw_body)
-                        if parsed:
-                            plain_text_source = "TradingView key-value plain text"
-                            logger.info(f"📋 Parsed as TV key-value alert: {parsed['strategy']} / {parsed['symbol']} is_exit={parsed['is_exit']}")
-
                     if not parsed:
                         logger.warning(f"❌ Could not parse alert: {raw_body[:200]}")
+                        try:
+                            self.telegram.send(
+                                severity=AlertSeverity.WARNING,
+                                title="TradingView Script Error",
+                                message=(
+                                    "Incoming plain-text alert did not match the bot parser.\n\n"
+                                    f"<b>Preview:</b> <code>{raw_body[:180]}</code>"
+                                ),
+                            )
+                        except Exception:
+                            pass
                         logger.info(f'Ignoring unrecognized alert format')
                         return jsonify({'status': 'ignored', 'message': 'Unrecognized alert format'}), 200
 
-                    received_secret = str(parsed.get('secret', '')).strip()
-                    auth_error = self._authorize_tradingview_request(raw_body_bytes, received_secret, hmac_sig, plain_text_source)
-                    if auth_error:
-                        return auth_error
+                    # Verify secret — parsed['secret'] is None for secretless TV order-fill
+                    # plain-text alerts; strict auth must reject them outright.
+                    parsed_secret = parsed.get('secret')
+                    if not parsed_secret or parsed_secret != self.webhook_secret:
+                        logger.warning("❌ Unauthorized plain text attempt — secret missing or mismatch")
+                        return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
 
                     symbol = parsed['symbol']
                     side = parsed['side']
@@ -637,12 +542,12 @@ class WebhookServer:
                     quantity = parsed['quantity']
                     exchange = "binance"
 
-                    # Plain text alerts may not include price â€” orchestrator resolves via mainnet.
+                    # Plain text alerts may not include price — orchestrator resolves via mainnet.
                     # TV order-fill format sends TradingView's internal simulation price (not live market price),
                     # so we always discard it and let orchestrator fetch the real mainnet price.
                     if _is_tv_order_fill:
                         price_val = 0.0
-                        logger.info(f"⚠️ TV order-fill price discarded for {symbol} - orchestrator will use mainnet price")
+                        logger.info(f"⚠️ TV order-fill price discarded for {symbol} — orchestrator will use mainnet price")
                     else:
                         price_val = parsed.get('price', 0)
                         try:
@@ -652,130 +557,104 @@ class WebhookServer:
                         if price_val <= 0:
                             logger.info(f"⚠️ No price in plain text for {symbol}, orchestrator will resolve")
 
+                    signal_meta = _resolve_trade_signal(
+                        parsed.get("side"),
+                        is_exit_hint=parsed.get("is_exit", False),
+                        position_hint=parsed.get("position"),
+                    )
+                    side = signal_meta["action"]
+                    is_exit_signal = signal_meta["is_exit"]
+                    trade_label = signal_meta["trade_label"]
+                    risk_levels = _derive_risk_levels(parsed, price_val, side)
+
                 # --- COMMON: Build payload, queue, respond ---
                 signal_id = f"TV-{int(time.time() * 1000)}"
                 if is_json:
                     signal_id = data.get('signal_id') or signal_id
 
-                # Detect if this is an exit/close signal.
-                is_exit_signal = False
-                if is_json:
-                    is_exit_raw = payload.get("is_exit", payload.get("exit", payload.get("close", False)))
-                    if isinstance(is_exit_raw, str):
-                        is_exit_signal = is_exit_raw.strip().lower() in {"1", "true", "yes", "exit", "close"}
-                    else:
-                        is_exit_signal = bool(is_exit_raw)
-                elif parsed and parsed.get("is_exit", False):
-                    is_exit_signal = True
-
-                # Extract SL/TP/TS from signal if provided by Pine script
-                sig_sl_pct = float(payload.get("sl_pct", 0) or 0) if is_json else 0.0
-                sig_tp_pct = float(payload.get("tp_pct", 0) or 0) if is_json else 0.0
+                # Extract trailing-stop % when explicitly provided
                 sig_ts_pct = float(payload.get("ts_pct", 0) or 0) if is_json else 0.0
 
                 clean_payload = {
                     "signal_id": signal_id,
-                    "secret": received_secret,
+                    "secret": self.webhook_secret,
+                    "raw_body": raw_body,
                     "payload": {
                         "strategy": strategy,
                         "symbol": symbol,
-                        "action": str(side).upper(),
+                        "action": side,
                         "price": price_val,
                         "quantity": quantity,
                         "exchange": exchange,
                         "indicator": indicator,
                         "is_exit": is_exit_signal,
-                        "sl_pct": sig_sl_pct,
-                        "tp_pct": sig_tp_pct,
+                        "sl_pct": risk_levels["sl_pct"],
+                        "tp_pct": risk_levels["tp_pct"],
                         "ts_pct": sig_ts_pct,
+                        "stop_loss": risk_levels["stop_loss"],
+                        "take_profit": risk_levels["take_profit"],
                     }
                 }
 
                 # Queue signal to both JSONL (legacy) and SQLite (durable)
                 self.queue.enqueue(clean_payload)
                 self.durable_queue.enqueue(clean_payload)
-                logger.info(f"Signal queued: {symbol} {side} @ ${price_val} | Strategy: {strategy} (ID: {signal_id})")
+                logger.info(f"✅ Signal Queued: {symbol} {side} @ ${price_val} | Strategy: {strategy} (ID: {signal_id})")
 
                 # Return 200 IMMEDIATELY
                 response = jsonify({'status': 'success', 'message': 'Signal received and processing'})
 
                 # Fire-and-forget Telegram notification (daemon thread)
                 _sym, _side, _price, _sig, _strat = symbol, side, price_val, signal_id, strategy
-                _is_exit = is_exit_signal
-                _sl_value = None
-                _tp_value = None
-                if is_json:
-                    _sl_value = payload.get('stop_loss') or payload.get('sl') or payload.get('sl_price')
-                    _tp_value = payload.get('take_profit') or payload.get('tp') or payload.get('tp_price')
-                _sl_pct_value = sig_sl_pct
-                _tp_pct_value = sig_tp_pct
+                _trade_label = trade_label
+                _sl_price = risk_levels["stop_loss"]
+                _tp_price = risk_levels["take_profit"]
+                _sl_pct = risk_levels["sl_pct"]
+                _tp_pct = risk_levels["tp_pct"]
                 def _notify_telegram():
                     try:
                         live_p = self._fetch_live_price(_sym)
                         if live_p and live_p > 0:
-                            price_display = 'Live: ${:,.4f}'.format(live_p)
+                            price_display = "Live: ${:,.4f}".format(live_p)
                         elif _price and _price > 0:
-                            price_display = '${:,.4f} (stale signal price)'.format(_price)
+                            price_display = "${:,.4f} (stale signal price)".format(_price)
                         else:
-                            price_display = 'Resolving...'
-
-                        side_token = str(_side).strip().upper().replace("-", "_").replace(" ", "_")
-                        if side_token in {'CLOSE_LONG', 'EXIT_LONG', 'SELL_TO_CLOSE'}:
-                            action_display = 'Close Long'
-                        elif side_token in {'CLOSE_SHORT', 'EXIT_SHORT', 'BUY_TO_CLOSE'}:
-                            action_display = 'Close Short'
-                        elif _is_exit:
-                            action_display = 'Close Long' if side_token in {'SELL', 'SHORT'} else 'Close Short'
-                        else:
-                            action_display = 'Open Long' if side_token in {'BUY', 'LONG', 'OPEN_LONG'} else 'Open Short'
-
-                        def _format_level(label, value, pct_value):
-                            try:
-                                pct_num = float(pct_value or 0)
-                            except (TypeError, ValueError):
-                                pct_num = 0.0
-                            try:
-                                price_num = float(value)
-                            except (TypeError, ValueError):
-                                price_num = 0.0
-
-                            if price_num > 0 and pct_num > 0:
-                                return f'{label}: ${price_num:,.4f} ({pct_num:.2f}%)'
-                            if price_num > 0:
-                                return f'{label}: ${price_num:,.4f}'
-                            if pct_num > 0:
-                                return f'{label}: {pct_num:.2f}%'
-                            return None
-
-                        sl_line = _format_level('SL', _sl_value, _sl_pct_value) or 'SL: N/A'
-                        tp_line = _format_level('TP', _tp_value, _tp_pct_value) or 'TP: N/A'
-
-                        lines = [
-                            f'Symbol: {_sym}',
-                            f'Action: {action_display}',
-                            f'Price: {price_display}',
-                            sl_line,
-                            tp_line,
-                            f'Strategy: {_strat}',
-                            f'ID: {_sig}',
-                            '',
-                            '? Processing via Orchestrator...',
-                        ]
-
+                            price_display = "Resolving..."
+                        sl_line = ""
+                        tp_line = ""
+                        if _sl_price and _sl_price > 0:
+                            sl_suffix = " ({:.2f}%)".format(_sl_pct) if _sl_pct and _sl_pct > 0 else ""
+                            sl_line = f"🛡️ <b>Stop-Loss:</b> <code>${_sl_price:,.4f}</code>{sl_suffix}\n"
+                        if _tp_price and _tp_price > 0:
+                            tp_suffix = " ({:.2f}%)".format(_tp_pct) if _tp_pct and _tp_pct > 0 else ""
+                            tp_line = f"🎯 <b>Take-Profit:</b> <code>${_tp_price:,.4f}</code>{tp_suffix}\n"
+                        open_position_info = format_positions_for_telegram(
+                            self._load_open_position_snapshot(),
+                            limit=3,
+                        )
                         self.telegram.send(
                             severity=AlertSeverity.INFO,
-                            title='Signal Received',
-                            message='\n'.join(lines)
+                            title=f"📥 Signal Received: {_sym}",
+                            message=(f"🏹 <b>Action:</b> <code>{str(_side).upper()}</code>\n"
+                                     f"📌 <b>Type:</b> <code>{_trade_label}</code>\n"
+                                     f"💰 <b>Price:</b> <code>{price_display}</code>\n"
+                                     f"📋 <b>Strategy:</b> <code>{_strat}</code>\n"
+                                     f"{sl_line}"
+                                     f"{tp_line}"
+                                     f"{open_position_info}\n"
+                                     f"🆔 <b>ID:</b> <code>{_sig}</code>\n\n"
+                                     f"⏳ <i>Processing via Orchestrator...</i>")
                         )
                     except Exception as e:
-                        logger.warning(f'Telegram notify failed (non-critical): {e}')
+                        logger.warning(f"Telegram notify failed (non-critical): {e}")
+
                 t = threading.Thread(target=_notify_telegram, daemon=True)
                 t.start()
 
                 return response, 200
 
             except Exception as e:
-                logger.error(f"Webhook server error: {str(e)}")
+                logger.error(f"🔥 Webhook Server Error: {str(e)}")
                 return jsonify({'status': 'error', 'message': 'Internal Server Error'}), 500
 
         @self.app.route('/backtest-report', methods=['POST'])

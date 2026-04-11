@@ -1,3 +1,4 @@
+import html
 import streamlit as st
 import pandas as pd
 import psutil
@@ -124,6 +125,25 @@ def read_tournament_csv(path):
         if col in df.columns:
             df[col] = df[col].apply(lambda v: to_float(v, default=float("nan")))
     return df
+
+def parse_position_meta(pos):
+    raw_symbol = str(pos.get("symbol", "") or "")
+    parts = raw_symbol.split(":")
+    if len(parts) >= 3:
+        asset = parts[1]
+        strategy = ":".join(parts[2:]) or "Aggregate"
+    elif len(parts) == 2:
+        asset = parts[1]
+        strategy = "Aggregate"
+    else:
+        asset = raw_symbol
+        strategy = "Aggregate"
+    return {"asset": asset or raw_symbol or "--", "strategy": strategy or "Aggregate"}
+
+def compute_unrealized_pnl(qty, entry_price, mark_price):
+    if not qty or not entry_price or not mark_price:
+        return None
+    return (mark_price - entry_price) * qty
 
 # -- set_page_config MUST be first st call -------------------------------------
 st.set_page_config(
@@ -540,14 +560,15 @@ def pnl_since(since):
 
 alltime_pnl  = sum(t.get("pnl", 0) for t in th)
 today_pnl    = pnl_since(today_str)
-open_unr_pnl = sum(p.get("realized_pnl", 0) for p in open_pos)
+open_unr_pnl = 0.0
 wins         = sum(1 for t in th if t.get("pnl", 0) > 0)
 win_rate     = (wins / len(th) * 100) if th else 0
 
 # Live prices — fetch from Binance PUBLIC API (no auth, bypasses testnet issues)
 @st.cache_data(ttl=30, show_spinner=False)
-def fetch_public_prices():
-    _syms = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","LINKUSDT","DOGEUSDT","AVAXUSDT"]
+def fetch_public_prices(extra_symbols=None):
+    _base_syms = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","LINKUSDT","DOGEUSDT","AVAXUSDT"]
+    _syms = list(dict.fromkeys(_base_syms + [str(s).upper() for s in (extra_symbols or []) if s]))
     try:
         import requests as _req
         r = _req.get("https://api.binance.com/api/v3/ticker/price", timeout=5)
@@ -565,7 +586,31 @@ def fetch_public_prices():
             _out[s] = None
     return _out
 
-prices = fetch_public_prices()
+open_assets = sorted({parse_position_meta(p)["asset"] for p in open_pos if parse_position_meta(p)["asset"]})
+prices = fetch_public_prices(tuple(open_assets))
+
+open_pos_enriched = []
+for p in open_pos:
+    _row = dict(p)
+    _meta = parse_position_meta(_row)
+    _qty = to_float(_row.get("quantity", 0))
+    _entry = to_float(_row.get("avg_price", 0))
+    _mark = prices.get(_meta["asset"])
+    _row["_asset"] = _meta["asset"]
+    _row["_strategy"] = _meta["strategy"]
+    _row["_mark_price"] = _mark
+    _row["_unrealized_pnl"] = compute_unrealized_pnl(_qty, _entry, _mark)
+    _row["_day_pnl"] = (
+        to_float(_row.get("daily_realized_pnl", 0))
+        if str(_row.get("last_update_date", "")) == today_str else 0.0
+    )
+    open_pos_enriched.append(_row)
+
+open_pos = open_pos_enriched
+open_unr_pnl = sum((p.get("_unrealized_pnl") or 0.0) for p in open_pos)
+open_assets_label = ", ".join(open_assets[:4]) if open_assets else "No open assets"
+if len(open_assets) > 4:
+    open_assets_label += ", ..."
 
 def fp(sym, d=2):
     p = prices.get(sym)
@@ -737,7 +782,7 @@ if st.session_state.page == "Home":
               <div class="dk-card-label">Open Position PnL</div>
               <div class="dk-card-value" style="color:{unr_col}">${open_unr_pnl:+,.4f}</div>
               <div class="dk-card-sub">{len(open_pos)} positions open<br>
-                SOLUSDT, LINKUSDT, AVAXUSDT, UNIUSDT</div>
+                {open_assets_label}</div>
             </div>""", unsafe_allow_html=True)
 
         with c4:
@@ -835,34 +880,37 @@ if st.session_state.page == "Home":
         if open_pos:
             rows_html = ""
             for p in open_pos:
-                sym  = p.get("symbol", "").replace("binance:", "")
+                asset = html.escape(str(p.get("_asset", "--")))
+                strategy = html.escape(str(p.get("_strategy", "Aggregate")))
                 qty  = p.get("quantity", 0)
                 ep   = p.get("avg_price", 0)
-                rpnl = p.get("realized_pnl", 0)
-                dpnl = p.get("daily_realized_pnl", 0)
+                upnl = p.get("_unrealized_pnl")
+                dpnl = p.get("_day_pnl", 0)
                 side = "?? LONG" if qty > 0 else "?? SHORT"
                 tp_p = ep * (1 + tp_pct / 100) if qty > 0 else ep * (1 - tp_pct / 100)
                 sl_p = ep * (1 - sl_pct / 100) if qty > 0 else ep * (1 + sl_pct / 100)
-                rpnl_c = "#3fb950" if rpnl >= 0 else "#f85149"
+                upnl_c = "#3fb950" if (upnl or 0) >= 0 else "#f85149"
+                upnl_v = f"${upnl:+.4f}" if upnl is not None else "--"
                 rows_html += f"""
                 <tr>
-                  <td style="font-weight:600;color:#58a6ff">{sym}</td>
+                  <td style="font-weight:600;color:#58a6ff">{asset}</td>
+                  <td style="color:#e6edf3;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{strategy}</td>
                   <td>{side}</td>
                   <td style="color:#e6edf3">{abs(qty):.4f}</td>
                   <td style="color:#e6edf3">${ep:,.4f}</td>
                   <td style="color:#3fb950">${tp_p:,.4f}</td>
                   <td style="color:#f85149">${sl_p:,.4f}</td>
-                  <td style="color:{rpnl_c};font-weight:600">${rpnl:+.4f}</td>
-                  <td style="color:{rpnl_c}">${dpnl:+.4f}</td>
+                  <td style="color:{upnl_c};font-weight:600">{upnl_v}</td>
+                  <td style="color:{'#3fb950' if dpnl >= 0 else '#f85149'}">${dpnl:+.4f}</td>
                   <td style="color:#6e7681;font-size:11px">{p.get("last_update_date","")}</td>
                 </tr>"""
             st.markdown(f"""
             <div class="tbl-wrap">
             <table>
               <thead><tr>
-                <th>Symbol</th><th>Side</th><th>Qty</th><th>Entry</th>
-                <th>TP Price</th><th>SL Price</th><th>Realized PnL</th>
-                <th>Daily PnL</th><th>Updated</th>
+                <th>Asset</th><th>Strategy</th><th>Side</th><th>Qty</th><th>Entry</th>
+                <th>TP Price</th><th>SL Price</th><th>Unrealized PnL</th>
+                <th>Day's PnL</th><th>Updated</th>
               </tr></thead>
               <tbody>{rows_html}</tbody>
             </table></div>""", unsafe_allow_html=True)
@@ -1073,14 +1121,17 @@ elif st.session_state.page == "Order Manager":
                 tp_p = ep * (1 + tp_pct / 100) if qty > 0 else ep * (1 - tp_pct / 100)
                 sl_p = ep * (1 - sl_pct / 100) if qty > 0 else ep * (1 + sl_pct / 100)
                 rows.append({
-                    "Symbol":   p.get("symbol", "").replace("binance:", ""),
+                    "Asset":    p.get("_asset", "--"),
+                    "Strategy": p.get("_strategy", "Aggregate"),
                     "Side":     "?? LONG" if qty > 0 else "?? SHORT",
                     "Qty":      f"{abs(qty):.4f}",
                     "Entry":    f"${ep:,.4f}",
                     "TP":       f"${tp_p:,.4f}",
                     "SL":       f"${sl_p:,.4f}",
-                    "Realized": f"${p.get('realized_pnl', 0):+.4f}",
-                    "Daily":    f"${p.get('daily_realized_pnl', 0):+.4f}",
+                    "Unrealized PnL": (
+                        f"${p.get('_unrealized_pnl', 0):+.4f}" if p.get("_unrealized_pnl") is not None else "--"
+                    ),
+                    "Day's PnL": f"${p.get('_day_pnl', 0):+.4f}",
                     "Updated":  str(p.get("last_update_date", "")),
                 })
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)

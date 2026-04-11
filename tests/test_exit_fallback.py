@@ -130,7 +130,10 @@ def test_unapproved_strategy_is_blocked_by_manifest(tmp_path, monkeypatch):
     assert "not approved in the live manifest" in orch.telegram.send.call_args.kwargs["message"]
 
 
-def test_paper_only_strategy_executes_when_present_in_manifest(tmp_path, monkeypatch):
+def test_paper_only_strategy_is_blocked_from_execution(tmp_path, monkeypatch):
+    """paper_only manifest entries must NOT reach the exchange — only classes in
+    LIVE_APPROVAL_CLASSES (candidate_for_tiny_capital, live_approved, approved)
+    may execute live orders. Enforces M-10."""
     monkeypatch.setenv("ALLOWED_SYMBOLS", "")
     monkeypatch.setenv("POSITION_SIZE_MODE", "fixed")
 
@@ -149,8 +152,6 @@ def test_paper_only_strategy_executes_when_present_in_manifest(tmp_path, monkeyp
     }
 
     assert orch.handle_signal(event) is True
-    orch.exchange_binance.execute_futures_order.assert_called_once_with(
-        "SOLUSDT", "BUY", 0.1, 81.0, signal_id="SIG-PAPER-ONLY-001"
-    )
-    if orch.telegram.send.call_args is not None:
-        assert orch.telegram.send.call_args.kwargs.get("title") != "Signal Blocked"
+    orch.exchange_binance.execute_futures_order.assert_not_called()
+    assert orch.telegram.send.call_args is not None
+    assert orch.telegram.send.call_args.kwargs["title"] == "Signal Blocked"

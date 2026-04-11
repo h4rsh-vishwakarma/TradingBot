@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-04-10T04:36:43Z",
+  "updated_at": "2026-04-11T09:20:00Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -104,40 +104,6 @@
       "notes": "ROI=149.33%, PF=1.07, DD=-16.70% (REQUIRED)",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "CCI Trend",
-      "exchange": "lighter",
-      "symbols": [
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-07T10:23:25Z",
-      "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
-      "label": "ALPHA",
-      "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS Lighter route enabled from matching Binance live-approved strategy.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance."
-    },
-    {
-      "strategy": "Donchian Trend",
-      "exchange": "lighter",
-      "symbols": [
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-07T10:23:28Z",
-      "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
-      "label": "ALPHA",
-      "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS Lighter route enabled from matching Binance live-approved strategy.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance."
     }
   ]
 }
