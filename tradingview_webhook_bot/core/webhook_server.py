@@ -469,7 +469,7 @@ class WebhookServer:
                         ),
                         position_hint=payload.get("position_size") or payload.get("position"),
                     )
-                    raw_symbol = str(payload.get('symbol', '')).upper().strip()
+                    raw_symbol = str(payload.get('symbol') or payload.get('ticker', '')).upper().strip()
                     side = signal_meta["action"]
                     price = payload.get('price') or payload.get('entry_price')
                     is_exit_signal = signal_meta["is_exit"]
