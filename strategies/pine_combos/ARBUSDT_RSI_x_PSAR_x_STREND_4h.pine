@@ -33,8 +33,8 @@ if shortCond and strategy.position_size >= 0
     strategy.entry("Short", strategy.short, alert_message=short_msg)
     strategy.exit("SX", "Short", stop=close*(1+sl_pct), limit=close*(1-sl_pct), alert_message=cshrt_msg)
 
-alertcondition(longCond,  title="LONG  ARBUSDT  RSI_x_PSAR_x_STREND", message=long_msg)
-alertcondition(shortCond, title="SHORT ARBUSDT  RSI_x_PSAR_x_STREND", message=short_msg)
+alertcondition(longCond,  title="LONG  ARBUSDT  RSI_x_PSAR_x_STREND")
+alertcondition(shortCond, title="SHORT ARBUSDT  RSI_x_PSAR_x_STREND")
 
 if longCond
     label.new(bar_index, low,  "L", color=color.green, style=label.style_label_up,   size=size.small)

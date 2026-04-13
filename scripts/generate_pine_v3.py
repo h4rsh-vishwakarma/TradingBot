@@ -70,8 +70,8 @@ if shortCond and strategy.position_size == 0
 // Alerts — JSON payload for webhook
 string long_msg  = '{{"symbol":"{sym}","strategy":"{alert_name}","action":"buy","price":' + str.tostring(close) + '}}'
 string short_msg = '{{"symbol":"{sym}","strategy":"{alert_name}","action":"sell","price":' + str.tostring(close) + '}}'
-alertcondition(longCond,  title="LONG  {sym}", message=long_msg)
-alertcondition(shortCond, title="SHORT {sym}", message=short_msg)
+alertcondition(longCond,  title="LONG  {sym}")
+alertcondition(shortCond, title="SHORT {sym}")
 
 // Visual markers
 if longCond
@@ -130,8 +130,8 @@ if shortCond and strategy.position_size == 0
 
 string long_msg  = '{{"symbol":"{sym}","strategy":"{alert_name}","action":"buy","price":' + str.tostring(close) + '}}'
 string short_msg = '{{"symbol":"{sym}","strategy":"{alert_name}","action":"sell","price":' + str.tostring(close) + '}}'
-alertcondition(longCond,  title="LONG  {sym}", message=long_msg)
-alertcondition(shortCond, title="SHORT {sym}", message=short_msg)
+alertcondition(longCond,  title="LONG  {sym}")
+alertcondition(shortCond, title="SHORT {sym}")
 
 if longCond
     label.new(bar_index, low,  "L", color=color.green, style=label.style_label_up,   size=size.small)
@@ -173,8 +173,8 @@ if shortCond and strategy.position_size == 0
 
 string long_msg  = '{{"symbol":"{sym}","strategy":"{alert_name}","action":"buy","price":' + str.tostring(close) + '}}'
 string short_msg = '{{"symbol":"{sym}","strategy":"{alert_name}","action":"sell","price":' + str.tostring(close) + '}}'
-alertcondition(longCond,  title="LONG  {sym}", message=long_msg)
-alertcondition(shortCond, title="SHORT {sym}", message=short_msg)
+alertcondition(longCond,  title="LONG  {sym}")
+alertcondition(shortCond, title="SHORT {sym}")
 
 if longCond
     label.new(bar_index, low,  "L", color=color.green, style=label.style_label_up,   size=size.small)

@@ -370,8 +370,8 @@ if shortCond and strategy.position_size >= 0
     strategy.entry("Short", strategy.short, alert_message=short_msg)
     strategy.exit("SX", "Short", stop=close*(1+sl_pct), limit=close*(1-sl_pct), alert_message=cshrt_msg)
 
-alertcondition(longCond,  title="LONG  {sym}  {combo_id}", message=long_msg)
-alertcondition(shortCond, title="SHORT {sym}  {combo_id}", message=short_msg)
+alertcondition(longCond,  title="LONG  {sym}  {combo_id}")
+alertcondition(shortCond, title="SHORT {sym}  {combo_id}")
 
 if longCond
     label.new(bar_index, low,  "L", color=color.green, style=label.style_label_up,   size=size.small)
