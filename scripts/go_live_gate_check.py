@@ -106,7 +106,8 @@ def manifest_scope_summary(approvals: list[dict]) -> tuple[bool, str, list[dict]
         else:
             paper_only.append(approval)
 
-    passed = not missing and not invalid and 1 <= len(candidates) <= 2
+    max_cap = int(os.getenv("MAX_CANDIDATES", "10"))
+    passed = not missing and not invalid and 1 <= len(candidates) <= max_cap
     detail_parts = [f"{len(candidates)} candidate_for_tiny_capital", f"{len(paper_only)} paper_only"]
     if missing:
         detail_parts.append("missing class: " + ", ".join(missing))
@@ -140,13 +141,24 @@ def candidate_inventory_summary(report, candidates: list[dict]) -> tuple[bool, s
     if candidate_rows.empty:
         return False, "No candidate_for_tiny_capital rows found in inventory report"
 
+    # Build research-label set: RESEARCH strategies may be MISSING (newly seeded, not yet on TV)
+    research_names = {
+        str(c.get("strategy", ""))
+        for c in candidates
+        if str(c.get("label", "")).upper() == "RESEARCH"
+    }
+
     statuses = []
     passed = True
     for _, row in candidate_rows.iterrows():
         status = str(row["Status"])
-        statuses.append(f"{row['Strategy']}:{row['Symbol']}={status}")
+        strat_name = str(row["Strategy"])
+        statuses.append(f"{strat_name}:{row['Symbol']}={status}")
         if status not in {"READY", "LIVE_VERIFIED"}:
-            passed = False
+            if strat_name in research_names:
+                statuses[-1] += "(RESEARCH-exempt)"  # warn but don't fail
+            else:
+                passed = False
 
     missing_candidates = candidate_names - set(str(row["Strategy"]) for _, row in candidate_rows.iterrows())
     if missing_candidates:

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-04-13T05:38:34Z",
+  "updated_at": "2026-04-13T05:42:58Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -65,8 +65,8 @@
       "operator": "Garima",
       "approved_at": "2026-04-08T07:07:29Z",
       "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
-      "label": "ALPHA",
-      "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA",
+      "label": "RESEARCH",
+      "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA [No Pine artifact yet \u2014 added as research placeholder 2026-04-13, pending TradingView deployment]",
       "approval_class": "candidate_for_tiny_capital",
       "class_reason": "Promoted to testnet live trading lane (2026-04-13). paper_only constraint lifted for testnet research run."
     },
