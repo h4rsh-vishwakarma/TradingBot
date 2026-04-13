@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-13
 
-> Auto-generated — last updated `2026-04-13T13:10:01Z`
+> Auto-generated — last updated `2026-04-13T14:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,13 +10,13 @@
 |---|---|
 | Verdict | **VERDICT: GO  (25/25 gates passed)** |
 | Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-13T13:10:01Z |
+| Last run | 2026-04-13T14:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
 | Version | v5 |
-| Updated | 2026-04-13T12:11:30Z |
+| Updated | 2026-04-13T13:19:38Z |
 | Total candidates | 14 |
 | ALPHA (live-ready) | 5 |
 | RESEARCH (no Pine yet) | 9 |
@@ -52,12 +52,12 @@
 | Completed | 4 |
 | Last signal | 2026-04-13 12:00 UTC |
 | Last strategy | 03_EMA_Break_Momentum / ETHUSDT |
-| 401 unauthorized (today) | 42 (22 plain-text, 20 JSON) |
+| 401 unauthorized (today) | 44 (23 plain-text, 21 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260413_1305 |
+| Last heartbeat file | heartbeat_20260413_1405 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -86,6 +86,7 @@
 
 ## Commits Today (2026-04-13)
 ```
+e5cad7b | 2026-04-13 13:10:08 +0000 | chore: auto-update RUNTIME_LOG
 6659cef | 2026-04-13 12:55:22 +0000 | docs: EOD report 2026-04-13 - reformatted per-task with exec summary, subtasks, timeline, code sync
 80093d2 | 2026-04-13 12:50:49 +0000 | docs: add EOD report 2026-04-13 - full day summary T01-T13, 21 commits, 25/25 gates GO
 aa6b186 | 2026-04-13 12:11:42 +0000 | feat: add 4 new combo strategies to manifest (OOS-validated by combo builder)
