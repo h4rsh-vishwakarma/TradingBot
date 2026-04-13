@@ -13,7 +13,7 @@ float tp_pct = input.float(4.5, "Take Profit %", minval=0.1, maxval=30) / 100
 [diplus, diminus, adx_v] = ta.dmi(14, 14)
 bool adx_ok = adx_v > 20
 
-cci_val = ta.cci(high, low, close, 20)
+cci_val = ta.cci(hlc3, 20)
 stoch_k = ta.stoch(close, high, low, 14)
 obv_val = ta.obv
 obv_ma = ta.sma(obv_val, 20)

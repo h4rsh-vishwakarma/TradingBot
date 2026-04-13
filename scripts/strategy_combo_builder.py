@@ -302,7 +302,7 @@ PINE_IND = {
                  "ta.crossover(ema8, ema21)", "ta.crossunder(ema8, ema21)"),
     "DONCHIAN": ("don_hi = ta.highest(high, 20)[1]\ndon_lo = ta.lowest(low, 20)[1]",
                  "close >= don_hi", "close <= don_lo"),
-    "CCI":      ("cci_val = ta.cci(high, low, close, 20)",
+    "CCI":      ("cci_val = ta.cci(hlc3, 20)",
                  "cci_val < -100", "cci_val > 100"),
     "BB":       ("[bb_u, bb_m, bb_l] = ta.bb(close, 20, 2)",
                  "close < bb_l", "close > bb_u"),
