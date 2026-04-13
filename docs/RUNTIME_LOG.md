@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-13
 
-> Auto-generated — last updated `2026-04-13T12:10:01Z`
+> Auto-generated — last updated `2026-04-13T13:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,16 +10,16 @@
 |---|---|
 | Verdict | **VERDICT: GO  (25/25 gates passed)** |
 | Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-13T12:10:01Z |
+| Last run | 2026-04-13T13:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
-| Version | v4 |
-| Updated | 2026-04-13T12:09:56Z |
-| Total candidates | 10 |
+| Version | v5 |
+| Updated | 2026-04-13T12:11:30Z |
+| Total candidates | 14 |
 | ALPHA (live-ready) | 5 |
-| RESEARCH (no Pine yet) | 5 |
+| RESEARCH (no Pine yet) | 9 |
 
 ### Apr 14 Production Decision Lane
 | Strategy | Symbols | Timeframe | Label |
@@ -40,6 +40,10 @@
 - 10_Aggressive_Entry
 - 21_Full_Momentum
 - 24_Keltner_Breakout
+- RSI_x_BB_x_PSAR
+- CCI_x_STOCH_x_OBV
+- RSI_x_PSAR_x_STREND
+- RSI_x_PSAR_x_OBV
 
 ## Signal Pipeline — Last 24h
 | Item | Value |
@@ -48,12 +52,12 @@
 | Completed | 4 |
 | Last signal | 2026-04-13 12:00 UTC |
 | Last strategy | 03_EMA_Break_Momentum / ETHUSDT |
-| 401 unauthorized (today) | 38 (20 plain-text, 18 JSON) |
+| 401 unauthorized (today) | 42 (22 plain-text, 20 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260413_1205 |
+| Last heartbeat file | heartbeat_20260413_1305 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -82,6 +86,10 @@
 
 ## Commits Today (2026-04-13)
 ```
+6659cef | 2026-04-13 12:55:22 +0000 | docs: EOD report 2026-04-13 - reformatted per-task with exec summary, subtasks, timeline, code sync
+80093d2 | 2026-04-13 12:50:49 +0000 | docs: add EOD report 2026-04-13 - full day summary T01-T13, 21 commits, 25/25 gates GO
+aa6b186 | 2026-04-13 12:11:42 +0000 | feat: add 4 new combo strategies to manifest (OOS-validated by combo builder)
+f36a47b | 2026-04-13 12:10:08 +0000 | chore: auto-update RUNTIME_LOG
 cc40fc1 | 2026-04-13 12:07:37 +0000 | fix: ta.cci() takes 2 args in Pine V5 - changed ta.cci(high,low,close,20) to ta.cci(hlc3,20)
 923ff90 | 2026-04-13 11:58:43 +0000 | fix: remove message= from alertcondition() - Pine V5 requires const string, payload sent via strategy.entry alert_message instead
 e523609 | 2026-04-13 11:55:59 +0000 | fix: update webhook URL to https://tradingbot.operatorbrief.xyz across all scripts
@@ -104,7 +112,7 @@ be1cc5d | 2026-04-13 05:11:32 +0000 | fix(ops): R-04/R-05/R-10 operational harde
 ```
 
 ## Governance Note (P-01)
-Runtime has 10 candidate_for_tiny_capital strategies.
+Runtime has 14 candidate_for_tiny_capital strategies.
 Apr 14 decision scope is locked to: **CCI Trend + Donchian Trend on ETHUSDT 4h only.**
 All other strategies are testnet/research — not part of Apr 14 go-live decision.
 
