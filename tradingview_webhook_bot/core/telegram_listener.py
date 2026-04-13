@@ -180,7 +180,8 @@ def cmd_help(message):
         "/new_combos   -- Auto-discover new indicator combos\n"
         "/setup_alerts [strat] [sym] -- TV alert setup guide\n"
         "/check_promote -- Auto-promote paper winners\n"
-        "/top_combos    -- Top 10 from last combo run"
+        "/top_combos    -- Top 10 from last combo run\n"
+        "/get_pine [combo] [sym] -- Download Pine script file"
     )
     bot.reply_to(message, help_text, parse_mode='HTML')
 
@@ -1042,6 +1043,85 @@ def cmd_top_combos(message):
         bot.reply_to(message, "\n".join(lines), parse_mode="HTML")
     except Exception as e:
         bot.reply_to(message, f"Error: {e}", parse_mode="HTML")
+
+
+
+@bot.message_handler(commands=['get_pine'])
+def cmd_get_pine(message):
+    import glob as _glob
+    PINE_DIRS = [
+        '/home/ubuntu/tradingview_webhook_bot/strategies/pine_combos',
+        '/home/ubuntu/tradingview_webhook_bot/strategies/pine_v3',
+    ]
+    parts   = message.text.strip().split()
+    combo   = parts[1].upper() if len(parts) > 1 else None
+    sym_flt = parts[2].upper() if len(parts) > 2 else None
+
+    # List mode — no args
+    if combo is None:
+        files = []
+        for d in PINE_DIRS:
+            files += _glob.glob(d + '/*.pine')
+        if not files:
+            bot.reply_to(message, 'No Pine scripts found. Run /new_combos first.')
+            return
+        lines = ['<b>Available Pine Scripts</b>']
+        for fp in sorted(files):
+            name = os.path.basename(fp).replace('_4h.pine', '').replace('.pine', '')
+            lines.append('  <code>' + name + '</code>')
+        lines.append('\nUsage: <code>/get_pine RSI_x_BB_x_PSAR</code>')
+        bot.reply_to(message, '\n'.join(lines), parse_mode='HTML')
+        return
+
+    # Search for matching .pine file
+    matches = []
+    for d in PINE_DIRS:
+        pat = d + '/*' + combo + '*.pine'
+        if sym_flt:
+            pat = d + '/' + sym_flt + '*' + combo + '*.pine'
+        matches += _glob.glob(pat)
+    if not matches:
+        for d in PINE_DIRS:
+            for fp in _glob.glob(d + '/*.pine'):
+                bn = os.path.basename(fp).lower()
+                if combo.lower() in bn and (sym_flt is None or sym_flt.lower() in bn):
+                    matches.append(fp)
+
+    if not matches:
+        bot.reply_to(message,
+            'No Pine script for <code>' + combo + '</code>.\nUse /get_pine to list all.',
+            parse_mode='HTML')
+        return
+
+    for fpath in matches[:3]:
+        fname = os.path.basename(fpath)
+        caption = (
+            '<b>' + fname + '</b>\n\n'
+            'Steps:\n'
+            '1. TradingView Pine Editor\n'
+            '2. Paste script -> Add to chart\n'
+            '3. Create Alert -> Condition: <b>Any alert() function call</b>\n'
+            '4. Webhook URL: <code>http://15.207.152.119:5000/webhook/tradingview</code>\n'
+            '5. Message box: BLANK'
+        )
+        try:
+            with open(fpath, 'rb') as fh:
+                bot.send_document(
+                    message.chat.id, fh,
+                    caption=caption,
+                    parse_mode='HTML',
+                    visible_file_name=fname,
+                )
+        except Exception as e:
+            try:
+                with open(fpath) as fh:
+                    code = fh.read()
+                bot.reply_to(message, '<b>' + fname + '</b>', parse_mode='HTML')
+                for i in range(0, len(code), 3900):
+                    bot.send_message(message.chat.id,
+                        '<pre>' + code[i:i+3900] + '</pre>', parse_mode='HTML')
+            except Exception as e2:
+                bot.reply_to(message, 'Error: ' + str(e2), parse_mode='HTML')
 
 if __name__ == "__main__":
     print('Telegram Listener starting...')
