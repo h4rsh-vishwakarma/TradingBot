@@ -1,6 +1,6 @@
 {
-  "version": 4,
-  "updated_at": "2026-04-13T08:38:51Z",
+  "version": 5,
+  "updated_at": "2026-04-13T12:11:30Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -173,43 +173,6 @@
       "class_reason": "Testnet research lane \u2014 approved for live testnet execution 2026-04-13."
     },
     {
-      "strategy": "G27 CCI Donchian Wide",
-      "exchange": "binance",
-      "symbols": [
-        "SUIUSDT",
-        "LINKUSDT",
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-13T08:24:07Z",
-      "backtest_hash": "manual_approval_g27_cci_donchian_wide_202604130824",
-      "label": "RESEARCH",
-      "notes": "ROI/day=1.11%, PF=11.92, DD=-1.62% (SUI 4h, CAGR=5548%, 759 trades)",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Promoted via Telegram /promote_strat \u2014 tiny-capital live execution enabled"
-    },
-    {
-      "strategy": "Aroon Oscillator Fusion",
-      "exchange": "binance",
-      "symbols": [
-        "LINKUSDT",
-        "AVAXUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-13T08:25:15Z",
-      "backtest_hash": "manual_approval_aroon_oscillator_fusion_202604130825",
-      "label": "RESEARCH",
-      "notes": "ROI/day=0.81%, PF=16.62, DD=-2.09% (LINK 4h, CAGR=1806%, 1378 trades)",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Promoted via Telegram /promote_strat \u2014 tiny-capital live execution enabled"
-    },
-    {
       "strategy": "G28 Donchian Short14",
       "exchange": "binance",
       "symbols": [
@@ -219,12 +182,162 @@
         "240"
       ],
       "operator": "garima",
-      "approved_at": "2026-04-13T08:25:36Z",
-      "backtest_hash": "manual_approval_g28_donchian_short14_202604130825",
+      "approved_at": "2026-04-13T12:08:23Z",
+      "backtest_hash": "manual_approval_g28_donchian_short14_202604131208",
+      "label": "ALPHA",
+      "notes": "TV PF=17.43, WR=85%, 899 trades",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G27 CCI Donchian Wide",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "SUIUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-13T12:08:50Z",
+      "backtest_hash": "manual_approval_g27_cci_donchian_wide_202604131208",
+      "label": "ALPHA",
+      "notes": "TV PF=9.93-11.92, WR=84-85%",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G19 Donchian Volume Surge",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-13T12:09:19Z",
+      "backtest_hash": "manual_approval_g19_donchian_volume_surge_202604131209",
+      "label": "ALPHA",
+      "notes": "TV PF=18.97, WR=85%, 699 trades",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G15 Aroon Donchian Breakout",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-13T12:09:44Z",
+      "backtest_hash": "manual_approval_g15_aroon_donchian_breakout_202604131209",
+      "label": "ALPHA",
+      "notes": "TV PF=15.29, WR=84.2%",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G68 OBV CCI Cross",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-13T12:09:56Z",
+      "backtest_hash": "manual_approval_g68_obv_cci_cross_202604131209",
+      "label": "ALPHA",
+      "notes": "New diversifier, OOS ROI=4.12%, PF=1.27",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "RSI_x_BB_x_PSAR",
+      "exchange": "binance",
+      "symbols": [
+        "ARBUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-13T12:11:30Z",
+      "backtest_hash": "combo_oos_RSI_x_BB_x_PSAR_ARBUSDT_20260413",
       "label": "RESEARCH",
-      "notes": "ROI/day=0.53%, PF=17.43, DD=-1.61% (ETH 4h, CAGR=590%, 899 trades)",
+      "notes": "Auto-discovered combo: RSI oversold + BB bounce + PSAR flip. OOS PF=127.108 WR=72.7% DD=-0.04%. Pine: strategies/pine_combos/",
       "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Promoted via Telegram /promote_strat \u2014 tiny-capital live execution enabled"
+      "class_reason": "Combo builder OOS-validated 2026-04-13. RESEARCH \u2014 paper trade before live capital.",
+      "oos_pf": 127.108,
+      "oos_wr": 72.7,
+      "oos_dd": -0.04
+    },
+    {
+      "strategy": "CCI_x_STOCH_x_OBV",
+      "exchange": "binance",
+      "symbols": [
+        "NEARUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-13T12:11:30Z",
+      "backtest_hash": "combo_oos_CCI_x_STOCH_x_OBV_NEARUSDT_20260413",
+      "label": "RESEARCH",
+      "notes": "Auto-discovered combo: CCI extreme + Stoch oversold + OBV trend. OOS PF=22.167 WR=62.5% DD=-0.57%.",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Combo builder OOS-validated 2026-04-13. RESEARCH \u2014 paper trade before live capital.",
+      "oos_pf": 22.167,
+      "oos_wr": 62.5,
+      "oos_dd": -0.57
+    },
+    {
+      "strategy": "RSI_x_PSAR_x_STREND",
+      "exchange": "binance",
+      "symbols": [
+        "ARBUSDT",
+        "AAVEUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-13T12:11:30Z",
+      "backtest_hash": "combo_oos_RSI_x_PSAR_x_STREND_20260413",
+      "label": "RESEARCH",
+      "notes": "Auto-discovered combo: RSI oversold + PSAR flip + Supertrend. ARB: PF=12.873 WR=65.4% DD=-0.88% | AAVE: PF=12.651 WR=52.4% DD=-1.06%.",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Combo builder OOS-validated 2026-04-13. RESEARCH \u2014 paper trade before live capital.",
+      "oos_pf": 12.873,
+      "oos_wr": 65.4,
+      "oos_dd": -0.88
+    },
+    {
+      "strategy": "RSI_x_PSAR_x_OBV",
+      "exchange": "binance",
+      "symbols": [
+        "LINKUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-13T12:11:30Z",
+      "backtest_hash": "combo_oos_RSI_x_PSAR_x_OBV_LINKUSDT_20260413",
+      "label": "RESEARCH",
+      "notes": "Auto-discovered combo: RSI oversold + PSAR flip + OBV trend. OOS PF=8.619 WR=56.2% DD=-0.44%.",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Combo builder OOS-validated 2026-04-13. RESEARCH \u2014 paper trade before live capital.",
+      "oos_pf": 8.619,
+      "oos_wr": 56.2,
+      "oos_dd": -0.44
     }
   ]
 }
