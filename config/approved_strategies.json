@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "updated_at": "2026-04-11T10:45:19Z",
+  "version": 2,
+  "updated_at": "2026-04-13T05:38:34Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -40,8 +40,7 @@
       "strategy": "56_PSAR_Volume_Tight",
       "exchange": "binance",
       "symbols": [
-        "ETHUSDT",
-        "BTCUSDT"
+        "*"
       ],
       "timeframes": [
         "240"
@@ -51,14 +50,14 @@
       "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
       "label": "ALPHA",
       "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.148%, Gross_DD=-29.72%, Net_DD=-32.22%, Win_Rate=49.2%, Sharpe=5.35, Trades=60802, OOS_ROI=0.691%, OOS_DD=-20.66%, OOS_Sharpe=3.83, Tier=ALPHA",
-      "approval_class": "paper_only",
-      "class_reason": "Tournament approval retained for paper/research only because drawdown profile is too large for tiny-capital scope."
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Promoted to testnet live trading lane (2026-04-13). paper_only constraint lifted for testnet research run."
     },
     {
       "strategy": "57_PSAR_Volume_Ultra",
       "exchange": "binance",
       "symbols": [
-        "ETHUSDT"
+        "*"
       ],
       "timeframes": [
         "240"
@@ -68,14 +67,14 @@
       "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
       "label": "ALPHA",
       "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA",
-      "approval_class": "paper_only",
-      "class_reason": "Tournament approval retained for paper/research only because drawdown profile is too large for tiny-capital scope."
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Promoted to testnet live trading lane (2026-04-13). paper_only constraint lifted for testnet research run."
     },
     {
       "strategy": "44_PSAR_Volume_Surge",
       "exchange": "binance",
       "symbols": [
-        "BTCUSDT"
+        "*"
       ],
       "timeframes": [
         "240"
@@ -85,14 +84,14 @@
       "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
       "label": "ALPHA",
       "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA",
-      "approval_class": "paper_only",
-      "class_reason": "Tournament approval retained for paper/research only because drawdown profile is too large for tiny-capital scope."
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Promoted to testnet live trading lane (2026-04-13). paper_only constraint lifted for testnet research run."
     },
     {
       "strategy": "22_Ichimoku_Trend_Pro",
       "exchange": "binance",
       "symbols": [
-        "BTCUSDT"
+        "*"
       ],
       "timeframes": [
         "240"
@@ -102,8 +101,76 @@
       "backtest_hash": "manual_approval_22_ichimoku_trend_pro_202604100436",
       "label": "ALPHA",
       "notes": "ROI=149.33%, PF=1.07, DD=-16.70% (REQUIRED)",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Promoted to testnet live trading lane (2026-04-13). paper_only constraint lifted for testnet research run."
+    },
+    {
+      "strategy": "03_EMA_Break_Momentum",
+      "exchange": "binance",
+      "symbols": [
+        "*"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-13T05:38:34Z",
+      "backtest_hash": "testnet_approval_03_ema_break_momentum_20260413",
+      "label": "RESEARCH",
+      "notes": "EMA8/EMA21 cross + Breakout20 + MACD cross + ADX>25. Min 2/4 signals. Testnet research lane.",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Testnet research lane \u2014 approved for live testnet execution 2026-04-13."
+    },
+    {
+      "strategy": "10_Aggressive_Entry",
+      "exchange": "binance",
+      "symbols": [
+        "*"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-13T05:38:34Z",
+      "backtest_hash": "testnet_approval_10_aggressive_entry_20260413",
+      "label": "RESEARCH",
+      "notes": "Breakout20 + Volume spike + MACD cross + ADX>25. Min 2/4 signals. Testnet research lane.",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Testnet research lane \u2014 approved for live testnet execution 2026-04-13."
+    },
+    {
+      "strategy": "21_Full_Momentum",
+      "exchange": "binance",
+      "symbols": [
+        "*"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-13T05:38:34Z",
+      "backtest_hash": "testnet_approval_21_full_momentum_20260413",
+      "label": "RESEARCH",
+      "notes": "PSAR + Ichimoku cloud + MACD cross + ADX>25 + OBV rising. Min 3/5 signals. Testnet research lane.",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Testnet research lane \u2014 approved for live testnet execution 2026-04-13."
+    },
+    {
+      "strategy": "24_Keltner_Breakout",
+      "exchange": "binance",
+      "symbols": [
+        "*"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-13T05:38:34Z",
+      "backtest_hash": "testnet_approval_24_keltner_breakout_20260413",
+      "label": "RESEARCH",
+      "notes": "Keltner lower + RSI oversold bounce + Volume spike + OBV rising. Min 2/4 signals. Testnet research lane.",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Testnet research lane \u2014 approved for live testnet execution 2026-04-13."
     }
   ]
 }
