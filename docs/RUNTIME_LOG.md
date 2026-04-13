@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-13
 
-> Auto-generated — last updated `2026-04-13T10:10:01Z`
+> Auto-generated — last updated `2026-04-13T11:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: GO  (25/25 gates passed)** |
 | Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-13T10:10:01Z |
+| Last run | 2026-04-13T11:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -51,12 +51,12 @@
 | Completed | 3 |
 | Last signal | 2026-04-13 06:18 UTC |
 | Last strategy | Donchian Trend / LINKUSDT |
-| 401 unauthorized (today) | 34 (18 plain-text, 16 JSON) |
+| 401 unauthorized (today) | 36 (19 plain-text, 17 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260413_1005 |
+| Last heartbeat file | heartbeat_20260413_1105 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -86,6 +86,7 @@
 
 ## Commits Today (2026-04-13)
 ```
+3c244f0 | 2026-04-13 10:10:09 +0000 | chore: auto-update RUNTIME_LOG
 b84f382 | 2026-04-13 09:45:34 +0000 | ops: add RUNTIME_LOG.md + gen_runtime_log.py - hourly auto-push to GitHub
 23af41a | 2026-04-13 08:39:10 +0000 | fix: dedupe manifest, mark Garima G27/Aroon/G28 as RESEARCH, raise MAX_CANDIDATES to 15
 a13c7da | 2026-04-13 07:18:59 +0000 | resolved: all stale positions closed on Binance Testnet 2026-04-13
