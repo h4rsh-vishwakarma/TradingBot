@@ -349,7 +349,8 @@ def stale_position_gate() -> tuple[bool, str]:
                 continue  # R-04: explicitly quarantined, must be flattened before go-live
             parts = key.split(":")
             symbol = parts[1].upper() if len(parts) >= 2 else key.upper()
-            if symbol not in approved_symbols:
+            wildcard = "*" in approved_symbols
+            if not wildcard and symbol not in approved_symbols:
                 stale.append(symbol)
 
         qnote = f"; {len(quarantined_keys)} stale pos quarantined (R-04)" if quarantined_keys else ""
