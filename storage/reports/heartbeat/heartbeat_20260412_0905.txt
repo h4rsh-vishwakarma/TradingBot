@@ -1,0 +1,44 @@
+<b>HOURLY TRADING HEARTBEAT</b>
+━━━━━━━━━━━━━━━━━━
+<b>Status: HEALTHY</b>
+
+✅ <b>Webhook:</b> UP
+✅ <b>Orchestrator:</b> RUNNING
+✅ <b>Dashboard:</b> UP
+✅ <b>Inventory:</b> READY
+✅ <b>Manifest Scope:</b> ETH 4h approved pair only
+✅ <b>Dead Letter Queue:</b> Clean
+
+📡 <b>Signal Flow</b>
+• Last approved signal: 2026-04-10 20:04 UTC | CCI Trend | ETHUSDT
+• Last bot-visible signal: 2026-04-11 11:00 UTC | AuditProbe_Valid | BTCUSDT
+• Signals in last 60m: 0
+• Blocked in last 60m: 0
+• Unauthorized in last 60m: 0
+
+📍 <b>Open Positions</b>
+• Count: 6
+• BTCUSDT | — | SHORT | Entry 71675.32 | Realized $+0.00
+• ETHUSDT | — | LONG | Entry 2251.05 | Realized $-0.97
+• SUIUSDT | — | SHORT | Entry 0.89 | Realized $+0.00
+• AVAXUSDT | — | SHORT | Entry 8.67 | Realized $+0.00
+• LDOUSDT | — | SHORT | Entry 0.31 | Realized $+0.00
+• LINKUSDT | — | SHORT | Entry 9.34 | Realized $+0.00
+
+💰 <b>P&amp;L</b>
+• Day P&amp;L: $+0.00
+• Paper Window P&amp;L: $-3.95
+
+🛡 <b>Risk / Integrity</b>
+• Critical drifts today: 0
+• High drifts today: 0
+• Queue stalls: 0
+• Duplicate executions: 0
+• Missing SL/TP: 0
+• Freeze diff: none
+
+<b>Issues:</b>
+• None
+
+━━━━━━━━━━━━━━━━━━
+<i>2026-04-12 02:35 PM IST</i>

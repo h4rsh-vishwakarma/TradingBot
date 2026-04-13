@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "updated_at": "2026-04-13T07:02:18Z",
+  "version": 4,
+  "updated_at": "2026-04-13T08:38:51Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -15,7 +15,7 @@
       "approved_at": "2026-04-07T10:23:25Z",
       "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
       "label": "ALPHA",
-      "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13",
+      "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['LDOUSDT', 'ETHUSDT']",
       "approval_class": "candidate_for_tiny_capital",
       "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance."
     },
@@ -32,7 +32,7 @@
       "approved_at": "2026-04-07T10:23:28Z",
       "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
       "label": "ALPHA",
-      "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13",
+      "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['ETHUSDT', 'SUIUSDT', 'LDOUSDT', 'LINKUSDT']",
       "approval_class": "candidate_for_tiny_capital",
       "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance."
     },
@@ -171,6 +171,60 @@
       "notes": "Keltner lower + RSI oversold bounce + Volume spike + OBV rising. Min 2/4 signals. Testnet research lane.",
       "approval_class": "candidate_for_tiny_capital",
       "class_reason": "Testnet research lane \u2014 approved for live testnet execution 2026-04-13."
+    },
+    {
+      "strategy": "G27 CCI Donchian Wide",
+      "exchange": "binance",
+      "symbols": [
+        "SUIUSDT",
+        "LINKUSDT",
+        "ETHUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-13T08:24:07Z",
+      "backtest_hash": "manual_approval_g27_cci_donchian_wide_202604130824",
+      "label": "RESEARCH",
+      "notes": "ROI/day=1.11%, PF=11.92, DD=-1.62% (SUI 4h, CAGR=5548%, 759 trades)",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Promoted via Telegram /promote_strat \u2014 tiny-capital live execution enabled"
+    },
+    {
+      "strategy": "Aroon Oscillator Fusion",
+      "exchange": "binance",
+      "symbols": [
+        "LINKUSDT",
+        "AVAXUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-13T08:25:15Z",
+      "backtest_hash": "manual_approval_aroon_oscillator_fusion_202604130825",
+      "label": "RESEARCH",
+      "notes": "ROI/day=0.81%, PF=16.62, DD=-2.09% (LINK 4h, CAGR=1806%, 1378 trades)",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Promoted via Telegram /promote_strat \u2014 tiny-capital live execution enabled"
+    },
+    {
+      "strategy": "G28 Donchian Short14",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-13T08:25:36Z",
+      "backtest_hash": "manual_approval_g28_donchian_short14_202604130825",
+      "label": "RESEARCH",
+      "notes": "ROI/day=0.53%, PF=17.43, DD=-1.61% (ETH 4h, CAGR=590%, 899 trades)",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Promoted via Telegram /promote_strat \u2014 tiny-capital live execution enabled"
     }
   ]
 }

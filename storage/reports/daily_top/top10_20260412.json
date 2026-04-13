@@ -1,0 +1,116 @@
+{
+  "date": "20260412",
+  "generated_at": "2026-04-12T08:15:29.477947+05:30",
+  "entries": [
+    {
+      "strategy": "Squeeze Go Pro",
+      "symbol": "AAVEUSDT",
+      "daily_roi_pct": 0.003,
+      "gross_dd_pct": -0.04,
+      "win_rate_pct": 100.0,
+      "risk_adjusted_score": 0.8189,
+      "calmar_ratio": 19.0,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "Squeeze Momentum Indicator [LazyBear]",
+      "symbol": "AAVEUSDT",
+      "daily_roi_pct": 0.003,
+      "gross_dd_pct": -0.04,
+      "win_rate_pct": 100.0,
+      "risk_adjusted_score": 0.8189,
+      "calmar_ratio": 19.0,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "Squeeze Momentum",
+      "symbol": "AAVEUSDT",
+      "daily_roi_pct": 0.003,
+      "gross_dd_pct": -0.04,
+      "win_rate_pct": 100.0,
+      "risk_adjusted_score": 0.8189,
+      "calmar_ratio": 19.0,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "Machine Learning Lorentzian Classification",
+      "symbol": "AAVEUSDT",
+      "daily_roi_pct": 0.003,
+      "gross_dd_pct": -0.04,
+      "win_rate_pct": 100.0,
+      "risk_adjusted_score": 0.8189,
+      "calmar_ratio": 19.0,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "Squeeze vX [DGT]",
+      "symbol": "AAVEUSDT",
+      "daily_roi_pct": 0.003,
+      "gross_dd_pct": -0.04,
+      "win_rate_pct": 100.0,
+      "risk_adjusted_score": 0.8189,
+      "calmar_ratio": 19.0,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "24 keltner breakout",
+      "symbol": "DOGEUSDT",
+      "daily_roi_pct": 0.703,
+      "gross_dd_pct": -34.27,
+      "win_rate_pct": 44.5,
+      "risk_adjusted_score": 0.7517,
+      "calmar_ratio": 5.17,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "ENSEMBLE[MAJORITY]:V2_RSI_MeanRev+V2_OBV_Trend",
+      "symbol": "AVAXUSDT",
+      "daily_roi_pct": 0.099,
+      "gross_dd_pct": -22.51,
+      "win_rate_pct": 37.2,
+      "risk_adjusted_score": 0.5032,
+      "calmar_ratio": 1.108,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "ENSEMBLE[AND]:V2_RSI_MeanRev+V2_OBV_Trend",
+      "symbol": "AVAXUSDT",
+      "daily_roi_pct": 0.099,
+      "gross_dd_pct": -22.51,
+      "win_rate_pct": 37.2,
+      "risk_adjusted_score": 0.5032,
+      "calmar_ratio": 1.108,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "V2_ATR_Breakout[period=40,atr_period=14,atr_mult=1.5]",
+      "symbol": "SOLUSDT",
+      "daily_roi_pct": 0.088,
+      "gross_dd_pct": -77.93,
+      "win_rate_pct": 29.4,
+      "risk_adjusted_score": 0.4087,
+      "calmar_ratio": 0.285,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "V2_MACD_Cross[fast=8,slow=17,signal=9]",
+      "symbol": "AVAXUSDT",
+      "daily_roi_pct": 0.046,
+      "gross_dd_pct": -75.27,
+      "win_rate_pct": 39.5,
+      "risk_adjusted_score": 0.4069,
+      "calmar_ratio": 0.154,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    }
+  ]
+}

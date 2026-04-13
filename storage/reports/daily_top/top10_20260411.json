@@ -1,0 +1,116 @@
+{
+  "date": "20260411",
+  "generated_at": "2026-04-11T17:51:35.544292+05:30",
+  "entries": [
+    {
+      "strategy": "cci trend",
+      "symbol": "SOLUSDT",
+      "daily_roi_pct": 0.62,
+      "gross_dd_pct": -22.97,
+      "win_rate_pct": 48.4,
+      "risk_adjusted_score": 0.7521,
+      "calmar_ratio": 6.802,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "44 psar volume surge 4h",
+      "symbol": "SOLUSDT",
+      "daily_roi_pct": 0.62,
+      "gross_dd_pct": -22.97,
+      "win_rate_pct": 48.4,
+      "risk_adjusted_score": 0.7521,
+      "calmar_ratio": 6.802,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "tv 03 eth tp6",
+      "symbol": "SOLUSDT",
+      "daily_roi_pct": 0.62,
+      "gross_dd_pct": -22.97,
+      "win_rate_pct": 48.4,
+      "risk_adjusted_score": 0.7521,
+      "calmar_ratio": 6.802,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "22 ichimoku trend pro",
+      "symbol": "SOLUSDT",
+      "daily_roi_pct": 0.62,
+      "gross_dd_pct": -22.97,
+      "win_rate_pct": 48.4,
+      "risk_adjusted_score": 0.7521,
+      "calmar_ratio": 6.802,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "56_PSAR_Volume_Tight",
+      "symbol": "SOLUSDT",
+      "daily_roi_pct": 0.62,
+      "gross_dd_pct": -22.97,
+      "win_rate_pct": 48.4,
+      "risk_adjusted_score": 0.7521,
+      "calmar_ratio": 6.802,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "Aggressive_Entry",
+      "symbol": "SOLUSDT",
+      "daily_roi_pct": 0.62,
+      "gross_dd_pct": -22.97,
+      "win_rate_pct": 48.4,
+      "risk_adjusted_score": 0.7521,
+      "calmar_ratio": 6.802,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "tv_03_ETH_TP6",
+      "symbol": "SOLUSDT",
+      "daily_roi_pct": 0.62,
+      "gross_dd_pct": -22.97,
+      "win_rate_pct": 48.4,
+      "risk_adjusted_score": 0.7521,
+      "calmar_ratio": 6.802,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "vwap break entry",
+      "symbol": "AVAXUSDT",
+      "daily_roi_pct": 0.735,
+      "gross_dd_pct": -24.27,
+      "win_rate_pct": 48.3,
+      "risk_adjusted_score": 0.7486,
+      "calmar_ratio": 7.632,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "Ichimoku_Trend_Pro",
+      "symbol": "AVAXUSDT",
+      "daily_roi_pct": 0.735,
+      "gross_dd_pct": -24.27,
+      "win_rate_pct": 48.3,
+      "risk_adjusted_score": 0.7486,
+      "calmar_ratio": 7.632,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    },
+    {
+      "strategy": "tv 03 eth tp6",
+      "symbol": "AVAXUSDT",
+      "daily_roi_pct": 0.735,
+      "gross_dd_pct": -24.27,
+      "win_rate_pct": 48.3,
+      "risk_adjusted_score": 0.7486,
+      "calmar_ratio": 7.632,
+      "passes_hard_filter": false,
+      "filter_mode": "soft"
+    }
+  ]
+}

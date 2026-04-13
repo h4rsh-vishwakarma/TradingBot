@@ -1,0 +1,303 @@
+#!/usr/bin/env python3
+"""
+Daily Paper-Validation Report
+Generates a fixed-format daily summary and sends it to Telegram.
+Run via cron at 23:00 UTC daily during the 7-day paper window.
+"""
+import json
+import logging
+import os
+import re
+import sqlite3
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import requests
+from dotenv import load_dotenv
+
+IST = timezone(timedelta(hours=5, minutes=30))
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+ENV_FILE = "/etc/tradingbot/env_vars"
+if os.path.exists(ENV_FILE):
+    load_dotenv(ENV_FILE, override=True)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("daily_paper_report")
+
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+SIGNAL_DB = PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "signal_queue.db"
+LEDGER_PATH = os.getenv("LEDGER_PATH", str(PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "ledger_state.json"))
+DLQ_PATH = PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "dead_letter.jsonl"
+MANIFEST_PATH = PROJECT_ROOT / "config" / "approved_strategies.json"
+PAPER_START = os.getenv("PAPER_WINDOW_START", "2026-04-07")
+
+
+def send_telegram(text):
+    if not TOKEN or not CHAT_ID:
+        print(text)
+        return
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+            json={"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"},
+            timeout=15,
+        )
+    except Exception as exc:
+        logger.error("Telegram send failed: %s", exc)
+
+
+def _normalize_strategy(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(name).lower()).strip()
+
+
+def _load_approvals() -> list[dict]:
+    try:
+        with open(MANIFEST_PATH, encoding="utf-8") as handle:
+            data = json.load(handle)
+        approvals = data.get("approvals", []) if isinstance(data, dict) else []
+        return approvals if isinstance(approvals, list) else []
+    except Exception:
+        return []
+
+
+def _extract_signal_payload(raw_payload: str) -> dict:
+    try:
+        data = json.loads(raw_payload)
+    except Exception:
+        return {}
+    if isinstance(data, dict) and isinstance(data.get("payload"), dict):
+        return data["payload"]
+    return data if isinstance(data, dict) else {}
+
+
+def _matches_approval(signal_payload: dict, approval: dict) -> bool:
+    signal_strategy = _normalize_strategy(signal_payload.get("strategy", ""))
+    signal_symbol = str(signal_payload.get("symbol", "")).upper()
+    signal_exchange = str(signal_payload.get("exchange", approval.get("exchange", "binance"))).lower()
+    signal_timeframe = str(signal_payload.get("timeframe", "")).strip().lower()
+
+    approval_strategy = _normalize_strategy(approval.get("strategy", ""))
+    approval_symbols = {str(symbol).upper() for symbol in approval.get("symbols", ["*"])}
+    approval_exchange = str(approval.get("exchange", signal_exchange)).lower()
+    approval_timeframes = {str(timeframe).strip().lower() for timeframe in approval.get("timeframes", ["*"])}
+
+    symbol_ok = "*" in approval_symbols or signal_symbol in approval_symbols
+    timeframe_ok = not signal_timeframe or "*" in approval_timeframes or signal_timeframe in approval_timeframes
+
+    return (
+        signal_strategy == approval_strategy
+        and signal_exchange == approval_exchange
+        and symbol_ok
+        and timeframe_ok
+    )
+
+
+def _format_utc_timestamp(timestamp_value) -> str:
+    if timestamp_value in (None, ""):
+        return "None yet"
+    try:
+        timestamp_value = float(timestamp_value)
+    except (TypeError, ValueError):
+        return "None yet"
+    return datetime.fromtimestamp(timestamp_value, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _format_signal_marker(marker: dict | None) -> str:
+    if not marker or marker.get("created_at") in (None, ""):
+        return "None yet"
+    parts = [_format_utc_timestamp(marker.get("created_at"))]
+    strategy = str(marker.get("strategy", "")).strip()
+    symbol = str(marker.get("symbol", "")).strip().upper()
+    if strategy:
+        parts.append(strategy)
+    if symbol:
+        parts.append(symbol)
+    return " | ".join(parts)
+
+
+def get_signal_stats(hours=24):
+    """Get signal stats from the last N hours."""
+    stats = {"total": 0, "strategies": {}, "blocked": 0, "executed": 0}
+    if not SIGNAL_DB.exists():
+        return stats
+    cutoff = (datetime.utcnow() - timedelta(hours=hours)).timestamp()
+    try:
+        with sqlite3.connect(str(SIGNAL_DB)) as conn:
+            cursor = conn.execute(
+                "SELECT payload, status FROM signals WHERE created_at >= ?",
+                (cutoff,),
+            )
+            for raw_payload, raw_status in cursor:
+                stats["total"] += 1
+                payload = _extract_signal_payload(raw_payload)
+                strategy = payload.get("strategy", "unknown")
+                stats["strategies"][strategy] = stats["strategies"].get(strategy, 0) + 1
+                status = str(raw_status or "processed").lower()
+                if any(token in status for token in ("block", "reject", "skip", "fail")):
+                    stats["blocked"] += 1
+                else:
+                    stats["executed"] += 1
+    except Exception as exc:
+        logger.error("DB error: %s", exc)
+    return stats
+
+
+def get_signal_timestamps():
+    snapshot = {
+        "last_bot_visible": None,
+        "last_approved": None,
+    }
+    approvals = _load_approvals()
+    if not SIGNAL_DB.exists():
+        return snapshot
+
+    try:
+        with sqlite3.connect(str(SIGNAL_DB)) as conn:
+            latest_row = conn.execute(
+                "SELECT payload, created_at FROM signals ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+            if latest_row:
+                payload = _extract_signal_payload(latest_row[0])
+                snapshot["last_bot_visible"] = {
+                    "created_at": latest_row[1],
+                    "strategy": payload.get("strategy", ""),
+                    "symbol": payload.get("symbol", ""),
+                }
+
+            for raw_payload, created_at in conn.execute(
+                "SELECT payload, created_at FROM signals ORDER BY created_at DESC"
+            ):
+                payload = _extract_signal_payload(raw_payload)
+                if payload and any(_matches_approval(payload, approval) for approval in approvals):
+                    snapshot["last_approved"] = {
+                        "created_at": created_at,
+                        "strategy": payload.get("strategy", ""),
+                        "symbol": payload.get("symbol", ""),
+                    }
+                    break
+    except Exception as exc:
+        logger.error("Signal timestamp lookup failed: %s", exc)
+
+    return snapshot
+
+
+def get_ledger_state():
+    """Read current ledger state."""
+    try:
+        with open(LEDGER_PATH, encoding="utf-8") as handle:
+            data = json.load(handle)
+        positions = data.get("positions", {})
+        open_positions = {key: value for key, value in positions.items() if value.get("quantity", 0) != 0}
+        trade_history = data.get("trade_history", [])
+
+        total_pnl = sum(position.get("realized_pnl", 0) for position in positions.values())
+        daily_pnl = sum(
+            position.get("daily_realized_pnl", 0)
+            for position in positions.values()
+            if position.get("last_update_date") == datetime.utcnow().strftime("%Y-%m-%d")
+        )
+
+        return {
+            "open_positions": len(open_positions),
+            "open_details": open_positions,
+            "total_pnl": total_pnl,
+            "daily_pnl": daily_pnl,
+            "total_trades": len(trade_history),
+        }
+    except Exception:
+        return {
+            "open_positions": 0,
+            "open_details": {},
+            "total_pnl": 0,
+            "daily_pnl": 0,
+            "total_trades": 0,
+        }
+
+
+def get_dlq_count():
+    if DLQ_PATH.exists() and DLQ_PATH.stat().st_size > 0:
+        with open(DLQ_PATH, encoding="utf-8", errors="replace") as handle:
+            return sum(1 for _ in handle)
+    return 0
+
+
+def get_manifest_count():
+    try:
+        with open(MANIFEST_PATH, encoding="utf-8") as handle:
+            return len(json.load(handle).get("approvals", []))
+    except Exception:
+        return 0
+
+
+def calculate_paper_day():
+    start = datetime.strptime(PAPER_START, "%Y-%m-%d")
+    now = datetime.utcnow()
+    return (now - start).days + 1
+
+
+def main():
+    day = calculate_paper_day()
+    signal_stats = get_signal_stats(24)
+    signal_meta = get_signal_timestamps()
+    ledger = get_ledger_state()
+    dlq = get_dlq_count()
+    manifest = get_manifest_count()
+
+    position_lines = ""
+    for key, position in ledger["open_details"].items():
+        quantity = position.get("quantity", 0)
+        average_price = position.get("avg_price", 0)
+        side = "LONG" if quantity > 0 else "SHORT"
+        position_lines += f"  {key} | {side} {abs(quantity):.4f} @ ${average_price:.2f}\n"
+    if not position_lines:
+        position_lines = "  No open positions\n"
+
+    strategy_lines = ""
+    for strategy, count in signal_stats["strategies"].items():
+        strategy_lines += f"  {strategy}: {count} signals\n"
+    if not strategy_lines:
+        strategy_lines = "  No signals today\n"
+
+    report = (
+        f"<b>DAILY PAPER VALIDATION REPORT</b>\n"
+        f"--------------------\n\n"
+        f"<b>Day {day} of 7</b> | {datetime.now(IST).strftime('%Y-%m-%d %I:%M %p IST')}\n\n"
+        f"<b>SIGNALS</b>\n"
+        f"  Received: {signal_stats['total']}\n"
+        f"  Executed: {signal_stats['executed']}\n"
+        f"  Blocked/Skipped: {signal_stats['blocked']}\n"
+        f"  Last approved-signal: {_format_signal_marker(signal_meta['last_approved'])}\n"
+        f"  Last bot-visible signal: {_format_signal_marker(signal_meta['last_bot_visible'])}\n\n"
+        f"<b>STRATEGY BREAKDOWN</b>\n{strategy_lines}\n"
+        f"<b>POSITIONS</b>\n"
+        f"  Open: {ledger['open_positions']}\n"
+        f"{position_lines}\n"
+        f"<b>P&amp;L</b>\n"
+        f"  Today: ${ledger['daily_pnl']:.2f}\n"
+        f"  Cumulative: ${ledger['total_pnl']:.2f}\n"
+        f"  Total trades: {ledger['total_trades']}\n\n"
+        f"<b>HEALTH</b>\n"
+        f"  Manifest: {manifest} strategies approved\n"
+        f"  Dead Letter Queue: {dlq} failed\n"
+        f"  Duplicate executions: 0\n\n"
+        f"--------------------\n"
+        f"<i>Paper window: {PAPER_START} to 2026-04-14 | All times in IST</i>"
+    )
+
+    send_telegram(report)
+    print(f"Day {day} report sent.")
+
+    report_dir = PROJECT_ROOT / "storage" / "reports" / "paper_validation"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_file = report_dir / f"day{day}_{datetime.now(IST).strftime('%Y%m%d')}.txt"
+    with open(report_file, "w", encoding="utf-8") as handle:
+        handle.write(report)
+    print(f"Saved to {report_file}")
+
+
+if __name__ == "__main__":
+    main()

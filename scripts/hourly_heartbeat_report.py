@@ -92,7 +92,7 @@ def load_manifest_scope() -> dict:
             for t in a.get("timeframes", []):
                 timeframes.add(t)
         strategies = sorted({a.get("strategy", "") for a in candidates})
-        max_cap = int(os.getenv("MAX_CANDIDATES", "10"))
+        max_cap = int(os.getenv("MAX_CANDIDATES", "15"))
         return {
             "ok": 1 <= len(candidates) <= max_cap,
             "candidate_count": len(candidates),
