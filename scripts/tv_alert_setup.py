@@ -36,7 +36,7 @@ if os.path.exists(ENV_FILE):
 TOKEN          = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID        = os.getenv("TELEGRAM_CHAT_ID", "5736858710")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "squeeze_tradingview_cluster_2026_secure")
-SERVER_URL     = "http://15.207.152.119:5000/webhook/tradingview"
+SERVER_URL     = "https://tradingbot.operatorbrief.xyz/webhook/tradingview"
 
 MANIFEST_PATH  = PROJECT_ROOT / "config" / "approved_strategies.json"
 PINE_V3_DIR    = PROJECT_ROOT / "strategies" / "pine_v3"

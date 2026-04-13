@@ -1372,7 +1372,7 @@ elif st.session_state.page == "Signals":
           <div style='font-size:32px;margin-bottom:10px'>??</div>
           <div style='font-size:15px;font-weight:600;color:#e6edf3;margin-bottom:6px'>No Signals Yet</div>
           <div style='font-size:13px'>Waiting for TradingView webhook signals.<br>
-          Set your alert webhook to: <code style='color:#58a6ff'>http://15.207.152.119:5000/webhook</code></div>
+          Set your alert webhook to: <code style='color:#58a6ff'>https://tradingbot.operatorbrief.xyz/webhook</code></div>
         </div>""", unsafe_allow_html=True)
 
 

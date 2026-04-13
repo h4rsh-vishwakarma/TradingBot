@@ -1101,7 +1101,7 @@ def cmd_get_pine(message):
             '1. TradingView Pine Editor\n'
             '2. Paste script -> Add to chart\n'
             '3. Create Alert -> Condition: <b>Any alert() function call</b>\n'
-            '4. Webhook URL: <code>http://15.207.152.119:5000/webhook/tradingview</code>\n'
+            '4. Webhook URL: <code>https://tradingbot.operatorbrief.xyz/webhook/tradingview</code>\n'
             '5. Message box: BLANK'
         )
         try:

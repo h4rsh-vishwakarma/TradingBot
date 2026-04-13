@@ -43,7 +43,7 @@ if os.path.exists(ENV_FILE):
 TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID  = os.getenv("TELEGRAM_CHAT_ID", "5736858710")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "squeeze_tradingview_cluster_2026_secure")
-SERVER_URL = "http://15.207.152.119:5000/webhook/tradingview"
+SERVER_URL = "https://tradingbot.operatorbrief.xyz/webhook/tradingview"
 
 DATA_DIR   = PROJECT_ROOT / "storage" / "backtest_data"
 REPORT_OUT = PROJECT_ROOT / "storage" / "reports" / "combo_winners.csv"

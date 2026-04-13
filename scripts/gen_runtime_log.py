@@ -172,7 +172,7 @@ log = f"""# Runtime Log — {today}
 ## Services
 | Service | URL | Status |
 |---|---|---|
-| Webhook | http://15.207.152.119:5000/health | UP |
+| Webhook | https://tradingbot.operatorbrief.xyz/health | UP |
 | Dashboard | http://15.207.152.119:8501 | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
