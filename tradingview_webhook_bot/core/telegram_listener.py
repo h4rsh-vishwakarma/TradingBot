@@ -175,7 +175,12 @@ def cmd_help(message):
         "• Pine scripts = only verified ALPHA (same condition as live trades)\n"
         "• REVERSE_ALPHA excluded from Pine (signal flip handled server-side)\n"
         "• ADX &gt; 20 + ATR Vol Filter + 2% Trail Stop + Daily Circuit Breaker\n"
-        "• /stop works mid-deployment — sends confirmation when halted"
+        "• /stop works mid-deployment — sends confirmation when halted\n\n"
+        "-- AUTO-DISCOVERY --\n"
+        "/new_combos   -- Auto-discover new indicator combos\n"
+        "/setup_alerts [strat] [sym] -- TV alert setup guide\n"
+        "/check_promote -- Auto-promote paper winners\n"
+        "/top_combos    -- Top 10 from last combo run"
     )
     bot.reply_to(message, help_text, parse_mode='HTML')
 
@@ -960,6 +965,83 @@ def cmd_demote_strat(message):
     )
 
 
+
+
+
+# ── New auto-discovery commands ──────────────────────────────────────────────
+
+@bot.message_handler(commands=["new_combos"])
+def cmd_new_combos(message):
+    bot.reply_to(message, "Starting combo builder (5-10 min). Report incoming via Telegram.", parse_mode="HTML")
+    try:
+        import subprocess
+        proc = subprocess.Popen(
+            ["python3", "scripts/strategy_combo_builder.py"],
+            cwd="/home/ubuntu/tradingview_webhook_bot",
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        bot.reply_to(message, f"Combo builder started (pid {proc.pid}).", parse_mode="HTML")
+    except Exception as e:
+        bot.reply_to(message, f"Error: {e}", parse_mode="HTML")
+
+
+@bot.message_handler(commands=["setup_alerts"])
+def cmd_setup_alerts(message):
+    parts    = message.text.strip().split()
+    strategy = parts[1] if len(parts) > 1 else None
+    symbol   = parts[2] if len(parts) > 2 else None
+    bot.reply_to(message, "Generating TradingView alert setup guide...", parse_mode="HTML")
+    try:
+        import subprocess
+        cmd = ["python3", "scripts/tv_alert_setup.py"]
+        if strategy and strategy != "--top5":
+            cmd.append(strategy)
+        if symbol:
+            cmd.append(symbol)
+        if strategy == "--top5":
+            cmd.append("--top5")
+        subprocess.Popen(cmd, cwd="/home/ubuntu/tradingview_webhook_bot",
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        bot.reply_to(message, f"Error: {e}", parse_mode="HTML")
+
+
+@bot.message_handler(commands=["check_promote"])
+def cmd_check_promote(message):
+    bot.reply_to(message, "Running auto-promotion check...", parse_mode="HTML")
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["python3", "scripts/auto_promote.py"],
+            cwd="/home/ubuntu/tradingview_webhook_bot",
+            capture_output=True, text=True, timeout=60,
+        )
+        out = (result.stdout + result.stderr).strip()[:2000]
+        bot.reply_to(message,
+            "<pre>" + out + "</pre>" if out else "Done.",
+            parse_mode="HTML")
+    except Exception as e:
+        bot.reply_to(message, f"Error: {e}", parse_mode="HTML")
+
+
+@bot.message_handler(commands=["top_combos"])
+def cmd_top_combos(message):
+    try:
+        import pandas as pd
+        csv_path = "/home/ubuntu/tradingview_webhook_bot/storage/reports/combo_winners.csv"
+        if not os.path.exists(csv_path):
+            bot.reply_to(message, "No combo_winners.csv yet. Run /new_combos first.", parse_mode="HTML")
+            return
+        df = pd.read_csv(csv_path).head(10).reset_index(drop=True)
+        lines = ["<b>Top Combos (OOS)</b>"]
+        for i, row in df.iterrows():
+            lines.append(
+                f"  {i+1}. <code>{row['Combo']}</code> [{row['Symbol']}] "
+                f"PF={row['OOS_PF']} WR={row['OOS_WR_%']}% DD={row['OOS_DD_%']}%"
+            )
+        bot.reply_to(message, "\n".join(lines), parse_mode="HTML")
+    except Exception as e:
+        bot.reply_to(message, f"Error: {e}", parse_mode="HTML")
 
 if __name__ == "__main__":
     print('Telegram Listener starting...')
