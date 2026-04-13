@@ -9,7 +9,8 @@
       "side": "SHORT",
       "qty": -0.0162,
       "entry": 71675.32,
-      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane"
+      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane",
+      "status": "CLOSED"
     },
     {
       "key": "binance:SUIUSDT",
@@ -17,7 +18,8 @@
       "side": "SHORT",
       "qty": -1070.8,
       "entry": 0.89,
-      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane"
+      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane",
+      "status": "CLOSED"
     },
     {
       "key": "binance:AVAXUSDT",
@@ -25,7 +27,8 @@
       "side": "SHORT",
       "qty": -35.0,
       "entry": 8.67,
-      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane"
+      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane",
+      "status": "CLOSED"
     },
     {
       "key": "binance:LDOUSDT",
@@ -33,7 +36,8 @@
       "side": "SHORT",
       "qty": -1000.0,
       "entry": 0.31,
-      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane"
+      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane",
+      "status": "CLOSED"
     },
     {
       "key": "binance:LINKUSDT",
@@ -41,7 +45,8 @@
       "side": "SHORT",
       "qty": -6.8,
       "entry": 9.34,
-      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane"
+      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane",
+      "status": "CLOSED"
     },
     {
       "key": "binance:XRPUSDT",
@@ -49,11 +54,14 @@
       "side": "LONG",
       "qty": 15.8,
       "entry": 1.3318,
-      "note": "Test signal from webhook debug session - not real trade"
+      "note": "Test signal from webhook debug session - not real trade",
+      "status": "CLOSED"
     }
   ],
   "approved_lane_positions": [
     "binance:ETHUSDT"
   ],
-  "action_required": "Flatten on testnet exchange before Apr 14 live decision. No capital at risk (testnet only)."
+  "action_required": "All positions manually closed on Binance Testnet 2026-04-13. No further action needed.",
+  "flattened_at": "2026-04-13T07:18:30Z",
+  "status": "RESOLVED"
 }
