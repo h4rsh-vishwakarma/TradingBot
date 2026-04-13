@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-13
 
-> Auto-generated — last updated `2026-04-13T11:10:02Z`
+> Auto-generated — last updated `2026-04-13T12:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,16 +10,16 @@
 |---|---|
 | Verdict | **VERDICT: GO  (25/25 gates passed)** |
 | Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-13T11:10:02Z |
+| Last run | 2026-04-13T12:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
 | Version | v4 |
-| Updated | 2026-04-13T08:38:51Z |
-| Total candidates | 13 |
+| Updated | 2026-04-13T12:09:56Z |
+| Total candidates | 10 |
 | ALPHA (live-ready) | 5 |
-| RESEARCH (no Pine yet) | 8 |
+| RESEARCH (no Pine yet) | 5 |
 
 ### Apr 14 Production Decision Lane
 | Strategy | Symbols | Timeframe | Label |
@@ -40,28 +40,24 @@
 - 10_Aggressive_Entry
 - 21_Full_Momentum
 - 24_Keltner_Breakout
-- G27 CCI Donchian Wide
-- Aroon Oscillator Fusion
-- G28 Donchian Short14
 
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 3 |
-| Completed | 3 |
-| Last signal | 2026-04-13 06:18 UTC |
-| Last strategy | Donchian Trend / LINKUSDT |
-| 401 unauthorized (today) | 36 (19 plain-text, 17 JSON) |
+| Signals received | 4 |
+| Completed | 4 |
+| Last signal | 2026-04-13 12:00 UTC |
+| Last strategy | 03_EMA_Break_Momentum / ETHUSDT |
+| 401 unauthorized (today) | 38 (20 plain-text, 18 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260413_1105 |
+| Last heartbeat file | heartbeat_20260413_1205 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
-- `binance:ETHUSDT` qty=0.074 @ 2251.05
 - `binance:XRPUSDT` qty=-15.8 @ 1.3304
 
 ## Stale Position Quarantine
@@ -80,12 +76,18 @@
 ## Services
 | Service | URL | Status |
 |---|---|---|
-| Webhook | http://15.207.152.119:5000/health | UP |
+| Webhook | https://tradingbot.operatorbrief.xyz/health | UP |
 | Dashboard | http://15.207.152.119:8501 | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
 ## Commits Today (2026-04-13)
 ```
+cc40fc1 | 2026-04-13 12:07:37 +0000 | fix: ta.cci() takes 2 args in Pine V5 - changed ta.cci(high,low,close,20) to ta.cci(hlc3,20)
+923ff90 | 2026-04-13 11:58:43 +0000 | fix: remove message= from alertcondition() - Pine V5 requires const string, payload sent via strategy.entry alert_message instead
+e523609 | 2026-04-13 11:55:59 +0000 | fix: update webhook URL to https://tradingbot.operatorbrief.xyz across all scripts
+862553c | 2026-04-13 11:50:30 +0000 | feat: /get_pine command - download Pine script file directly from Telegram
+eb5120a | 2026-04-13 11:39:20 +0000 | feat: auto strategy discovery + TV alert guide + auto-promote pipeline
+153abc8 | 2026-04-13 11:10:08 +0000 | chore: auto-update RUNTIME_LOG
 3c244f0 | 2026-04-13 10:10:09 +0000 | chore: auto-update RUNTIME_LOG
 b84f382 | 2026-04-13 09:45:34 +0000 | ops: add RUNTIME_LOG.md + gen_runtime_log.py - hourly auto-push to GitHub
 23af41a | 2026-04-13 08:39:10 +0000 | fix: dedupe manifest, mark Garima G27/Aroon/G28 as RESEARCH, raise MAX_CANDIDATES to 15
@@ -102,7 +104,7 @@ be1cc5d | 2026-04-13 05:11:32 +0000 | fix(ops): R-04/R-05/R-10 operational harde
 ```
 
 ## Governance Note (P-01)
-Runtime has 13 candidate_for_tiny_capital strategies.
+Runtime has 10 candidate_for_tiny_capital strategies.
 Apr 14 decision scope is locked to: **CCI Trend + Donchian Trend on ETHUSDT 4h only.**
 All other strategies are testnet/research — not part of Apr 14 go-live decision.
 
