@@ -92,8 +92,9 @@ def load_manifest_scope() -> dict:
             for t in a.get("timeframes", []):
                 timeframes.add(t)
         strategies = sorted({a.get("strategy", "") for a in candidates})
+        max_cap = int(os.getenv("MAX_CANDIDATES", "10"))
         return {
-            "ok": 1 <= len(candidates) <= 2,
+            "ok": 1 <= len(candidates) <= max_cap,
             "candidate_count": len(candidates),
             "paper_only_count": len(paper_only),
             "strategies": strategies,
@@ -404,8 +405,26 @@ def inventory_ready() -> bool:
             if "Approval Class" in df.columns else df
         if candidate_rows.empty:
             return False
+        # Load RESEARCH-labelled strategies from manifest (exempt from MISSING penalty)
+        research_names = set()
+        try:
+            with open(MANIFEST_PATH) as _mf:
+                import json as _json
+                _mdata = _json.load(_mf)
+            research_names = {
+                a.get("strategy", "")
+                for a in _mdata.get("approvals", [])
+                if str(a.get("label", "")).upper() == "RESEARCH"
+            }
+        except Exception:
+            pass
         ok_statuses = {"READY", "LIVE_VERIFIED"}
-        return all(str(s) in ok_statuses for s in candidate_rows.get("Status", []))
+        for _, row in candidate_rows.iterrows():
+            status = str(row.get("Status", ""))
+            name = str(row.get("Strategy", ""))
+            if status not in ok_statuses and name not in research_names:
+                return False
+        return True
     except Exception:
         return False
 
