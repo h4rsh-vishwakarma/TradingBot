@@ -227,6 +227,128 @@ def dlq_summary() -> tuple[bool, str]:
     return dlq_count == 0, ("Clean" if dlq_count == 0 else f"{dlq_count} failed signals")
 
 
+
+def signal_gap_gate() -> tuple[bool, str]:
+    """Gate: last bot-visible signal must be within 48h.
+    Catches TradingView alert stagnation before the Apr 14 decision.
+    """
+    import sqlite3
+    signal_db = PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "signal_queue.db"
+    if not signal_db.exists():
+        return False, "signal_queue.db missing"
+    try:
+        with sqlite3.connect(str(signal_db)) as conn:
+            row = conn.execute(
+                "SELECT MAX(created_at) FROM signals"
+            ).fetchone()
+        last_ts = row[0] if row and row[0] else None
+        if not last_ts:
+            return False, "No signals ever recorded in signal_queue.db"
+        minutes_since = int((datetime.now(UTC).timestamp() - float(last_ts)) / 60)
+        hours = minutes_since / 60
+        detail = f"Last bot-visible signal {minutes_since}m ago ({hours:.1f}h)"
+        passed = minutes_since < (48 * 60)  # warn if > 48h
+        if not passed:
+            detail += " -- STALE: verify TradingView alerts are firing"
+        return passed, detail
+    except Exception as exc:
+        return False, f"signal_gap_gate error: {exc}"
+
+
+def approved_lane_signal_count_gate() -> tuple[bool, str]:
+    """Gate: at least 1 approved-lane signal recorded during the paper window.
+    Prevents declaring a paper window healthy when zero approved signals fired.
+    """
+    import sqlite3, json as _json, re as _re
+    signal_db = PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "signal_queue.db"
+    manifest_path = PROJECT_ROOT / "config" / "approved_strategies.json"
+    paper_start = os.getenv("PAPER_WINDOW_START", "2026-04-07")
+    if not signal_db.exists():
+        return False, "signal_queue.db missing"
+    try:
+        window_start_ts = datetime.strptime(paper_start, "%Y-%m-%d").replace(tzinfo=UTC).timestamp()
+        with open(manifest_path) as f:
+            manifest = _json.load(f)
+        approved = [
+            a for a in manifest.get("approvals", [])
+            if a.get("approval_class") == "candidate_for_tiny_capital"
+        ]
+        approved_names = {_re.sub(r"[^a-z0-9]+", " ", a["strategy"].lower()).strip() for a in approved}
+
+        with sqlite3.connect(str(signal_db)) as conn:
+            rows = conn.execute(
+                "SELECT payload, created_at FROM signals WHERE created_at >= ?",
+                (window_start_ts,)
+            ).fetchall()
+
+        count = 0
+        for raw, _ in rows:
+            try:
+                data = _json.loads(raw)
+                payload = data.get("payload", data) if isinstance(data, dict) else {}
+                strat = _re.sub(r"[^a-z0-9]+", " ", str(payload.get("strategy", "")).lower()).strip()
+                if strat in approved_names:
+                    count += 1
+            except Exception:
+                pass
+
+        detail = f"{count} approved-lane signal(s) recorded since {paper_start}"
+        return count >= 1, detail
+    except Exception as exc:
+        return False, f"approved_lane_signal_count_gate error: {exc}"
+
+
+def stale_position_gate() -> tuple[bool, str]:
+    """Gate: no UNQUARANTINED open positions outside the approved-lane symbols.
+    Quarantined positions (in storage/stale_position_quarantine.json) are explicitly
+    acknowledged and skipped — they must still be flattened before go-live.
+    """
+    import json as _json
+    ledger_path = os.getenv("LEDGER_PATH",
+        str(PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "ledger_state.json"))
+    manifest_path = PROJECT_ROOT / "config" / "approved_strategies.json"
+    quarantine_path = PROJECT_ROOT / "storage" / "stale_position_quarantine.json"
+    try:
+        with open(ledger_path) as f:
+            ledger = _json.load(f)
+        with open(manifest_path) as f:
+            manifest = _json.load(f)
+
+        # Load quarantine list (R-04 acknowledgement)
+        quarantined_keys = set()
+        if quarantine_path.exists():
+            try:
+                qdata = _json.loads(quarantine_path.read_text())
+                quarantined_keys = {p["key"] for p in qdata.get("positions", [])}
+            except Exception:
+                pass
+
+        approved_symbols = set()
+        for a in manifest.get("approvals", []):
+            if a.get("approval_class") == "candidate_for_tiny_capital":
+                for s in a.get("symbols", []):
+                    approved_symbols.add(s.upper())
+
+        stale = []
+        for key, pos in ledger.get("positions", {}).items():
+            if (pos.get("quantity") or 0) == 0:
+                continue
+            if key in quarantined_keys:
+                continue  # R-04: explicitly quarantined, must be flattened before go-live
+            parts = key.split(":")
+            symbol = parts[1].upper() if len(parts) >= 2 else key.upper()
+            if symbol not in approved_symbols:
+                stale.append(symbol)
+
+        qnote = f"; {len(quarantined_keys)} stale pos quarantined (R-04)" if quarantined_keys else ""
+        if stale:
+            detail = f"Stale non-lane positions open: {', '.join(sorted(set(stale)))} — quarantine before Apr 14 decision"
+            return False, detail
+        return True, f"All open positions are within approved lane ({', '.join(sorted(approved_symbols))}){qnote}"
+    except Exception as exc:
+        return False, f"stale_position_gate error: {exc}"
+
+
 def main() -> int:
     load_env_file()
 
@@ -314,6 +436,16 @@ def main() -> int:
 
     dlq_ok, dlq_detail = dlq_summary()
     check("Dead letter queue is clean", dlq_ok, dlq_detail)
+
+    # R-10: Operational gates
+    sig_gap_ok, sig_gap_detail = signal_gap_gate()
+    check("Signal pipeline active (last signal < 48h)", sig_gap_ok, sig_gap_detail)
+
+    lane_sig_ok, lane_sig_detail = approved_lane_signal_count_gate()
+    check("Approved-lane signals fired during paper window", lane_sig_ok, lane_sig_detail)
+
+    stale_ok, stale_detail = stale_position_gate()
+    check("No stale non-lane positions open", stale_ok, stale_detail)
 
     print()
     print("=" * 60)
