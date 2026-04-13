@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-13
 
-> Auto-generated — last updated `2026-04-13T15:10:01Z`
+> Auto-generated — last updated `2026-04-13T16:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: GO  (25/25 gates passed)** |
 | Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-13T15:10:01Z |
+| Last run | 2026-04-13T16:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -48,21 +48,22 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 4 |
-| Completed | 4 |
-| Last signal | 2026-04-13 12:00 UTC |
-| Last strategy | 03_EMA_Break_Momentum / ETHUSDT |
-| 401 unauthorized (today) | 46 (24 plain-text, 22 JSON) |
+| Signals received | 9 |
+| Completed | 9 |
+| Last signal | 2026-04-13 16:00 UTC |
+| Last strategy | 24_keltner_breakoutt / BTCUSDT |
+| 401 unauthorized (today) | 48 (25 plain-text, 23 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260413_1505 |
+| Last heartbeat file | heartbeat_20260413_1605 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
 - `binance:XRPUSDT` qty=-15.8 @ 1.3304
+- `binance:BTCUSDT:22_Ichimoku_Trend_Pro` qty=0.005053078736106839 @ 71824.91904348
 
 ## Stale Position Quarantine
 | Item | Value |
@@ -86,6 +87,7 @@
 
 ## Commits Today (2026-04-13)
 ```
+3aeda2c | 2026-04-13 15:10:08 +0000 | chore: auto-update RUNTIME_LOG
 f1f4de5 | 2026-04-13 14:10:08 +0000 | chore: auto-update RUNTIME_LOG
 e5cad7b | 2026-04-13 13:10:08 +0000 | chore: auto-update RUNTIME_LOG
 6659cef | 2026-04-13 12:55:22 +0000 | docs: EOD report 2026-04-13 - reformatted per-task with exec summary, subtasks, timeline, code sync
