@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-13
 
-> Auto-generated — last updated `2026-04-13T20:10:02Z`
+> Auto-generated — last updated `2026-04-13T21:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: GO  (25/25 gates passed)** |
 | Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-13T20:10:02Z |
+| Last run | 2026-04-13T21:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -52,17 +52,16 @@
 | Completed | 12 |
 | Last signal | 2026-04-13 20:00 UTC |
 | Last strategy | 03_EMA_Break_Momentum / ETHUSDT |
-| 401 unauthorized (today) | 61 (34 plain-text, 27 JSON) |
+| 401 unauthorized (today) | 64 (36 plain-text, 28 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260413_2005 |
-| Verdict | WATCH |
+| Last heartbeat file | heartbeat_20260413_2105 |
+| Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
-- `binance:ETHUSDT` qty=0.153 @ 2261.84
 - `binance:XRPUSDT` qty=-15.8 @ 1.3304
 - `binance:BTCUSDT:22_Ichimoku_Trend_Pro` qty=0.005053078736106839 @ 71824.91904348
 
@@ -88,6 +87,7 @@
 
 ## Commits Today (2026-04-13)
 ```
+2f1b29b | 2026-04-13 20:10:08 +0000 | chore: auto-update RUNTIME_LOG
 34ab5c6 | 2026-04-13 19:10:08 +0000 | chore: auto-update RUNTIME_LOG
 5e25c17 | 2026-04-13 18:10:08 +0000 | chore: auto-update RUNTIME_LOG
 4f57b42 | 2026-04-13 17:10:08 +0000 | chore: auto-update RUNTIME_LOG
