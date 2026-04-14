@@ -596,6 +596,22 @@ class WebhookServer:
                     }
                 }
 
+                                # --- Strategy allowlist check: skip unapproved/test strategies silently ---
+                _manifest_path = Path(__file__).resolve().parents[2] / 'config' / 'approved_strategies.json'
+                _approved_names = set()
+                try:
+                    with open(_manifest_path) as _mf:
+                        _manifest_data = json.load(_mf)
+                    _approved_names = {a['strategy'] for a in _manifest_data.get('approvals', [])}
+                except Exception:
+                    pass
+                if _approved_names and strategy not in _approved_names:
+                    logger.info(
+                        f"Signal skipped (not in manifest): strategy={strategy} symbol={symbol} - returning 200 silently"
+                    )
+                    return jsonify({'status': 'success', 'message': 'Signal acknowledged'}), 200
+                # --- End allowlist check ---
+
                 # Queue signal to both JSONL (legacy) and SQLite (durable)
                 self.queue.enqueue(clean_payload)
                 self.durable_queue.enqueue(clean_payload)
