@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-14
 
-> Auto-generated — last updated `2026-04-14T05:10:01Z`
+> Auto-generated — last updated `2026-04-14T06:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,9 +8,9 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (1 of 25 gates FAILED)** |
-| Gates passed | VERDICT: NO-GO  (1 of 25 gates FAILED) |
-| Last run | 2026-04-14T05:10:01Z |
+| Verdict | **VERDICT: NO-GO  (2 of 25 gates FAILED)** |
+| Gates passed | VERDICT: NO-GO  (2 of 25 gates FAILED) |
+| Last run | 2026-04-14T06:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -48,21 +48,21 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 23 |
-| Completed | 23 |
-| Last signal | 2026-04-14 04:59 UTC |
-| Last strategy | CCI Trend / ETHUSDT |
+| Signals received | 25 |
+| Completed | 25 |
+| Last signal | 2026-04-14 05:49 UTC |
+| Last strategy | 56_PSAR_Volume_Tight / ETHUSDT |
 | 401 unauthorized (today) | 68 (38 plain-text, 30 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260414_0505 |
+| Last heartbeat file | heartbeat_20260414_0605 |
 | Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
-- `binance:ETHUSDT` qty=0.154 @ 2363.59
+- `binance:ETHUSDT` qty=-0.155 @ 2360.15
 - `binance:XRPUSDT` qty=-15.8 @ 1.3304
 
 ## Stale Position Quarantine
@@ -87,6 +87,7 @@
 
 ## Commits Today (2026-04-14)
 ```
+6958940 | 2026-04-14 05:10:08 +0000 | chore: auto-update RUNTIME_LOG
 c842805 | 2026-04-14 05:00:04 +0000 | fix: silently drop signals from unapproved/test strategies at webhook level
 d0bd65f | 2026-04-14 04:10:08 +0000 | chore: auto-update RUNTIME_LOG
 4227465 | 2026-04-14 03:10:09 +0000 | chore: auto-update RUNTIME_LOG
