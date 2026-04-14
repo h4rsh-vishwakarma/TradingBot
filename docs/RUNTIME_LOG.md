@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-14
 
-> Auto-generated — last updated `2026-04-14T06:10:02Z`
+> Auto-generated — last updated `2026-04-14T07:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,15 +8,15 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (2 of 25 gates FAILED)** |
-| Gates passed | VERDICT: NO-GO  (2 of 25 gates FAILED) |
-| Last run | 2026-04-14T06:10:02Z |
+| Verdict | **VERDICT: GO  (25/25 gates passed)** |
+| Gates passed | VERDICT: GO  (25/25 gates passed) |
+| Last run | 2026-04-14T07:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
 | Version | v5 |
-| Updated | 2026-04-13T13:19:38Z |
+| Updated | 2026-04-14T06:58:50Z |
 | Total candidates | 14 |
 | ALPHA (live-ready) | 5 |
 | RESEARCH (no Pine yet) | 9 |
@@ -48,8 +48,8 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 25 |
-| Completed | 25 |
+| Signals received | 22 |
+| Completed | 22 |
 | Last signal | 2026-04-14 05:49 UTC |
 | Last strategy | 56_PSAR_Volume_Tight / ETHUSDT |
 | 401 unauthorized (today) | 68 (38 plain-text, 30 JSON) |
@@ -57,12 +57,12 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260414_0605 |
-| Verdict | ACTION NEEDED |
+| Last heartbeat file | heartbeat_20260414_0705 |
+| Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
-- `binance:ETHUSDT` qty=-0.155 @ 2360.15
+- `binance:BTCUSDT` qty=0.0047 @ 74505.0
 - `binance:XRPUSDT` qty=-15.8 @ 1.3304
 
 ## Stale Position Quarantine
@@ -87,6 +87,10 @@
 
 ## Commits Today (2026-04-14)
 ```
+cd8fbd5 | 2026-04-14 06:59:40 +0000 | paper: add G79 Fisher Donchian to paper lane — ETH+XRP only, DOT excluded
+18551c6 | 2026-04-14 06:17:46 +0000 | fix: correct executedQty string key bug + update test for webhook allowlist
+0c401b9 | 2026-04-14 06:10:38 +0000 | fix: use exchange-reported filled qty for ledger to stop reconciler drift
+ad83aca | 2026-04-14 06:10:08 +0000 | chore: auto-update RUNTIME_LOG
 6958940 | 2026-04-14 05:10:08 +0000 | chore: auto-update RUNTIME_LOG
 c842805 | 2026-04-14 05:00:04 +0000 | fix: silently drop signals from unapproved/test strategies at webhook level
 d0bd65f | 2026-04-14 04:10:08 +0000 | chore: auto-update RUNTIME_LOG
