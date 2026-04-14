@@ -982,8 +982,12 @@ class Orchestrator:
             if execution_res.get("status") == "SUCCESS":
                 self.idempotency.mark_seen(signal_id)
                 pre_snapshot = self.ledger.get_position(ledger_pos_key).model_copy(deep=True)
+                # Resolve actual filled qty from exchange response (fix_quantity rounds up inside
+                # execute_futures_order, so ledger must use the same adjusted qty to avoid drift).
+                _exec_qty = float(execution_res.get(executedQty) or execution_res.get(origQty) or 0)
+                ledger_qty = _exec_qty if _exec_qty > 0 else qty
                 try:
-                    pos_snapshot = self.ledger.apply_fill(ledger_pos_key, side, qty, fill_price)
+                    pos_snapshot = self.ledger.apply_fill(ledger_pos_key, side, ledger_qty, fill_price)
                 except Exception as e:
                     logger.critical(f"LEDGER WRITE FAILED: {e}. Trade OK but ledger desynced!")
                     def _alert_desync():
@@ -1005,10 +1009,10 @@ class Orchestrator:
                 except (TypeError, ValueError):
                     reference_price = float(fill_price or 0.0)
                 estimated_fee_bps = estimate_fee_bps(target_exchange, execution_res)
-                fill_notional = abs(float(qty) * float(fill_price or 0.0))
+                fill_notional = abs(float(ledger_qty) * float(fill_price or 0.0))
                 estimated_fee_usd = fill_notional * estimated_fee_bps / 10000 if fill_notional > 0 else 0.0
-                latency_impact_usd = abs(reference_price - signal_price_used) * abs(float(qty)) if reference_price > 0 and signal_price_used > 0 else 0.0
-                execution_slippage_usd = abs(float(fill_price or 0.0) - reference_price) * abs(float(qty)) if float(fill_price or 0.0) > 0 and reference_price > 0 else 0.0
+                latency_impact_usd = abs(reference_price - signal_price_used) * abs(float(ledger_qty)) if reference_price > 0 and signal_price_used > 0 else 0.0
+                execution_slippage_usd = abs(float(fill_price or 0.0) - reference_price) * abs(float(ledger_qty)) if float(fill_price or 0.0) > 0 and reference_price > 0 else 0.0
                 realized_pnl_delta = float(pos_snapshot.realized_pnl - pre_snapshot.realized_pnl)
                 gross_edge_usd = None
                 if is_exit:
