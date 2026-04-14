@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-14
 
-> Auto-generated — last updated `2026-04-14T03:10:01Z`
+> Auto-generated — last updated `2026-04-14T04:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (1 of 25 gates FAILED)** |
 | Gates passed | VERDICT: NO-GO  (1 of 25 gates FAILED) |
-| Last run | 2026-04-14T03:10:01Z |
+| Last run | 2026-04-14T04:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -48,22 +48,21 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 21 |
-| Completed | 21 |
-| Last signal | 2026-04-14 00:58 UTC |
-| Last strategy | 24_keltner_breakoutt / ETHUSDT |
+| Signals received | 22 |
+| Completed | 22 |
+| Last signal | 2026-04-14 04:00 UTC |
+| Last strategy | 44_PSAR_Volume_Surge / BTCUSDT |
 | 401 unauthorized (today) | 68 (38 plain-text, 30 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260414_0305 |
+| Last heartbeat file | heartbeat_20260414_0405 |
 | Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
 - `binance:XRPUSDT` qty=-15.8 @ 1.3304
-- `binance:BTCUSDT:56_PSAR_Volume_Tight` qty=-0.00466736265572318 @ 74186.13943028
 
 ## Stale Position Quarantine
 | Item | Value |
@@ -87,6 +86,7 @@
 
 ## Commits Today (2026-04-14)
 ```
+4227465 | 2026-04-14 03:10:09 +0000 | chore: auto-update RUNTIME_LOG
 b1bda3e | 2026-04-14 02:10:10 +0000 | chore: auto-update RUNTIME_LOG
 a2345ac | 2026-04-14 01:10:10 +0000 | chore: auto-update RUNTIME_LOG
 5a2d699 | 2026-04-14 00:10:09 +0000 | chore: auto-update RUNTIME_LOG
