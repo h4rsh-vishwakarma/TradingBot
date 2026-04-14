@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-14
 
-> Auto-generated — last updated `2026-04-14T11:10:01Z`
+> Auto-generated — last updated `2026-04-14T12:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: GO  (25/25 gates passed)** |
 | Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-14T11:10:01Z |
+| Last run | 2026-04-14T12:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -50,18 +50,19 @@
 |---|---|
 | Signals received | 23 |
 | Completed | 23 |
-| Last signal | 2026-04-14 10:40 UTC |
+| Last signal | 2026-04-14 12:00 UTC |
 | Last strategy | 44_PSAR_Volume_Surge / BTCUSDT |
 | 401 unauthorized (today) | 68 (38 plain-text, 30 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260414_1105 |
+| Last heartbeat file | heartbeat_20260414_1205 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
+- `binance:BTCUSDT:44_PSAR_Volume_Surge` qty=0.004884601489055513 @ 74352.5
 - `binance:XRPUSDT` qty=-15.8 @ 1.3304
 
 ## Stale Position Quarantine
@@ -86,6 +87,7 @@
 
 ## Commits Today (2026-04-14)
 ```
+fe84a94 | 2026-04-14 11:10:08 +0000 | chore: auto-update RUNTIME_LOG
 ab85132 | 2026-04-14 10:10:08 +0000 | chore: auto-update RUNTIME_LOG
 5e04a4f | 2026-04-14 09:10:09 +0000 | chore: auto-update RUNTIME_LOG
 c791cb9 | 2026-04-14 08:10:08 +0000 | chore: auto-update RUNTIME_LOG
