@@ -1,6 +1,6 @@
 {
   "version": 5,
-  "updated_at": "2026-04-13T12:11:30Z",
+  "updated_at": "2026-04-14T06:58:50Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -173,41 +173,6 @@
       "class_reason": "Testnet research lane \u2014 approved for live testnet execution 2026-04-13."
     },
     {
-      "strategy": "G28 Donchian Short14",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-13T12:08:23Z",
-      "backtest_hash": "manual_approval_g28_donchian_short14_202604131208",
-      "label": "ALPHA",
-      "notes": "TV PF=17.43, WR=85%, 899 trades",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G27 CCI Donchian Wide",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT",
-        "SUIUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-13T12:08:50Z",
-      "backtest_hash": "manual_approval_g27_cci_donchian_wide_202604131208",
-      "label": "ALPHA",
-      "notes": "TV PF=9.93-11.92, WR=84-85%",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
       "strategy": "G19 Donchian Volume Surge",
       "exchange": "binance",
       "symbols": [
@@ -238,23 +203,6 @@
       "backtest_hash": "manual_approval_g15_aroon_donchian_breakout_202604131209",
       "label": "ALPHA",
       "notes": "TV PF=15.29, WR=84.2%",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G68 OBV CCI Cross",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-13T12:09:56Z",
-      "backtest_hash": "manual_approval_g68_obv_cci_cross_202604131209",
-      "label": "ALPHA",
-      "notes": "New diversifier, OOS ROI=4.12%, PF=1.27",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
     },
@@ -338,6 +286,188 @@
       "oos_pf": 8.619,
       "oos_wr": 56.2,
       "oos_dd": -0.44
+    },
+    {
+      "strategy": "G28 Donchian Short14",
+      "exchange": "binance",
+      "symbols": [
+        "SUIUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-13T13:14:24Z",
+      "backtest_hash": "manual_approval_g28_donchian_short14_202604131314",
+      "label": "ALPHA",
+      "notes": "TV PF=10.13, WR=86.5%, ROI/d=0.77%, DD=-1.62%, 518 trades",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G68 OBV CCI Cross",
+      "exchange": "binance",
+      "symbols": [
+        "SUIUSDT",
+        "MAGICUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-13T13:14:40Z",
+      "backtest_hash": "manual_approval_g68_obv_cci_cross_202604131314",
+      "label": "ALPHA",
+      "notes": "TV PF=9.48-12.61, WR=83-85%, ROI/d=0.78-0.83%, DD=-1.62%",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G27 CCI Donchian Wide",
+      "exchange": "binance",
+      "symbols": [
+        "SUIUSDT",
+        "LDOUSDT",
+        "MAGICUSDT",
+        "AVAXUSDT",
+        "LINKUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-13T13:19:38Z",
+      "backtest_hash": "manual_approval_g27_cci_donchian_wide_202604131319",
+      "label": "ALPHA",
+      "notes": "TV PF 8-11, WR 83-85 pct, ROI/d 0.9-1.1 pct, DD under 3.2 pct",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G79 Fisher Donchian",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "XRPUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-14T06:58:50Z",
+      "backtest_hash": "manual_approval_g79_fisher_donchian_202604140631",
+      "label": "ALPHA",
+      "notes": "Fisher Transform cross. ETH: CAGR=3890%, ROI/day=1.01%, champion of batch. XRP: CAGR=2297%, PF=12-16. DOT excluded \u2014 17-26% DD across all G-family, unsafe.",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G80 UO Donchian",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "XRPUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-14T06:31:43Z",
+      "backtest_hash": "manual_approval_g80_uo_donchian_202604140631",
+      "label": "ALPHA",
+      "notes": "Ultimate Oscillator 50 cross, TV PF 10-13, CAGR 926-1255 pct",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G83 DeMarker Donchian",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "XRPUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-14T06:32:04Z",
+      "backtest_hash": "manual_approval_g83_demarker_donchian_202604140632",
+      "label": "ALPHA",
+      "notes": "DeMarker 0.3 0.7 cross, TV PF 11-18 ETH, CAGR 324-549 pct",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G86 Klinger Donchian",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "XRPUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-14T06:32:32Z",
+      "backtest_hash": "manual_approval_g86_klinger_donchian_202604140632",
+      "label": "ALPHA",
+      "notes": "Klinger Volume Osc, TV PF 12-14, CAGR 1033-1569 pct",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G77 ROC Donchian",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "XRPUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-14T06:32:42Z",
+      "backtest_hash": "manual_approval_g77_roc_donchian_202604140632",
+      "label": "ALPHA",
+      "notes": "ROC 12 cross, TV PF 13-16, CAGR 770-1121 pct",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G81 TSI Donchian",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "XRPUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-14T06:32:53Z",
+      "backtest_hash": "manual_approval_g81_tsi_donchian_202604140632",
+      "label": "ALPHA",
+      "notes": "True Strength Index zero cross, TV PF 11-14, CAGR 348-589 pct",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G84 VWMA Cross Donchian",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "XRPUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-14T06:33:44Z",
+      "backtest_hash": "manual_approval_g84_vwma_cross_donchian_202604140633",
+      "label": "ALPHA",
+      "notes": "VWMA 20 50 cross, TV PF 12-13, CAGR 334-540 pct",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
     }
   ]
 }
