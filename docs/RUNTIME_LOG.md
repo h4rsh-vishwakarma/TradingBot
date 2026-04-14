@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-14
 
-> Auto-generated — last updated `2026-04-14T07:10:01Z`
+> Auto-generated — last updated `2026-04-14T08:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: GO  (25/25 gates passed)** |
 | Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-14T07:10:01Z |
+| Last run | 2026-04-14T08:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -57,7 +57,7 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260414_0705 |
+| Last heartbeat file | heartbeat_20260414_0805 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -87,6 +87,7 @@
 
 ## Commits Today (2026-04-14)
 ```
+e566fb0 | 2026-04-14 07:10:08 +0000 | chore: auto-update RUNTIME_LOG
 cd8fbd5 | 2026-04-14 06:59:40 +0000 | paper: add G79 Fisher Donchian to paper lane — ETH+XRP only, DOT excluded
 18551c6 | 2026-04-14 06:17:46 +0000 | fix: correct executedQty string key bug + update test for webhook allowlist
 0c401b9 | 2026-04-14 06:10:38 +0000 | fix: use exchange-reported filled qty for ledger to stop reconciler drift
