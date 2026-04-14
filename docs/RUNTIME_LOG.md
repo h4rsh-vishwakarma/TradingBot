@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-14
 
-> Auto-generated — last updated `2026-04-14T19:10:01Z`
+> Auto-generated — last updated `2026-04-14T20:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: GO  (25/25 gates passed)** |
 | Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-14T19:10:01Z |
+| Last run | 2026-04-14T20:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -48,22 +48,23 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 25 |
-| Completed | 25 |
-| Last signal | 2026-04-14 18:38 UTC |
-| Last strategy | 21_Full_Momentum / BTCUSDT |
+| Signals received | 26 |
+| Completed | 26 |
+| Last signal | 2026-04-14 20:00 UTC |
+| Last strategy | 03_EMA_Break_Momentum / ETHUSDT |
 | 401 unauthorized (today) | 68 (38 plain-text, 30 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260414_1905 |
+| Last heartbeat file | heartbeat_20260414_2005 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
-- `binance:BTCUSDT` qty=-0.0055 @ 74373.60363636
+- `binance:ETHUSDT` qty=-0.15 @ 2312.24
 - `binance:XRPUSDT` qty=-15.8 @ 1.3304
+- `binance:BTCUSDT:21_Full_Momentum` qty=0.004899352849948881 @ 74187.55543478
 
 ## Stale Position Quarantine
 | Item | Value |
@@ -87,6 +88,7 @@
 
 ## Commits Today (2026-04-14)
 ```
+b0efb04 | 2026-04-14 19:10:08 +0000 | chore: auto-update RUNTIME_LOG
 c8ecdad | 2026-04-14 18:10:08 +0000 | chore: auto-update RUNTIME_LOG
 a8c7ded | 2026-04-14 17:10:08 +0000 | chore: auto-update RUNTIME_LOG
 2a97a62 | 2026-04-14 16:10:09 +0000 | chore: auto-update RUNTIME_LOG
