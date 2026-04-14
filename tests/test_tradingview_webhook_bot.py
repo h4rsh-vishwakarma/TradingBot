@@ -258,6 +258,7 @@ class TestWebhookServer:
         app_client, queue_file = client
         payload = {
             "secret": "test_secret_123",
+            "strategy": "CCI Trend",  # must be in approved_strategies.json for allowlist check
             "symbol": "ETHUSDT",
             "action": "SELL",
             "price": 2000,

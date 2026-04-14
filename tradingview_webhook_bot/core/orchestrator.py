@@ -984,7 +984,7 @@ class Orchestrator:
                 pre_snapshot = self.ledger.get_position(ledger_pos_key).model_copy(deep=True)
                 # Resolve actual filled qty from exchange response (fix_quantity rounds up inside
                 # execute_futures_order, so ledger must use the same adjusted qty to avoid drift).
-                _exec_qty = float(execution_res.get(executedQty) or execution_res.get(origQty) or 0)
+                _exec_qty = float(execution_res.get("executedQty") or execution_res.get("origQty") or 0)
                 ledger_qty = _exec_qty if _exec_qty > 0 else qty
                 try:
                     pos_snapshot = self.ledger.apply_fill(ledger_pos_key, side, ledger_qty, fill_price)
