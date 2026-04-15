@@ -596,13 +596,9 @@ class WebhookServer:
                     }
                 }
 
-                                # --- Strategy name alias normalization (fix known TV alert typos) ---
-                _STRATEGY_ALIASES = {
-                    "24_keltner_breakoutt": "24_Keltner_Breakout",
-                    "10_Aggrasive_Entry":   "10_Aggressive_Entry",
-                }
+                                # Strategy alias map (empty — orphaned TV alerts deleted 2026-04-15)
+                _STRATEGY_ALIASES = {}
                 strategy = _STRATEGY_ALIASES.get(strategy, strategy)
-                # --- End alias normalization ---
 
                 # --- Strategy allowlist check: skip unapproved/test strategies silently ---
                 _manifest_path = Path(__file__).resolve().parents[2] / 'config' / 'approved_strategies.json'

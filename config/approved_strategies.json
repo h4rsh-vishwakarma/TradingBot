@@ -1,6 +1,6 @@
 {
-  "version": 8,
-  "updated_at": "2026-04-15T13:00:00Z",
+  "version": 9,
+  "updated_at": "2026-04-15T13:30:00Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -136,7 +136,7 @@
       "label": "RESEARCH",
       "notes": "Breakout20 + Volume spike + MACD cross + ADX>25. Min 2/4 signals. Testnet research lane.",
       "approval_class": "paper_only",
-      "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days."
+      "class_reason": "paper_only \u2014 no Pine script deployed on TradingView. Orphaned TV alerts deleted 2026-04-15. Re-activate only after Pine script is live on TV."
     },
     {
       "strategy": "21_Full_Momentum",
@@ -170,7 +170,7 @@
       "label": "RESEARCH",
       "notes": "Keltner lower + RSI oversold bounce + Volume spike + OBV rising. Min 2/4 signals. Testnet research lane.",
       "approval_class": "paper_only",
-      "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days."
+      "class_reason": "paper_only \u2014 no Pine script deployed on TradingView. Orphaned TV alerts deleted 2026-04-15. Re-activate only after Pine script is live on TV."
     },
     {
       "strategy": "G19 Donchian Volume Surge",
