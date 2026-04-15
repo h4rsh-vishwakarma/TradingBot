@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-15
 
-> Auto-generated — last updated `2026-04-15T04:10:01Z`
+> Auto-generated — last updated `2026-04-15T05:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (1 of 25 gates FAILED)** |
 | Gates passed | VERDICT: NO-GO  (1 of 25 gates FAILED) |
-| Last run | 2026-04-15T04:10:01Z |
+| Last run | 2026-04-15T05:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -48,8 +48,8 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 21 |
-| Completed | 21 |
+| Signals received | 20 |
+| Completed | 20 |
 | Last signal | 2026-04-15 04:00 UTC |
 | Last strategy | 44_PSAR_Volume_Surge / BTCUSDT |
 | 401 unauthorized (today) | 68 (38 plain-text, 30 JSON) |
@@ -57,7 +57,7 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260415_0405 |
+| Last heartbeat file | heartbeat_20260415_0505 |
 | Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
@@ -87,6 +87,7 @@
 
 ## Commits Today (2026-04-15)
 ```
+01a7497 | 2026-04-15 04:10:08 +0000 | chore: auto-update RUNTIME_LOG
 29b9823 | 2026-04-15 03:10:10 +0000 | chore: auto-update RUNTIME_LOG
 7ccc26a | 2026-04-15 02:10:08 +0000 | chore: auto-update RUNTIME_LOG
 7649bdb | 2026-04-15 01:10:09 +0000 | chore: auto-update RUNTIME_LOG
