@@ -148,6 +148,25 @@ def candidate_inventory_summary(report, candidates: list[dict]) -> tuple[bool, s
         if str(c.get("label", "")).upper() == "RESEARCH"
     }
 
+    # Grace period: strategies approved within the last 7 days are not yet expected
+    # to have live TV alerts firing — exempt them from the MISSING gate fail.
+    from datetime import timedelta
+    _now = datetime.now(timezone.utc)
+    def _recently_approved(approved_at: str, grace_days: int = 7) -> bool:
+        if not approved_at:
+            return False
+        try:
+            ap = datetime.fromisoformat(approved_at.replace("Z", "+00:00"))
+            return (_now - ap).days < grace_days
+        except Exception:
+            return False
+
+    newly_added_names = {
+        str(c.get("strategy", ""))
+        for c in candidates
+        if _recently_approved(str(c.get("approved_at", "")))
+    }
+
     statuses = []
     passed = True
     for _, row in candidate_rows.iterrows():
@@ -157,6 +176,8 @@ def candidate_inventory_summary(report, candidates: list[dict]) -> tuple[bool, s
         if status not in {"READY", "LIVE_VERIFIED"}:
             if strat_name in research_names:
                 statuses[-1] += "(RESEARCH-exempt)"  # warn but don't fail
+            elif strat_name in newly_added_names:
+                statuses[-1] += "(NEW-exempt:pending-TV-alert)"  # warn but don't fail
             else:
                 passed = False
 

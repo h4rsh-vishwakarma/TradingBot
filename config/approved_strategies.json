@@ -1,6 +1,6 @@
 {
-  "version": 5,
-  "updated_at": "2026-04-14T06:58:50Z",
+  "version": 8,
+  "updated_at": "2026-04-15T13:00:00Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -48,10 +48,10 @@
       "operator": "Garima",
       "approved_at": "2026-04-08T07:06:29Z",
       "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
-      "label": "ALPHA",
+      "label": "RESEARCH",
       "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.148%, Gross_DD=-29.72%, Net_DD=-32.22%, Win_Rate=49.2%, Sharpe=5.35, Trades=60802, OOS_ROI=0.691%, OOS_DD=-20.66%, OOS_Sharpe=3.83, Tier=ALPHA",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Promoted to testnet live trading lane (2026-04-13). paper_only constraint lifted for testnet research run."
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: Passes_Hard_Filter=False. Downgraded pending re-evaluation."
     },
     {
       "strategy": "57_PSAR_Volume_Ultra",
@@ -67,8 +67,8 @@
       "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
       "label": "RESEARCH",
       "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA [No Pine artifact yet \u2014 added as research placeholder 2026-04-13, pending TradingView deployment]",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Promoted to testnet live trading lane (2026-04-13). paper_only constraint lifted for testnet research run."
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days."
     },
     {
       "strategy": "44_PSAR_Volume_Surge",
@@ -82,10 +82,10 @@
       "operator": "Garima",
       "approved_at": "2026-04-08T07:08:23Z",
       "backtest_hash": "tournament_INJUSDT_20260408_4h_85strats",
-      "label": "ALPHA",
+      "label": "RESEARCH",
       "notes": "Tournament: INJUSDT 4h, Daily_ROI=1.19%, Gross_DD=-26.65%, Net_DD=-28.41%, Win_Rate=49.2%, Sharpe=5.53, Trades=61035, OOS_ROI=0.767%, OOS_DD=-22.86%, OOS_Sharpe=4.21, Tier=ALPHA",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Promoted to testnet live trading lane (2026-04-13). paper_only constraint lifted for testnet research run."
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: Passes_Hard_Filter=False. Downgraded pending re-evaluation."
     },
     {
       "strategy": "22_Ichimoku_Trend_Pro",
@@ -99,10 +99,10 @@
       "operator": "garima",
       "approved_at": "2026-04-10T04:36:43Z",
       "backtest_hash": "manual_approval_22_ichimoku_trend_pro_202604100436",
-      "label": "ALPHA",
+      "label": "RESEARCH",
       "notes": "ROI=149.33%, PF=1.07, DD=-16.70% (REQUIRED)",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Promoted to testnet live trading lane (2026-04-13). paper_only constraint lifted for testnet research run."
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: PF=1.07 per notes. Too weak for capital routing."
     },
     {
       "strategy": "03_EMA_Break_Momentum",
@@ -118,8 +118,8 @@
       "backtest_hash": "testnet_approval_03_ema_break_momentum_20260413",
       "label": "RESEARCH",
       "notes": "EMA8/EMA21 cross + Breakout20 + MACD cross + ADX>25. Min 2/4 signals. Testnet research lane.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Testnet research lane \u2014 approved for live testnet execution 2026-04-13."
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: no backtest PF/DD evidence. Must not route to capital."
     },
     {
       "strategy": "10_Aggressive_Entry",
@@ -135,8 +135,8 @@
       "backtest_hash": "testnet_approval_10_aggressive_entry_20260413",
       "label": "RESEARCH",
       "notes": "Breakout20 + Volume spike + MACD cross + ADX>25. Min 2/4 signals. Testnet research lane.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Testnet research lane \u2014 approved for live testnet execution 2026-04-13."
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days."
     },
     {
       "strategy": "21_Full_Momentum",
@@ -152,8 +152,8 @@
       "backtest_hash": "testnet_approval_21_full_momentum_20260413",
       "label": "RESEARCH",
       "notes": "PSAR + Ichimoku cloud + MACD cross + ADX>25 + OBV rising. Min 3/5 signals. Testnet research lane.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Testnet research lane \u2014 approved for live testnet execution 2026-04-13."
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: no backtest PF/DD evidence. Must not route to capital."
     },
     {
       "strategy": "24_Keltner_Breakout",
@@ -169,8 +169,8 @@
       "backtest_hash": "testnet_approval_24_keltner_breakout_20260413",
       "label": "RESEARCH",
       "notes": "Keltner lower + RSI oversold bounce + Volume spike + OBV rising. Min 2/4 signals. Testnet research lane.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Testnet research lane \u2014 approved for live testnet execution 2026-04-13."
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days."
     },
     {
       "strategy": "G19 Donchian Volume Surge",
@@ -220,8 +220,8 @@
       "backtest_hash": "combo_oos_RSI_x_BB_x_PSAR_ARBUSDT_20260413",
       "label": "RESEARCH",
       "notes": "Auto-discovered combo: RSI oversold + BB bounce + PSAR flip. OOS PF=127.108 WR=72.7% DD=-0.04%. Pine: strategies/pine_combos/",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Combo builder OOS-validated 2026-04-13. RESEARCH \u2014 paper trade before live capital.",
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days.",
       "oos_pf": 127.108,
       "oos_wr": 72.7,
       "oos_dd": -0.04
@@ -240,8 +240,8 @@
       "backtest_hash": "combo_oos_CCI_x_STOCH_x_OBV_NEARUSDT_20260413",
       "label": "RESEARCH",
       "notes": "Auto-discovered combo: CCI extreme + Stoch oversold + OBV trend. OOS PF=22.167 WR=62.5% DD=-0.57%.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Combo builder OOS-validated 2026-04-13. RESEARCH \u2014 paper trade before live capital.",
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days.",
       "oos_pf": 22.167,
       "oos_wr": 62.5,
       "oos_dd": -0.57
@@ -261,8 +261,8 @@
       "backtest_hash": "combo_oos_RSI_x_PSAR_x_STREND_20260413",
       "label": "RESEARCH",
       "notes": "Auto-discovered combo: RSI oversold + PSAR flip + Supertrend. ARB: PF=12.873 WR=65.4% DD=-0.88% | AAVE: PF=12.651 WR=52.4% DD=-1.06%.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Combo builder OOS-validated 2026-04-13. RESEARCH \u2014 paper trade before live capital.",
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: zero signals received across full history. No TradingView alert deployed. Cannot generate live testnet data.",
       "oos_pf": 12.873,
       "oos_wr": 65.4,
       "oos_dd": -0.88
@@ -281,8 +281,8 @@
       "backtest_hash": "combo_oos_RSI_x_PSAR_x_OBV_LINKUSDT_20260413",
       "label": "RESEARCH",
       "notes": "Auto-discovered combo: RSI oversold + PSAR flip + OBV trend. OOS PF=8.619 WR=56.2% DD=-0.44%.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Combo builder OOS-validated 2026-04-13. RESEARCH \u2014 paper trade before live capital.",
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days.",
       "oos_pf": 8.619,
       "oos_wr": 56.2,
       "oos_dd": -0.44
@@ -468,6 +468,138 @@
       "notes": "VWMA 20 50 cross, TV PF 12-13, CAGR 334-540 pct",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G27 CCI Donchian Wide",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "SUIUSDT",
+        "LDOUSDT",
+        "MAGICUSDT",
+        "AVAXUSDT",
+        "LINKUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-14T13:15:18Z",
+      "backtest_hash": "manual_approval_g27_cci_donchian_wide_202604141315",
+      "label": "ALPHA",
+      "notes": "TV PF 8-11, WR 83-85 pct, DD under 3.2 pct",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G28 Donchian Short14",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "SUIUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-14T13:15:38Z",
+      "backtest_hash": "manual_approval_g28_donchian_short14_202604141315",
+      "label": "ALPHA",
+      "notes": "TV PF 17.43 ETH, WR 85 pct, DD 1.61 pct",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G68 OBV CCI Cross",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "SUIUSDT",
+        "MAGICUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-14T13:15:53Z",
+      "backtest_hash": "manual_approval_g68_obv_cci_cross_202604141315",
+      "label": "ALPHA",
+      "notes": "TV PF 8.62 avg, WR 83-85 pct, new diversifier",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "G45_CCI Donchian Fusion",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT",
+        "LINKUSDT",
+        "SOLUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-04-14T13:16:04Z",
+      "backtest_hash": "manual_approval_g45_cci_donchian_fusion_202604141316",
+      "label": "ALPHA",
+      "notes": "TV PF 18.48 ETH, WR 85.4 pct, DD 1.61 pct",
+      "approval_class": "paper_only",
+      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "ML Lorentzian Classification",
+      "exchange": "binance",
+      "symbols": [
+        "*"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-15T12:00:00Z",
+      "backtest_hash": "backtest_ml_lorentzian_LDOUSDT_4h_20260415",
+      "label": "ALPHA",
+      "notes": "ML Lorentzian Classification (JdeP). LDOUSDT 4h. Sharpe=7.28, PF=high, DD low. Kernel regression + k-NN feature space. Approved for testnet live execution. | symbols widened to wildcard 2026-04-15: existing TV alert sends SOLUSDT; primary target LDOUSDT 4h.",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Sharpe=7.28 on LDOUSDT 4h backtest. Strong ML signal quality. Approved for testnet execution lane 2026-04-15."
+    },
+    {
+      "strategy": "Machine Learning Lorentzian Classification",
+      "exchange": "binance",
+      "symbols": [
+        "*"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-15T12:00:00Z",
+      "backtest_hash": "backtest_ml_lorentzian_v2_LDOUSDT_4h_20260415",
+      "label": "ALPHA",
+      "notes": "ML Lorentzian Classification v2 variant. LDOUSDT 4h. Sharpe=6.93. Kernel regression + k-NN feature space. Approved for testnet live execution. | symbols widened to wildcard 2026-04-15: existing TV alert sends SOLUSDT; primary target LDOUSDT 4h.",
+      "approval_class": "candidate_for_tiny_capital",
+      "class_reason": "Sharpe=6.93 on LDOUSDT 4h backtest. Companion to ML Lorentzian Classification. Approved for testnet execution lane 2026-04-15."
+    },
+    {
+      "strategy": "SMC",
+      "exchange": "binance",
+      "symbols": [
+        "SOLUSDT",
+        "BTCUSDT",
+        "ETHUSDT"
+      ],
+      "timeframes": [
+        "60",
+        "240"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-15T12:30:00Z",
+      "backtest_hash": "legacy_smc_luxalgo_signal_history_20260415",
+      "label": "RESEARCH",
+      "notes": "LuxAlgo SMC strategy. Was live Mar 2026 on SOLUSDT/BTCUSDT 1h with correct secret. Added as paper_only for signal observation. No OOS backtest on file.",
+      "approval_class": "paper_only",
+      "class_reason": "Legacy strategy reinstated as paper_only 2026-04-15. Correct secret confirmed in logs. Signals being observed before capital routing."
     }
   ]
 }

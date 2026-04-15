@@ -778,15 +778,10 @@ class Orchestrator:
                     # Check exact strategy key first
                     current_check = self.ledger.get_position(ledger_pos_key)
                     pos_qty = float(current_check.quantity)
-                    # If no position on exact key, check all positions on same exchange:symbol
-                    if pos_qty == 0:
-                        base_key = f"{target_exchange}:{symbol}"
-                        for lk, lp in self.ledger.positions.items():
-                            if lk.startswith(base_key) and float(lp.quantity) != 0:
-                                pos_qty = float(lp.quantity)
-                                ledger_pos_key = lk  # use the actual key with position
-                                logger.info(f"Exit match: no position on exact key, found {lk} with qty={pos_qty}")
-                                break
+                    # Cross-strategy position matching DISABLED 2026-04-15
+                    # Rationale: exit signals must only close the same strategy's position.
+                    # Fallback to sibling strategies causes cross-routing (verified 3 cases Apr 8-14).
+                    # If the exact strategy key has no position, auto-exit is not triggered.
                     if pos_qty != 0:
                         is_long = pos_qty > 0
                         signal_is_sell = side == "SELL"
@@ -801,24 +796,26 @@ class Orchestrator:
                 aggregate_pos_key = f"{target_exchange}:{symbol}"
                 current_pos = self.ledger.get_position(strategy_pos_key)
                 if current_pos.quantity == 0:
-                    aggregate_pos = self.ledger.get_position(aggregate_pos_key)
-                    if aggregate_pos.quantity == 0:
-                        logger.info(f"Exit signal for {symbol} but no position open. Skipping.")
-                        self._notify_signal_decision(
-                            title="Signal Skipped",
-                            reason=(
-                                f"Exit signal received, but no open position exists on "
-                                f"{strategy_pos_key} or {aggregate_pos_key}"
-                            ),
-                            signal_id=signal_id,
-                            symbol=symbol,
-                            strategy=strat_name,
-                            action=payload.get("action", side),
-                            severity=AlertSeverity.INFO,
-                        )
-                        return True
-                    current_pos = aggregate_pos
-                    ledger_pos_key = aggregate_pos_key
+                    # Cross-strategy aggregate fallback DISABLED 2026-04-15
+                    # Exit must match the exact strategy key — no cross-routing.
+                    logger.info(
+                        f"Exit signal for {strat_name}/{symbol} but no open position on "
+                        f"{strategy_pos_key}. Skipping to prevent cross-routing."
+                    )
+                    self._notify_signal_decision(
+                        title="Signal Skipped",
+                        reason=(
+                            f"Exit signal received for {strat_name} on {symbol}, "
+                            f"but no open position exists under {strategy_pos_key}. "
+                            f"Cross-routing prevention active."
+                        ),
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        strategy=strat_name,
+                        action=payload.get("action", side),
+                        severity=AlertSeverity.INFO,
+                    )
+                    return True
                 if current_pos.quantity > 0:
                     side = "SELL"
                     qty = abs(current_pos.quantity)

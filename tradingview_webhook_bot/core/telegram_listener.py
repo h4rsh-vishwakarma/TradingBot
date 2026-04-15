@@ -693,21 +693,34 @@ def cmd_list_manifest(message):
             bot.reply_to(message, "📋 <b>Manifest is empty.</b> No approved strategies.\n\nUse /new_strat_mani to add one.", parse_mode='HTML')
             return
 
-        msg = f"📋 <b>Approved Strategies ({len(approvals)})</b>\n"
-        msg += "━━━━━━━━━━━━━━━━━━\n\n"
+        MAX_LEN = 3800
+        header = f"📋 <b>Approved Strategies ({len(approvals)})</b>\n━━━━━━━━━━━━━━━━━━\n\n"
+        footer = f"\n<i>Updated: {manifest.get('updated_at', 'N/A')}</i>"
 
+        chunks = []
+        current = header
         for i, a in enumerate(approvals):
             symbols = ', '.join(a.get('symbols', ['*']))
             tfs = ', '.join(a.get('timeframes', ['*']))
-            msg += (
+            entry = (
                 f"<b>#{i+1} {a.get('strategy', 'N/A')}</b>\n"
                 f"  🏦 {a.get('exchange', 'N/A')} | 💎 {symbols} | ⏰ {tfs}\n"
-                f"  Label={a.get('label', 'N/A')} | Class={a.get('approval_class', 'paper_only')} | Operator={a.get('operator', 'N/A')}\n"
+                f"  Label={a.get('label', 'N/A')} | Class={a.get('approval_class', 'paper_only')} | Op={a.get('operator', 'N/A')}\n"
                 f"  📅 {a.get('approved_at', 'N/A')}\n\n"
             )
+            if len(current) + len(entry) > MAX_LEN:
+                chunks.append(current)
+                current = entry
+            else:
+                current += entry
+        current += footer
+        chunks.append(current)
 
-        msg += f"<i>Updated: {manifest.get('updated_at', 'N/A')}</i>"
-        bot.reply_to(message, msg, parse_mode='HTML')
+        for idx, chunk in enumerate(chunks):
+            if idx == 0:
+                bot.reply_to(message, chunk, parse_mode='HTML')
+            else:
+                bot.send_message(message.chat.id, chunk, parse_mode='HTML')
 
     except Exception as e:
         bot.reply_to(message, f"❌ Error: {e}", parse_mode='HTML')

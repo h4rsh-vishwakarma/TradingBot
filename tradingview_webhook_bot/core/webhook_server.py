@@ -596,7 +596,15 @@ class WebhookServer:
                     }
                 }
 
-                                # --- Strategy allowlist check: skip unapproved/test strategies silently ---
+                                # --- Strategy name alias normalization (fix known TV alert typos) ---
+                _STRATEGY_ALIASES = {
+                    "24_keltner_breakoutt": "24_Keltner_Breakout",
+                    "10_Aggrasive_Entry":   "10_Aggressive_Entry",
+                }
+                strategy = _STRATEGY_ALIASES.get(strategy, strategy)
+                # --- End alias normalization ---
+
+                # --- Strategy allowlist check: skip unapproved/test strategies silently ---
                 _manifest_path = Path(__file__).resolve().parents[2] / 'config' / 'approved_strategies.json'
                 _approved_names = set()
                 try:
