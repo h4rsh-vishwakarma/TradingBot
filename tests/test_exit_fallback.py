@@ -72,16 +72,21 @@ def _build_orchestrator(tmp_path, approval_class="candidate_for_tiny_capital"):
     return orch
 
 
-def test_exit_signal_falls_back_to_aggregate_position(tmp_path, monkeypatch):
+def test_exit_signal_does_not_cross_route_to_aggregate_position(tmp_path, monkeypatch):
+    # Cross-routing prevention (2026-04-15): an exit signal for strategy X
+    # must NOT close a position opened by a different strategy or the aggregate
+    # key. The signal must be silently skipped and no order placed.
     monkeypatch.setenv("ALLOWED_SYMBOLS", "")
     monkeypatch.setenv("POSITION_SIZE_MODE", "fixed")
 
     orch = _build_orchestrator(tmp_path)
+    # Aggregate position exists (opened by a different strategy or cross-routed)
     orch.ledger.update_position_manually("binance:SOLUSDT", -2.0, avg_price=80.0)
+    # Strategy-specific position is flat
     orch.ledger.update_position_manually("binance:SOLUSDT:07_MACD_Breakout", 0.0)
 
     event = {
-        "signal_id": "SIG-EXIT-FALLBACK",
+        "signal_id": "SIG-EXIT-NO-CROSSROUTE",
         "payload": {
             "exchange": "binance",
             "strategy": "07_MACD_Breakout",
@@ -94,16 +99,11 @@ def test_exit_signal_falls_back_to_aggregate_position(tmp_path, monkeypatch):
         },
     }
 
+    # Must return True (handled) but must NOT place any order
     assert orch.handle_signal(event) is True
-    orch.exchange_binance.execute_futures_order.assert_called_once_with(
-        "SOLUSDT",
-        "BUY",
-        2.0,
-        81.0,
-        signal_id="SIG-EXIT-FALLBACK",
-    )
-    assert orch.ledger.get_position("binance:SOLUSDT").quantity == 0.0
-    assert orch.ledger.get_position("binance:SOLUSDT:07_MACD_Breakout").quantity == 0.0
+    orch.exchange_binance.execute_futures_order.assert_not_called()
+    # Aggregate position must remain untouched — cross-routing is blocked
+    assert orch.ledger.get_position("binance:SOLUSDT").quantity == -2.0
 
 
 def test_unapproved_strategy_is_blocked_by_manifest(tmp_path, monkeypatch):
