@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-15
 
-> Auto-generated — last updated `2026-04-15T09:10:02Z`
+> Auto-generated — last updated `2026-04-15T10:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,16 +10,16 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (1 of 25 gates FAILED)** |
 | Gates passed | VERDICT: NO-GO  (1 of 25 gates FAILED) |
-| Last run | 2026-04-15T09:10:02Z |
+| Last run | 2026-04-15T10:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
 | Version | v5 |
-| Updated | 2026-04-14T13:16:04Z |
-| Total candidates | 14 |
-| ALPHA (live-ready) | 5 |
-| RESEARCH (no Pine yet) | 9 |
+| Updated | 2026-04-15T09:21:00Z |
+| Total candidates | 9 |
+| ALPHA (live-ready) | 2 |
+| RESEARCH (no Pine yet) | 7 |
 
 ### Apr 14 Production Decision Lane
 | Strategy | Symbols | Timeframe | Label |
@@ -30,15 +30,10 @@
 ### All ALPHA Strategies
 - CCI Trend | ['*'] | label=ALPHA
 - Donchian Trend | ['*'] | label=ALPHA
-- 56_PSAR_Volume_Tight | ['*'] | label=ALPHA
-- 44_PSAR_Volume_Surge | ['*'] | label=ALPHA
-- 22_Ichimoku_Trend_Pro | ['*'] | label=ALPHA
 
 ### RESEARCH (placeholder — not yet on TradingView)
 - 57_PSAR_Volume_Ultra
-- 03_EMA_Break_Momentum
 - 10_Aggressive_Entry
-- 21_Full_Momentum
 - 24_Keltner_Breakout
 - RSI_x_BB_x_PSAR
 - CCI_x_STOCH_x_OBV
@@ -57,7 +52,7 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260415_0905 |
+| Last heartbeat file | heartbeat_20260415_1005 |
 | Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
@@ -87,6 +82,7 @@
 
 ## Commits Today (2026-04-15)
 ```
+2007bc9 | 2026-04-15 09:10:09 +0000 | chore: auto-update RUNTIME_LOG
 1c54e00 | 2026-04-15 08:10:08 +0000 | chore: auto-update RUNTIME_LOG
 988e21d | 2026-04-15 07:10:08 +0000 | chore: auto-update RUNTIME_LOG
 db55945 | 2026-04-15 06:10:08 +0000 | chore: auto-update RUNTIME_LOG
@@ -161,7 +157,7 @@ be1cc5d | 2026-04-13 05:11:32 +0000 | fix(ops): R-04/R-05/R-10 operational harde
 ```
 
 ## Governance Note (P-01)
-Runtime has 14 candidate_for_tiny_capital strategies.
+Runtime has 9 candidate_for_tiny_capital strategies.
 Apr 14 decision scope is locked to: **CCI Trend + Donchian Trend on ETHUSDT 4h only.**
 All other strategies are testnet/research — not part of Apr 14 go-live decision.
 
