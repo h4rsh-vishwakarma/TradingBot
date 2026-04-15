@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-15
 
-> Auto-generated — last updated `2026-04-15T02:10:01Z`
+> Auto-generated — last updated `2026-04-15T03:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,9 +8,9 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: GO  (25/25 gates passed)** |
-| Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-15T02:10:01Z |
+| Verdict | **VERDICT: NO-GO  (1 of 25 gates FAILED)** |
+| Gates passed | VERDICT: NO-GO  (1 of 25 gates FAILED) |
+| Last run | 2026-04-15T03:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -48,20 +48,21 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 20 |
-| Completed | 20 |
-| Last signal | 2026-04-15 00:00 UTC |
-| Last strategy | 22_Ichimoku_Trend_Pro / BTCUSDT |
+| Signals received | 21 |
+| Completed | 21 |
+| Last signal | 2026-04-15 02:31 UTC |
+| Last strategy | 44_PSAR_Volume_Surge / BTCUSDT |
 | 401 unauthorized (today) | 68 (38 plain-text, 30 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260415_0205 |
-| Verdict | HEALTHY |
+| Last heartbeat file | heartbeat_20260415_0305 |
+| Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
+- `binance:BTCUSDT:44_PSAR_Volume_Surge` qty=-0.004659225076426642 @ 74221.5
 - `binance:ETHUSDT` qty=0.149 @ 2321.53
 - `binance:XRPUSDT` qty=-15.8 @ 1.3304
 
@@ -87,6 +88,7 @@
 
 ## Commits Today (2026-04-15)
 ```
+7ccc26a | 2026-04-15 02:10:08 +0000 | chore: auto-update RUNTIME_LOG
 7649bdb | 2026-04-15 01:10:09 +0000 | chore: auto-update RUNTIME_LOG
 10caff7 | 2026-04-15 00:10:09 +0000 | chore: auto-update RUNTIME_LOG
 ea3681b | 2026-04-14 23:10:09 +0000 | chore: auto-update RUNTIME_LOG
