@@ -393,6 +393,52 @@ def stale_position_gate() -> tuple[bool, str]:
         return False, f"stale_position_gate error: {exc}"
 
 
+def family_concentration_gate(candidates: list[dict]) -> tuple[bool, str]:
+    """Gate: no more than 1 candidate_for_tiny_capital per indicator family.
+    Prevents correlated strategies from being promoted together.
+    """
+    STRATEGY_FAMILY = {
+        "Supertrend_3_10": "supertrend", "Supertrend_2_7": "supertrend",
+        "Donchian_EMA_20": "donchian",   "Donchian_EMA_30": "donchian",
+        "Donchian Trend":    "donchian",
+        "EMA_Cross_9_21":  "ema_cross",  "EMA_Cross_13_34": "ema_cross",
+        "BB_Squeeze": "bb_band", "Mean_Rev_BB": "bb_band", "Keltner_Break": "bb_band",
+        "MACD_Histogram": "macd", "DEMA_Cross": "macd",
+        "Heikin_Ashi": "trend_ma", "Triple_EMA": "trend_ma",
+        "Hull_MA": "trend_ma", "PSAR_EMA": "trend_ma",
+        "Williams_R": "oscillator", "Stoch_RSI": "oscillator",
+        "QQE_Oscillator": "oscillator", "RSI_Divergence": "oscillator",
+        "Dual_Momentum": "momentum", "ATR_Channel": "breakout",
+        "Volume_Breakout": "breakout", "Turtle_Trading": "breakout",
+        "VWAP_ATR": "vwap", "CCI_Trend": "cci", "CCI Trend": "cci", "Ichimoku_Cloud": "ichimoku",
+    }
+    family_counts: dict = {}
+    symbol_counts: dict = {}
+    violations = []
+    for cand in candidates:
+        name = str(cand.get("strategy", ""))
+        syms = cand.get("symbols", [])
+        fam  = STRATEGY_FAMILY.get(name, STRATEGY_FAMILY.get(name.replace(" ","_"), "unknown"))
+        family_counts[fam] = family_counts.get(fam, 0) + 1
+        for s in syms:
+            symbol_counts[s] = symbol_counts.get(s, 0) + 1
+
+    for fam, count in family_counts.items():
+        if count > 1:
+            violations.append(f"family:{fam}={count}(max 1)")
+    for sym, count in symbol_counts.items():
+        if count > 2:
+            violations.append(f"symbol:{sym}={count}(max 2)")
+
+    details = []
+    for fam, count in sorted(family_counts.items()):
+        details.append(f"{fam}:{count}")
+    summary = "families=" + ", ".join(details)
+    if violations:
+        return False, summary + " VIOLATIONS: " + "; ".join(violations)
+    return True, summary
+
+
 def min_closed_trades_gate(candidates: list[dict], min_trades: int = 20) -> tuple[bool, str]:
     """Gate: each candidate_for_tiny_capital must have >= min_trades closed paper trades.
     Counts is_exit=True entries in execution_metrics.jsonl since PAPER_WINDOW_START.
@@ -545,6 +591,9 @@ def main() -> int:
 
     min_trades_ok, min_trades_detail = min_closed_trades_gate(candidates)
     check("Candidates have >=20 closed paper trades", min_trades_ok, min_trades_detail)
+
+    conc_ok, conc_detail = family_concentration_gate(candidates)
+    check("Candidate family/symbol concentration within limits", conc_ok, conc_detail)
 
     print()
     print("=" * 60)
