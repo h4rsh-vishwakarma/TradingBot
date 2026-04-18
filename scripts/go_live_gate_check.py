@@ -439,8 +439,36 @@ def family_concentration_gate(candidates: list[dict]) -> tuple[bool, str]:
     return True, summary
 
 
-def min_closed_trades_gate(candidates: list[dict], min_trades: int = 20) -> tuple[bool, str]:
-    """Gate: each candidate_for_tiny_capital must have >= min_trades closed paper trades.
+def _min_trades_for_timeframe(timeframe: str) -> int:
+    """Timeframe-aware minimum closed trades before promotion.
+    4H  signals ~2/week → 5 trades ≈ 3 weeks evidence
+    1H  signals ~8/week → 10 trades ≈ 2 weeks evidence
+    15m signals ~30/week → 20 trades ≈ 1 week evidence
+    """
+    tf = str(timeframe).strip().lower()
+    if "4h" in tf or tf in ("240", "4"):
+        return int(os.getenv("PAPER_MIN_TRADES_4H", "5"))
+    if "1h" in tf or tf in ("60", "1"):
+        return int(os.getenv("PAPER_MIN_TRADES_1H", "10"))
+    return int(os.getenv("PAPER_MIN_TRADES_15M", "20"))
+
+
+def _normalize_strat_name(name: str) -> str:
+    """Strip TV parameter suffixes and normalise to lowercase with spaces.
+    'CCI Trend (20, 100, 1.5, 12, 4)' -> 'cci trend'
+    'Donchian_Trend'                   -> 'donchian trend'
+    """
+    import re as _re
+    s = str(name).strip()
+    s = _re.sub(r"\s*\([^)]*\)", "", s)   # strip (params)
+    s = s.replace("_", " ")
+    s = _re.sub(r"\s+", " ", s).strip().lower()
+    return s
+
+
+def min_closed_trades_gate(candidates: list[dict]) -> tuple[bool, str]:
+    """Gate: each candidate_for_tiny_capital must have >= N closed paper trades.
+    Threshold is timeframe-aware (4H=5, 1H=10, 15m=20).
     Counts is_exit=True entries in execution_metrics.jsonl since PAPER_WINDOW_START.
     Prevents promoting strategies with insufficient live evidence.
     """
@@ -478,14 +506,21 @@ def min_closed_trades_gate(candidates: list[dict], min_trades: int = 20) -> tupl
     details = []
     passed = True
     for cand in candidates:
-        name = str(cand.get("strategy", "unknown"))
-        count = strategy_exits.get(name, 0)
-        ok = count >= min_trades
+        name = str(cand.get('strategy', 'unknown'))
+        name_norm = _normalize_strat_name(name)
+        count = 0
+        for telemetry_name, c in strategy_exits.items():
+            if _normalize_strat_name(telemetry_name) == name_norm:
+                count += c
+        tf = str((cand.get('timeframes') or ['4h'])[0])
+        threshold = _min_trades_for_timeframe(tf)
+        ok = count >= threshold
         if not ok:
             passed = False
-        details.append(f"{name}:{count}({'OK' if ok else f'NEED {min_trades}'})")
+        status = 'OK' if ok else f'NEED {threshold}'
+        details.append(f'{name}:{count}({status})')
 
-    return passed, "; ".join(details) if details else f"No candidates to check"
+    return passed, '; '.join(details) if details else 'No candidates to check'
 
 
 def main() -> int:
@@ -589,8 +624,8 @@ def main() -> int:
     stale_ok, stale_detail = stale_position_gate()
     check("No stale non-lane positions open", stale_ok, stale_detail)
 
-    min_trades_ok, min_trades_detail = min_closed_trades_gate(candidates)
-    check("Candidates have >=20 closed paper trades", min_trades_ok, min_trades_detail)
+    min_trades_ok, min_trades_detail = min_closed_trades_gate(candidates)  # thresholds: 4H=5, 1H=10, 15m=20
+    check("Candidates have min closed paper trades (4H=5,1H=10,15m=20)", min_trades_ok, min_trades_detail)
 
     conc_ok, conc_detail = family_concentration_gate(candidates)
     check("Candidate family/symbol concentration within limits", conc_ok, conc_detail)
