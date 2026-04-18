@@ -356,9 +356,19 @@ def stale_position_gate() -> tuple[bool, str]:
             except Exception:
                 pass
 
-        approved_symbols = set()
+        # Decision-lane symbols (candidate_for_tiny_capital only) — for reporting
+        decision_lane_symbols = set()
         for a in manifest.get("approvals", []):
             if a.get("approval_class") == "candidate_for_tiny_capital":
+                for s in a.get("symbols", []):
+                    decision_lane_symbols.add(s.upper())
+
+        # All manifest symbols (candidate_for_tiny_capital + paper_only) — for gate validation.
+        # Paper_only research positions are expected and must not fail this gate.
+        # Only truly orphan positions (no matching manifest strategy) are flagged as stale.
+        approved_symbols = set(decision_lane_symbols)
+        for a in manifest.get("approvals", []):
+            if a.get("approval_class") in ("candidate_for_tiny_capital", "paper_only"):
                 for s in a.get("symbols", []):
                     approved_symbols.add(s.upper())
 
@@ -378,7 +388,7 @@ def stale_position_gate() -> tuple[bool, str]:
         if stale:
             detail = f"Stale non-lane positions open: {', '.join(sorted(set(stale)))} — quarantine before Apr 14 decision"
             return False, detail
-        return True, f"All open positions are within approved lane ({', '.join(sorted(approved_symbols))}){qnote}"
+        return True, f"All open positions within approved+paper_only lane; decision-lane: {sorted(decision_lane_symbols)}{qnote}"
     except Exception as exc:
         return False, f"stale_position_gate error: {exc}"
 
