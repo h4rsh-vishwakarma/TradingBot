@@ -34,6 +34,13 @@ INITIAL_CAPITAL     = 10_000
 LEVERAGE_DEFAULT    = 2.0
 TOTAL_DAYS          = 1095     # 3-year backtest window
 
+# ── Half-Kelly constants ─────────────────────────────────────────────────────
+KELLY_MIN_SIZE      = 0.02     # floor: 2% of equity even in bad conditions
+KELLY_MAX_SIZE      = 0.20     # ceiling: 20% of equity even with perfect edge
+KELLY_WARMUP_TRADES = 10       # trades before Kelly activates (use fixed until then)
+KELLY_ATR_PERIOD    = 14       # ATR lookback for volatility regime detection
+KELLY_ROLLING_WINDOW = 20      # rolling window for edge/win-rate estimation
+
 # ── Grading Tiers ────────────────────────────────────────────────────────────
 # Uses MAX drawdown (peak-to-trough) not gross_dd.
 # Reason: gross_dd accumulates ALL losses and penalises high-churn strategies
@@ -50,6 +57,70 @@ TIERS = [
 ]
 
 
+# ── Half-Kelly helpers ───────────────────────────────────────────────────────
+
+def _compute_atr(high_arr: np.ndarray, low_arr: np.ndarray,
+                 close_arr: np.ndarray, period: int = 14) -> np.ndarray:
+    """Wilder-smoothed ATR — same method used in TradingView's ta.atr()."""
+    n = len(close_arr)
+    atr = np.zeros(n, dtype=float)
+    if n < 2:
+        return atr
+    # True Range per bar
+    tr = np.empty(n, dtype=float)
+    tr[0] = high_arr[0] - low_arr[0]
+    for i in range(1, n):
+        tr[i] = max(
+            high_arr[i] - low_arr[i],
+            abs(high_arr[i] - close_arr[i - 1]),
+            abs(low_arr[i]  - close_arr[i - 1]),
+        )
+    # Seed with simple average for first period
+    if n >= period:
+        atr[period - 1] = float(np.mean(tr[:period]))
+        for i in range(period, n):
+            atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period
+    return atr
+
+
+def _half_kelly_size(recent_returns: np.ndarray, current_atr: float,
+                     avg_atr: float,
+                     min_size: float = KELLY_MIN_SIZE,
+                     max_size: float = KELLY_MAX_SIZE) -> float:
+    """
+    Half-Kelly position size as fraction of equity.
+
+    Formula (CEO framework):
+        edge      = mean(recent_returns)
+        avg_win   = mean(recent_returns[wins]) or edge if no wins
+        vol_factor = current_atr / avg_atr          (>1 = high vol regime)
+        half_kelly = (edge / (avg_win * vol_factor)) / 2
+
+    Bounded to [min_size, max_size].  Returns fixed min_size on bad inputs.
+    """
+    if len(recent_returns) < 3 or avg_atr <= 0 or current_atr <= 0:
+        return min_size
+
+    edge = float(np.mean(recent_returns))
+    if edge <= 0:
+        return min_size  # negative edge → minimum size
+
+    wins = recent_returns[recent_returns > 0]
+    avg_win = float(np.mean(wins)) if len(wins) > 0 else edge
+
+    if avg_win <= 0:
+        return min_size
+
+    vol_factor = current_atr / avg_atr
+    if vol_factor <= 0:
+        vol_factor = 1.0
+
+    half_kelly = (edge / (avg_win * vol_factor)) / 2.0
+    return float(np.clip(half_kelly, min_size, max_size))
+
+
+# ── Core backtest ─────────────────────────────────────────────────────────────
+
 def run_backtest(
     df              : pd.DataFrame,
     signal_col      : str   = "sig",
@@ -65,6 +136,7 @@ def run_backtest(
     min_entry_gap   : int   = 0,
     min_trades      : int   = 10,
     exit_on_signal_off: bool = True,
+    sizing_mode     : str   = "fixed",
 ) -> Optional[dict]:
     """
     Core trade-simulation backtest.
@@ -79,15 +151,14 @@ def run_backtest(
     commission    : Per-side fee as decimal (0.0006 = 0.06%)
     leverage      : Position leverage multiplier
     position_size : Fraction of equity allocated per trade (0.95 = 95%)
+                    Used as fixed size when sizing_mode="fixed".
+                    Acts as fallback cap when sizing_mode="kelly".
     total_days    : Backtest period in calendar days — used for CAGR
     use_intrabar  : Use High/Low for SL/TP (True = TV-equivalent accuracy)
-    min_entry_gap      : Bars to wait after SL/TP exit before next entry
-                         (use MIN_BAR_GAP from tournament to prevent rapid re-entry)
-    min_trades         : Minimum trades for a valid result (returns None if fewer)
+    min_entry_gap : Bars to wait after SL/TP exit before next entry
+    min_trades    : Minimum trades for a valid result (returns None if fewer)
     exit_on_signal_off : If True (default), close position when signal turns 0.
-                         Use True for tournament (MAX_HOLD expiry = exit).
-                         Use False for entry-only strategies (Donchian, etc.)
-                         where SL/TP/trail are the ONLY exits.
+    sizing_mode   : "fixed" (default, 95% equity) or "kelly" (Half-Kelly dynamic)
 
     Returns
     -------
@@ -101,6 +172,10 @@ def run_backtest(
     low_arr   = df["low"].values.astype(float)  if (use_intrabar and "low"  in df.columns) else close_arr
     sig_arr   = df[signal_col].values.astype(int)
     n         = len(df)
+
+    # ATR array for Kelly vol-regime scaling
+    use_kelly = sizing_mode == "kelly"
+    atr_arr   = _compute_atr(high_arr, low_arr, close_arr, KELLY_ATR_PERIOD) if use_kelly else None
 
     # Extract dates for daily Sharpe (TV Validator style)
     dates = None
@@ -119,10 +194,15 @@ def run_backtest(
     entry_bar      = -1
     trail_stop     = 0.0
     last_exit_bar  = -min_entry_gap - 1
+    _entry_size    = position_size  # size locked at entry, used at exit
 
     trades          = []         # (ret_pct, pnl_usd, entry_bar_idx, exit_bar_idx)
     equity_arr      = [capital]
     daily_pnl_map   = {}         # date → cumulative pnl_usd  (for Sharpe)
+    kelly_sizes     = []         # track dynamic sizes for reporting
+
+    # Rolling returns buffer for Kelly edge estimation
+    recent_rets_buf = []
 
     # ── Main loop ────────────────────────────────────────────────────────────
     for i in range(1, n):
@@ -171,11 +251,14 @@ def run_backtest(
 
                 if exit_px is not None:
                     ret_pct   = (exit_px - entry_price) / entry_price * leverage
-                    pos_value = capital * position_size
+                    pos_value = capital * _entry_size
                     # Commission both sides on position value
                     pnl_usd   = pos_value * ret_pct - pos_value * commission * 2.0
                     capital   = max(capital + pnl_usd, 0.01)
                     trades.append((ret_pct, pnl_usd, entry_bar, i))
+                    recent_rets_buf.append(ret_pct)
+                    if len(recent_rets_buf) > KELLY_ROLLING_WINDOW:
+                        recent_rets_buf.pop(0)
                     if dates is not None:
                         d = dates[i]
                         daily_pnl_map[d] = daily_pnl_map.get(d, 0.0) + pnl_usd
@@ -217,10 +300,13 @@ def run_backtest(
 
                 if exit_px is not None:
                     ret_pct   = (entry_price - exit_px) / entry_price * leverage
-                    pos_value = capital * position_size
+                    pos_value = capital * _entry_size
                     pnl_usd   = pos_value * ret_pct - pos_value * commission * 2.0
                     capital   = max(capital + pnl_usd, 0.01)
                     trades.append((ret_pct, pnl_usd, entry_bar, i))
+                    recent_rets_buf.append(ret_pct)
+                    if len(recent_rets_buf) > KELLY_ROLLING_WINDOW:
+                        recent_rets_buf.pop(0)
                     if dates is not None:
                         d = dates[i]
                         daily_pnl_map[d] = daily_pnl_map.get(d, 0.0) + pnl_usd
@@ -229,16 +315,28 @@ def run_backtest(
 
         # ── ENTRY MANAGEMENT ─────────────────────────────────────────────────
         if position == 0 and (i - last_exit_bar) > min_entry_gap:
-            if sig == 1:
-                position    = 1
+            if sig in (1, -1):
+                # Compute position size for this entry
+                if use_kelly and len(recent_rets_buf) >= KELLY_WARMUP_TRADES:
+                    avg_atr = float(np.mean(atr_arr[max(0, i - KELLY_ATR_PERIOD * 3):i + 1]))
+                    cur_atr = float(atr_arr[i]) if atr_arr[i] > 0 else avg_atr
+                    _entry_size = _half_kelly_size(
+                        np.array(recent_rets_buf[-KELLY_ROLLING_WINDOW:]),
+                        cur_atr, avg_atr,
+                        min_size=KELLY_MIN_SIZE,
+                        max_size=min(KELLY_MAX_SIZE, position_size),
+                    )
+                else:
+                    _entry_size = position_size
+                kelly_sizes.append(_entry_size)
+
+                position    = sig
                 entry_price = price
                 entry_bar   = i
-                trail_stop  = price * (1.0 - trail_pct) if trail_pct > 0.0 else 0.0
-            elif sig == -1:
-                position    = -1
-                entry_price = price
-                entry_bar   = i
-                trail_stop  = price * (1.0 + trail_pct) if trail_pct > 0.0 else 0.0
+                if trail_pct > 0.0:
+                    trail_stop = price * (1.0 - trail_pct) if sig == 1 else price * (1.0 + trail_pct)
+                else:
+                    trail_stop = 0.0
 
         equity_arr.append(capital)
 
@@ -347,7 +445,7 @@ def run_backtest(
             if net_profit > 0 and profit_factor >= 1.0:
                 grade, status = "WEAK", "IGNORE"
 
-    return {
+    result = {
         # Capital
         "initial_capital"   : round(initial_capital, 2),
         "final_capital"     : round(final_cap, 2),
@@ -387,7 +485,17 @@ def run_backtest(
         "tp_pct"            : round(tp_pct * 100, 2),
         "trail_pct"         : round(trail_pct * 100, 2),
         "commission_rt_pct" : round(commission * 2 * 100, 4),  # round-trip
+        "sizing_mode"       : sizing_mode,
     }
+
+    # Kelly-specific stats
+    if use_kelly and kelly_sizes:
+        ks = np.array(kelly_sizes, dtype=float)
+        result["kelly_avg_size_pct"] = round(float(ks.mean()) * 100, 2)
+        result["kelly_min_size_pct"] = round(float(ks.min()) * 100, 2)
+        result["kelly_max_size_pct"] = round(float(ks.max()) * 100, 2)
+
+    return result
 
 
 def run_backtest_oos(
@@ -411,6 +519,46 @@ def run_backtest_oos(
                         **kwargs)
 
 
+def run_backtest_comparison(
+    df          : pd.DataFrame,
+    signal_col  : str = "sig",
+    **kwargs,
+) -> Optional[dict]:
+    """
+    Run fixed vs Half-Kelly side-by-side and return combined metrics.
+
+    Returns a dict with all keys from both runs prefixed with
+    "fixed_" and "kelly_", plus top-level improvement deltas:
+        sizing_improvement_pct  — kelly net_profit% minus fixed net_profit%
+        dd_improvement_pct      — reduction in max drawdown (positive = better)
+        sharpe_improvement      — kelly sharpe minus fixed sharpe
+        kelly_better            — bool, True when Kelly dominates on net profit
+    Returns None if either run fails.
+    """
+    fixed = run_backtest(df, signal_col=signal_col, sizing_mode="fixed", **kwargs)
+    kelly = run_backtest(df, signal_col=signal_col, sizing_mode="kelly", **kwargs)
+
+    if fixed is None or kelly is None:
+        return None
+
+    result = {}
+    for k, v in fixed.items():
+        result[f"fixed_{k}"] = v
+    for k, v in kelly.items():
+        result[f"kelly_{k}"] = v
+
+    result["sizing_improvement_pct"] = round(
+        kelly["total_return_pct"] - fixed["total_return_pct"], 2)
+    result["dd_improvement_pct"] = round(
+        abs(fixed["max_dd_pct"]) - abs(kelly["max_dd_pct"]), 2)
+    result["sharpe_improvement"] = round(
+        kelly["sharpe_ratio"] - fixed["sharpe_ratio"], 2)
+    result["kelly_better"] = bool(
+        kelly["net_profit_usd"] > fixed["net_profit_usd"])
+
+    return result
+
+
 def print_result(sym: str, r: dict, oos: Optional[dict] = None) -> None:
     """Pretty-print a single backtest result to stdout."""
     w = 62
@@ -429,6 +577,12 @@ def print_result(sym: str, r: dict, oos: Optional[dict] = None) -> None:
     print(f"  Gross DD  : {r['gross_dd_pct']:>6.1f}%  Net DD: {r['net_dd_pct']:.1f}%  Curr DD: {r['curr_dd_pct']:.1f}%")
     print(f"  SL/TP     : {r['sl_pct']}% / {r['tp_pct']}%  Trail: {r['trail_pct']}%")
     print(f"  Commission: {r['commission_rt_pct']}% RT  Leverage: {r['leverage']}x")
+    mode = r.get("sizing_mode", "fixed")
+    if mode == "kelly":
+        avg_k = r.get("kelly_avg_size_pct", "N/A")
+        min_k = r.get("kelly_min_size_pct", "N/A")
+        max_k = r.get("kelly_max_size_pct", "N/A")
+        print(f"  Sizing    : Half-Kelly  avg={avg_k}%  min={min_k}%  max={max_k}%")
     if oos:
         print(f"  {'─'*56}")
         print(f"  OOS Daily : {oos['roi_daily_pct']:>8.4f}%/day  "

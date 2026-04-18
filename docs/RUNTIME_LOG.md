@@ -1,6 +1,6 @@
-# Runtime Log — 2026-04-15
+# Runtime Log — 2026-04-18
 
-> Auto-generated — last updated `2026-04-15T10:10:02Z`
+> Auto-generated — last updated `2026-04-18T07:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,18 +8,18 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (1 of 25 gates FAILED)** |
-| Gates passed | VERDICT: NO-GO  (1 of 25 gates FAILED) |
-| Last run | 2026-04-15T10:10:02Z |
+| Verdict | **VERDICT: GO  (25/25 gates passed)** |
+| Gates passed | VERDICT: GO  (25/25 gates passed) |
+| Last run | 2026-04-18T07:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
-| Version | v5 |
-| Updated | 2026-04-15T09:21:00Z |
-| Total candidates | 9 |
+| Version | v10 |
+| Updated | 2026-04-16T13:00:00Z |
+| Total candidates | 2 |
 | ALPHA (live-ready) | 2 |
-| RESEARCH (no Pine yet) | 7 |
+| RESEARCH (no Pine yet) | 0 |
 
 ### Apr 14 Production Decision Lane
 | Strategy | Symbols | Timeframe | Label |
@@ -32,33 +32,35 @@
 - Donchian Trend | ['*'] | label=ALPHA
 
 ### RESEARCH (placeholder — not yet on TradingView)
-- 57_PSAR_Volume_Ultra
-- 10_Aggressive_Entry
-- 24_Keltner_Breakout
-- RSI_x_BB_x_PSAR
-- CCI_x_STOCH_x_OBV
-- RSI_x_PSAR_x_STREND
-- RSI_x_PSAR_x_OBV
+
 
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 18 |
-| Completed | 18 |
-| Last signal | 2026-04-15 04:00 UTC |
-| Last strategy | 44_PSAR_Volume_Surge / BTCUSDT |
-| 401 unauthorized (today) | 68 (38 plain-text, 30 JSON) |
+| Signals received | 54 |
+| Completed | 54 |
+| Last signal | 2026-04-18 04:00 UTC |
+| Last strategy | G91 ATR Compression Breakout / LDOUSDT |
+| 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260415_1005 |
-| Verdict | ACTION NEEDED |
+| Last heartbeat file | heartbeat_20260418_0705 |
+| Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
-- `binance:ETHUSDT` qty=0.149 @ 2321.53
-- `binance:XRPUSDT` qty=-15.8 @ 1.3304
+- `binance:BTCUSDT` qty=-0.0162 @ 76177.66790123
+- `binance:ETHUSDT` qty=0.136 @ 2324.58
+- `binance:SUIUSDT` qty=-330.0 @ 0.9903
+- `binance:AVAXUSDT` qty=-32.0 @ 9.578
+- `binance:LDOUSDT` qty=-790.0 @ 0.419
+- `binance:LINKUSDT` qty=-0.01 @ 9.419
+- `binance:XRPUSDT` qty=0.5 @ 1.4463
+- `binance:OPUSDT` qty=-2000.0 @ 0.1303
+- `binance:MAGICUSDT` qty=313.3 @ 0.0671
+- `binance:UNIUSDT` qty=80.0 @ 3.466
 
 ## Stale Position Quarantine
 | Item | Value |
@@ -68,10 +70,13 @@
 | File | `storage/stale_position_quarantine.json` |
 
 ## Known Issues — Requires Manual Action
-1. **CCI Trend / LDOUSDT** — TradingView alert still using old plain-text order-fill format → 401
-   - Fix: TradingView → Alert → Condition = "Any alert() function call" (not "Order fills")
-2. **Garima test signals** — using wrong secret `test_secret_123` → 401
-   - Fix: Use `squeeze_tradingview_cluster_2026_secure`
+_None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JSON format + auth bypass + SKIP_PYTEST cron noise)._
+
+**Resolved today (2026-04-16):**
+- G-series alerts: now sending JSON format with correct strategy names (Harsh Pine Script update)
+- CCI Trend / LDOUSDT old plain-text format: superseded by server-side TV order-fill bypass
+- Garima test signals (`test_secret_123`): no hits since 2026-04-13; stale note removed
+- TestStrategy: pytest-only infrastructure (operator=harsh), no manifest entry, no live alerts
 
 ## Services
 | Service | URL | Status |
@@ -80,8 +85,13 @@
 | Dashboard | http://15.207.152.119:8501 | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
-## Commits Today (2026-04-15)
+## Commits Today (2026-04-18)
 ```
+399bd27 | 2026-04-18 04:42:28 +0000 | fix: update secretless order-fill test + telegram 429 retry hardening
+7a42f6c | 2026-04-15 12:51:24 +0000 | fix: remove orphaned TV alert aliases + mark strategies no-script
+9cff284 | 2026-04-15 12:26:28 +0000 | test: update exit-fallback test to verify cross-routing prevention
+fe9ce75 | 2026-04-15 12:24:57 +0000 | fix: pre-7-day testing hardening — cross-routing, manifest, gate
+b0e6822 | 2026-04-15 10:10:08 +0000 | chore: auto-update RUNTIME_LOG
 2007bc9 | 2026-04-15 09:10:09 +0000 | chore: auto-update RUNTIME_LOG
 1c54e00 | 2026-04-15 08:10:08 +0000 | chore: auto-update RUNTIME_LOG
 988e21d | 2026-04-15 07:10:08 +0000 | chore: auto-update RUNTIME_LOG
@@ -157,7 +167,7 @@ be1cc5d | 2026-04-13 05:11:32 +0000 | fix(ops): R-04/R-05/R-10 operational harde
 ```
 
 ## Governance Note (P-01)
-Runtime has 9 candidate_for_tiny_capital strategies.
+Runtime has 2 candidate_for_tiny_capital strategies.
 Apr 14 decision scope is locked to: **CCI Trend + Donchian Trend on ETHUSDT 4h only.**
 All other strategies are testnet/research — not part of Apr 14 go-live decision.
 

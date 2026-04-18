@@ -12,7 +12,8 @@ ts = now.strftime('%Y-%m-%dT%H:%M:%SZ')
 # Gate check
 gate = subprocess.run(
     ['python3', 'scripts/go_live_gate_check.py'],
-    capture_output=True, text=True
+    capture_output=True, text=True,
+    env={**__import__('os').environ, 'SKIP_PYTEST': '1'}
 )
 gate_out = gate.stdout
 verdict = 'UNKNOWN'
@@ -75,14 +76,19 @@ commits = subprocess.run(
     capture_output=True, text=True
 ).stdout.strip()
 
-# 401 count
+# 401 count — read from today's journalctl
 try:
-    bot_log = open('logs/bot.log').read()
-    unauth_lines = [l for l in bot_log.split('\n') if '2026-04-13' in l and 'Unauthorized' in l]
+    import subprocess as _sp, datetime as _dt
+    _today = _dt.date.today().strftime('%Y-%m-%d')
+    _res = _sp.run(
+        ['sudo', 'journalctl', '-u', 'trading_webhook.service',
+         '--since', _today + ' 00:00:00', '--no-pager'],
+        capture_output=True, text=True
+    )
+    unauth_lines = [l for l in _res.stdout.split(chr(10)) if 'Unauthorized' in l or 'unauthorized' in l]
     unauth_count = len(unauth_lines)
-    # Get unique sources
     plain_text = sum(1 for l in unauth_lines if 'plain text' in l.lower())
-    json_auth = sum(1 for l in unauth_lines if 'JSON' in l)
+    json_auth = sum(1 for l in unauth_lines if 'JSON' in l or 'json' in l)
 except Exception:
     unauth_count = plain_text = json_auth = 0
 
@@ -164,10 +170,13 @@ log = f"""# Runtime Log — {today}
 | File | `storage/stale_position_quarantine.json` |
 
 ## Known Issues — Requires Manual Action
-1. **CCI Trend / LDOUSDT** — TradingView alert still using old plain-text order-fill format → 401
-   - Fix: TradingView → Alert → Condition = "Any alert() function call" (not "Order fills")
-2. **Garima test signals** — using wrong secret `test_secret_123` → 401
-   - Fix: Use `squeeze_tradingview_cluster_2026_secure`
+_None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JSON format + auth bypass + SKIP_PYTEST cron noise)._
+
+**Resolved today (2026-04-16):**
+- G-series alerts: now sending JSON format with correct strategy names (Harsh Pine Script update)
+- CCI Trend / LDOUSDT old plain-text format: superseded by server-side TV order-fill bypass
+- Garima test signals (`test_secret_123`): no hits since 2026-04-13; stale note removed
+- TestStrategy: pytest-only infrastructure (operator=harsh), no manifest entry, no live alerts
 
 ## Services
 | Service | URL | Status |

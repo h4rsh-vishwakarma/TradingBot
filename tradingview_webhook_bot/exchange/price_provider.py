@@ -4,6 +4,7 @@ STRICT RULE: This module ONLY connects to Binance MAINNET for price data
 """
 
 import os
+import re
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 from dotenv import load_dotenv
@@ -14,6 +15,11 @@ from threading import Lock
 load_dotenv()
 
 logger = setup_logger('price_provider')
+
+
+def _clean_symbol(symbol: str) -> str:
+    """Strip TradingView perpetual suffixes (.P, .PERP) — Binance uses plain symbol."""
+    return re.sub(r'\.(P|PERP)$', '', str(symbol).strip(), flags=re.IGNORECASE)
 
 class MainnetPriceProvider:
     """
@@ -47,6 +53,7 @@ class MainnetPriceProvider:
         Get current MAINNET price for symbol
         This is the ONLY method that should be used for price data
         """
+        symbol = _clean_symbol(symbol)
         try:
             # Check cache first
             with self._cache_lock:
@@ -74,6 +81,7 @@ class MainnetPriceProvider:
     
     def get_orderbook(self, symbol, limit=5):
         """Get MAINNET orderbook for better limit order pricing"""
+        symbol = _clean_symbol(symbol)
         try:
             # Binance futures supports limits: 5, 10, 20, 50, 100, 500, 1000
             valid_limits = [5, 10, 20, 50, 100, 500, 1000]

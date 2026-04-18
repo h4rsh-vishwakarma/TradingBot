@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 import time
 import math
@@ -92,8 +93,13 @@ class BinanceClient:
     def get_mainnet_mark_price(self, symbol):
         """SUB-TASK 1.1: Fetch Real Price from Mainnet"""
         try:
+            # Strip TradingView perpetual suffix (.P, .PERP) — Binance uses plain symbol
+            clean_symbol = re.sub(r'\.(P|PERP)$', '', str(symbol).strip(), flags=re.IGNORECASE)
             url = f"{self.mainnet_base}/fapi/v1/premiumIndex"
-            res = requests.get(url, params={"symbol": symbol}, timeout=5).json()
+            res = requests.get(url, params={"symbol": clean_symbol}, timeout=5).json()
+            if 'markPrice' not in res:
+                logger.error(f"⚠️ Mainnet Price Fetch Error: no markPrice in response for {clean_symbol}: {res}")
+                return None
             return float(res['markPrice'])
         except Exception as e:
             logger.error(f"⚠️ Mainnet Price Fetch Error: {e}")

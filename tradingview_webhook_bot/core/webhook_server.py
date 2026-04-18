@@ -478,8 +478,11 @@ class WebhookServer:
                     if not all([raw_symbol, price]):
                         return jsonify({'status': 'error', 'message': 'Missing symbol, action, or price'}), 400
 
-                    # Clean symbol (remove _PREMIUM, _PERP, etc)
-                    symbol = raw_symbol.replace("_PREMIUM", "").replace("_PERP", "").replace("_INDEX", "")
+                    # Clean symbol — strip TradingView suffixes (.P, .PERP, _PREMIUM, _PERP, _INDEX)
+                    # This is the single source-of-truth strip; all downstream code receives a clean symbol
+                    import re as _re_sym
+                    symbol = _re_sym.sub(r'\.(P|PERP)$', '', raw_symbol, flags=_re_sym.IGNORECASE)
+                    symbol = symbol.replace("_PREMIUM", "").replace("_PERP", "").replace("_INDEX", "")
                     symbol = symbol.split('_')[0]
                     if symbol and "USDT" not in symbol:
                         symbol = f"{symbol.replace('USD', '')}USDT"
@@ -528,10 +531,14 @@ class WebhookServer:
                         logger.info(f'Ignoring unrecognized alert format')
                         return jsonify({'status': 'ignored', 'message': 'Unrecognized alert format'}), 200
 
-                    # Verify secret — parsed['secret'] is None for secretless TV order-fill
-                    # plain-text alerts; strict auth must reject them outright.
+                    # Verify secret — parsed['secret'] is None for secretless TV order-fill.
+                    # TV order-fill alerts (matched by TV_ORDER_FILL_PATTERN) are trusted by
+                    # format specificity and do not carry a secret in the message body.
                     parsed_secret = parsed.get('secret')
-                    if not parsed_secret or parsed_secret != self.webhook_secret:
+                    if _is_tv_order_fill:
+                        # Secretless TV order-fill — accept, log for audit
+                        logger.info("✅ Accepted secretless TV order-fill alert (format-trusted)")
+                    elif not parsed_secret or parsed_secret != self.webhook_secret:
                         logger.warning("❌ Unauthorized plain text attempt — secret missing or mismatch")
                         return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
 
@@ -606,7 +613,7 @@ class WebhookServer:
                 try:
                     with open(_manifest_path) as _mf:
                         _manifest_data = json.load(_mf)
-                    _approved_names = {a['strategy'] for a in _manifest_data.get('approvals', [])}
+                    _approved_names = {a['strategy'].replace(' ', '_') for a in _manifest_data.get('approvals', [])} | {a['strategy'] for a in _manifest_data.get('approvals', [])}
                 except Exception:
                     pass
                 if _approved_names and strategy not in _approved_names:

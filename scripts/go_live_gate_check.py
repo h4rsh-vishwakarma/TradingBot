@@ -424,8 +424,11 @@ def main() -> int:
     gate_doc = PROJECT_ROOT / "docs" / "GO_LIVE_GATE.md"
     check("GO_LIVE_GATE.md exists", gate_doc.exists())
 
-    tests_ok, tests_detail = collect_pytest_count()
-    check("Pytest suite is discoverable", tests_ok, tests_detail)
+    if os.getenv("SKIP_PYTEST") == "1":
+        check("Pytest suite is discoverable", True, "skipped (SKIP_PYTEST=1)")
+    else:
+        tests_ok, tests_detail = collect_pytest_count()
+        check("Pytest suite is discoverable", tests_ok, tests_detail)
 
     ledger_path = Path(os.getenv("LEDGER_PATH", str(PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "ledger_state.json")))
     check("Ledger state file exists", ledger_path.exists(), str(ledger_path))

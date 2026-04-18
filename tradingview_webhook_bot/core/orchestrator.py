@@ -269,7 +269,10 @@ class Orchestrator:
         if not approvals:
             return False, "No approved strategies configured", {}
 
-        symbol_upper = str(symbol or "").upper()
+        # Strip TradingView perpetual suffix (.P / .PERP) before manifest lookup
+        # Manifest stores plain symbols (ETHUSDT), signals arrive as ETHUSDT.P
+        import re as _re
+        symbol_upper = _re.sub(r"\.(P|PERP)$", "", str(symbol or "").upper().strip())
         exchange_lower = str(exchange or "").lower()
         strategy_norm = self._normalize_strategy(strategy_name)
         timeframe_norm = str(timeframe or "").strip().lower()
@@ -559,6 +562,9 @@ class Orchestrator:
                 return True
 
             # --- SYMBOL CLEANING ---
+            # Strip .P/.PERP suffix (TradingView perpetual notation) before any processing
+            import re as _re_sc
+            symbol_raw = _re_sc.sub(r"\.(P|PERP)$", "", symbol_raw, flags=_re_sc.IGNORECASE)
             symbol = symbol_raw.split('_')[0]
             if target_exchange in ("hyperliquid", "lighter"):
                 symbol = symbol.replace("USDT", "").replace("USD", "") if target_exchange == "hyperliquid" else symbol
