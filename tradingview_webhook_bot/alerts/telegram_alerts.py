@@ -7,6 +7,7 @@ import html
 import logging
 import os
 import re
+import threading
 import time
 from enum import Enum
 from typing import Dict, Optional
@@ -15,6 +16,11 @@ from datetime import timezone, timedelta
 import requests
 
 IST = timezone(timedelta(hours=5, minutes=30))
+
+# Global send throttle — enforce min gap between Telegram API calls to avoid 429 bursts
+_tg_send_lock = threading.Lock()
+_tg_last_send_time = 0.0
+_TG_MIN_SEND_INTERVAL = 0.5  # seconds between consecutive sends
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +130,17 @@ class TelegramAlert:
                 'disable_web_page_preview': True
             }
 
+            # Global throttle: enforce minimum gap between any two Telegram sends
+            global _tg_last_send_time
+            with _tg_send_lock:
+                now = time.time()
+                gap = now - _tg_last_send_time
+                if gap < _TG_MIN_SEND_INTERVAL:
+                    time.sleep(_TG_MIN_SEND_INTERVAL - gap)
+                _tg_last_send_time = time.time()
+
             # Retry with backoff for HTTP 429 (rate limit)
-            max_retries = 2
+            max_retries = 5
             for attempt in range(max_retries):
                 response = requests.post(url, json=payload, timeout=15)
 
@@ -135,11 +150,12 @@ class TelegramAlert:
                         self.last_alert_time[alert_key] = time.time()
                     return True
                 elif response.status_code == 429:
-                    # Telegram rate limit — extract retry_after, cap at 3s
+                    # Telegram rate limit — extract retry_after, cap at 60s
                     try:
-                        retry_after = min(response.json().get('parameters', {}).get('retry_after', 2), 3)
+                        retry_after = min(response.json().get("parameters", {}).get("retry_after", 5), 60)
                     except Exception:
-                        retry_after = 2
+                        retry_after = 5
+                    _tg_last_send_time = time.time() + retry_after
                     logger.warning(f"Rate limited (429). Retrying in {retry_after}s (attempt {attempt+1}/{max_retries})")
                     time.sleep(retry_after)
                 else:
