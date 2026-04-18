@@ -393,6 +393,55 @@ def stale_position_gate() -> tuple[bool, str]:
         return False, f"stale_position_gate error: {exc}"
 
 
+def min_closed_trades_gate(candidates: list[dict], min_trades: int = 20) -> tuple[bool, str]:
+    """Gate: each candidate_for_tiny_capital must have >= min_trades closed paper trades.
+    Counts is_exit=True entries in execution_metrics.jsonl since PAPER_WINDOW_START.
+    Prevents promoting strategies with insufficient live evidence.
+    """
+    import json as _json
+    from datetime import datetime, timezone
+    metrics_path = PROJECT_ROOT / "storage" / "reports" / "paper_validation" / "execution_metrics.jsonl"
+    paper_start = os.getenv("PAPER_WINDOW_START", "2026-04-07")
+    window_start_ts = datetime.strptime(paper_start, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()
+
+    if not metrics_path.exists():
+        return False, f"execution_metrics.jsonl missing — cannot verify closed-trade count"
+
+    # Count closed trades per strategy
+    strategy_exits: dict = {}
+    try:
+        with open(metrics_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = _json.loads(line)
+                except Exception:
+                    continue
+                if float(rec.get("timestamp_epoch", 0)) < window_start_ts:
+                    continue
+                if not rec.get("is_exit"):
+                    continue
+                strat = str(rec.get("strategy", "")).strip()
+                if strat:
+                    strategy_exits[strat] = strategy_exits.get(strat, 0) + 1
+    except Exception as exc:
+        return False, f"Error reading execution_metrics.jsonl: {exc}"
+
+    details = []
+    passed = True
+    for cand in candidates:
+        name = str(cand.get("strategy", "unknown"))
+        count = strategy_exits.get(name, 0)
+        ok = count >= min_trades
+        if not ok:
+            passed = False
+        details.append(f"{name}:{count}({'OK' if ok else f'NEED {min_trades}'})")
+
+    return passed, "; ".join(details) if details else f"No candidates to check"
+
+
 def main() -> int:
     load_env_file()
 
@@ -493,6 +542,9 @@ def main() -> int:
 
     stale_ok, stale_detail = stale_position_gate()
     check("No stale non-lane positions open", stale_ok, stale_detail)
+
+    min_trades_ok, min_trades_detail = min_closed_trades_gate(candidates)
+    check("Candidates have >=20 closed paper trades", min_trades_ok, min_trades_detail)
 
     print()
     print("=" * 60)
