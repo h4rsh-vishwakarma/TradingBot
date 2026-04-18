@@ -646,8 +646,8 @@ class Orchestrator:
                 )
                 return True
 
-            # --- 1.6. SYMBOL COOLDOWN CHECK ---
-            if self._is_symbol_in_cooldown(symbol, strat_name):
+            # --- 1.6. SYMBOL COOLDOWN CHECK (exits bypass to prevent uncloseable positions) ---
+            if not is_exit_hint and self._is_symbol_in_cooldown(symbol, strat_name):
                 logger.info(f"Cooldown block: {symbol} (strategy: {strat_name})")
                 self._notify_signal_decision(
                     title="Signal Blocked",
@@ -658,6 +658,10 @@ class Orchestrator:
                     action=side_hint,
                     severity=AlertSeverity.WARNING,
                 )
+                try:
+                    self.sheets_logger.log_blocked_trade(symbol=symbol, side=side_hint, strategy=strat_name, reason="Cooldown active (" + strat_name + ")", signal_id=signal_id)
+                except Exception:
+                    pass
                 return True
 
             # --- 1.7. CANDLE LOCK ---
