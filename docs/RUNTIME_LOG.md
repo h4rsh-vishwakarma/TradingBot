@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-21
 
-> Auto-generated — last updated `2026-04-21T15:10:01Z`
+> Auto-generated — last updated `2026-04-21T16:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (2 of 27 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-21T15:10:01Z |
+| Last run | 2026-04-21T16:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -37,16 +37,16 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 9 |
-| Completed | 9 |
-| Last signal | 2026-04-21 13:51 UTC |
-| Last strategy | EMA_Stack_15M / BTCUSDT |
+| Signals received | 7 |
+| Completed | 7 |
+| Last signal | 2026-04-21 16:00 UTC |
+| Last strategy | G27 CCI Donchian Wide / LDOUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260421_1505 |
+| Last heartbeat file | heartbeat_20260421_1605 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -86,6 +86,7 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 
 ## Commits Today (2026-04-21)
 ```
+2d0714c | 2026-04-21 15:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-21T15:10:01Z
 e64baa1 | 2026-04-21 20:03:03 +0530 | infra: freeze auto_promote + auto-push RUNTIME_LOG to GitHub hourly
 68448e0 | 2026-04-21 19:21:19 +0530 | feat: add EMA Stack 15M as personal_live strategy (v11 manifest)
 88963db | 2026-04-21 19:15:15 +0530 | governance: A-05 — record side/qty/entry_price in trade_history on close
