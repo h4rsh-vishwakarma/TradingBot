@@ -6,7 +6,7 @@ from tradingview_webhook_bot.core.orchestrator import Orchestrator
 from tradingview_webhook_bot.ledger.positions import PositionLedger
 
 
-def _approved_manifest(tmp_path):
+def _approved_manifest(tmp_path, approval_class="candidate_for_tiny_capital"):
     path = tmp_path / "approved_strategies.json"
     path.write_text(json.dumps({
         "version": 1,
@@ -21,13 +21,14 @@ def _approved_manifest(tmp_path):
                 "approved_at": "2026-04-06T00:00:00Z",
                 "backtest_hash": "sha256:test",
                 "label": "APPROVED_MANIFEST",
+                "approval_class": approval_class,
             }
         ],
     }), encoding="utf-8")
     return str(path)
 
 
-def _build_orchestrator(tmp_path):
+def _build_orchestrator(tmp_path, approval_class="candidate_for_tiny_capital"):
     orch = Orchestrator.__new__(Orchestrator)
     orch.idempotency = MagicMock()
     orch.idempotency.is_seen.return_value = False
@@ -47,6 +48,8 @@ def _build_orchestrator(tmp_path):
         "status": "SUCCESS",
         "avg_price": 81.0,
     }
+    orch.exchange_binance.place_stop_loss.return_value = {"status": "SUCCESS"}
+    orch.exchange_binance.place_take_profit.return_value = {"status": "SUCCESS"}
     orch.analytics = MagicMock()
     orch.circuit_breaker = None
     orch.processed_count = 0
@@ -58,9 +61,10 @@ def _build_orchestrator(tmp_path):
     orch.daily_loss_limit = -50.0
     orch.ledger_path = str(tmp_path / "ledger_state.json")
     orch.dlq_path = str(tmp_path / "dead_letter.jsonl")
+    orch.execution_metrics_path = str(tmp_path / "execution_metrics.jsonl")
     orch.ledger = PositionLedger(orch.ledger_path)
     orch.require_approval_manifest = True
-    orch.approval_manifest_path = _approved_manifest(tmp_path)
+    orch.approval_manifest_path = _approved_manifest(tmp_path, approval_class=approval_class)
     orch._notify_signal_decision = Orchestrator._notify_signal_decision.__get__(orch, Orchestrator)
     orch.check_strategy_approval = Orchestrator.check_strategy_approval.__get__(orch, Orchestrator)
     orch._load_approval_manifest = Orchestrator._load_approval_manifest.__get__(orch, Orchestrator)
@@ -68,16 +72,21 @@ def _build_orchestrator(tmp_path):
     return orch
 
 
-def test_exit_signal_falls_back_to_aggregate_position(tmp_path, monkeypatch):
+def test_exit_signal_does_not_cross_route_to_aggregate_position(tmp_path, monkeypatch):
+    # Cross-routing prevention (2026-04-15): an exit signal for strategy X
+    # must NOT close a position opened by a different strategy or the aggregate
+    # key. The signal must be silently skipped and no order placed.
     monkeypatch.setenv("ALLOWED_SYMBOLS", "")
     monkeypatch.setenv("POSITION_SIZE_MODE", "fixed")
 
     orch = _build_orchestrator(tmp_path)
+    # Aggregate position exists (opened by a different strategy or cross-routed)
     orch.ledger.update_position_manually("binance:SOLUSDT", -2.0, avg_price=80.0)
+    # Strategy-specific position is flat
     orch.ledger.update_position_manually("binance:SOLUSDT:07_MACD_Breakout", 0.0)
 
     event = {
-        "signal_id": "SIG-EXIT-FALLBACK",
+        "signal_id": "SIG-EXIT-NO-CROSSROUTE",
         "payload": {
             "exchange": "binance",
             "strategy": "07_MACD_Breakout",
@@ -90,16 +99,11 @@ def test_exit_signal_falls_back_to_aggregate_position(tmp_path, monkeypatch):
         },
     }
 
+    # Must return True (handled) but must NOT place any order
     assert orch.handle_signal(event) is True
-    orch.exchange_binance.execute_futures_order.assert_called_once_with(
-        "SOLUSDT",
-        "BUY",
-        2.0,
-        81.0,
-        signal_id="SIG-EXIT-FALLBACK",
-    )
-    assert orch.ledger.get_position("binance:SOLUSDT").quantity == 0.0
-    assert orch.ledger.get_position("binance:SOLUSDT:07_MACD_Breakout").quantity == 0.0
+    orch.exchange_binance.execute_futures_order.assert_not_called()
+    # Aggregate position must remain untouched — cross-routing is blocked
+    assert orch.ledger.get_position("binance:SOLUSDT").quantity == -2.0
 
 
 def test_unapproved_strategy_is_blocked_by_manifest(tmp_path, monkeypatch):
@@ -124,3 +128,35 @@ def test_unapproved_strategy_is_blocked_by_manifest(tmp_path, monkeypatch):
     orch.exchange_binance.execute_futures_order.assert_not_called()
     assert orch.telegram.send.call_args.kwargs["title"] == "Signal Blocked"
     assert "not approved in the live manifest" in orch.telegram.send.call_args.kwargs["message"]
+
+
+def test_paper_only_strategy_is_blocked_from_execution(tmp_path, monkeypatch):
+    """paper_only manifest entries must NOT reach the exchange when the gate
+    is in its strict default. Enforces M-10. Explicitly pins the env so the
+    test behavior is deterministic regardless of the shell-inherited value of
+    LIVE_APPROVAL_CLASSES (which is relaxed on testnet hosts)."""
+    monkeypatch.setenv("ALLOWED_SYMBOLS", "")
+    monkeypatch.setenv("POSITION_SIZE_MODE", "fixed")
+    monkeypatch.setenv(
+        "LIVE_APPROVAL_CLASSES",
+        "candidate_for_tiny_capital,live_approved,approved",
+    )
+
+    orch = _build_orchestrator(tmp_path, approval_class="paper_only")
+    event = {
+        "signal_id": "SIG-PAPER-ONLY-001",
+        "payload": {
+            "exchange": "binance",
+            "strategy": "07_MACD_Breakout",
+            "symbol": "SOLUSDT",
+            "action": "BUY",
+            "price": 81.0,
+            "quantity": 0.1,
+            "secret": "test_secret",
+        },
+    }
+
+    assert orch.handle_signal(event) is True
+    orch.exchange_binance.execute_futures_order.assert_not_called()
+    assert orch.telegram.send.call_args is not None
+    assert orch.telegram.send.call_args.kwargs["title"] == "Signal Blocked"

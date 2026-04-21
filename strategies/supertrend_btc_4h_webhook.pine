@@ -4,21 +4,21 @@ strategy("SuperTrend BTC 4h - Webhook", overlay=true, initial_capital=1000, defa
 //---------------------------------------------------------------------------------------------------------------------}
 //WEBHOOK CONFIGURATION
 //---------------------------------------------------------------------------------------------------------------------{
-grp_webhook = "🔔 Webhook Configuration"
+grp_webhook = " Webhook Configuration"
 enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
 webhook_secret = input.string("supertrend_btc_4h_cluster_2026_secure", "Webhook Secret", group=grp_webhook, tooltip="Must match bot configuration")
 
 //---------------------------------------------------------------------------------------------------------------------}
 //SUPERTREND SETTINGS
 //---------------------------------------------------------------------------------------------------------------------{
-grp_st = "📈 SuperTrend Parameters"
+grp_st = " SuperTrend Parameters"
 atrPeriod = input.int(10, "ATR Period", minval=1, group=grp_st, tooltip="Standard: 10, BTC 4h can use 10-12")
 factor = input.float(3.0, "ATR Multiplier", step=0.1, minval=0.1, group=grp_st, tooltip="Standard: 3.0")
 
 //---------------------------------------------------------------------------------------------------------------------}
 //RISK MANAGEMENT
 //---------------------------------------------------------------------------------------------------------------------{
-grp_risk = "⚠️ Risk Management"
+grp_risk = " Risk Management"
 stop_loss_pct = input.float(1.5, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1, group=grp_risk)
 take_profit_pct = input.float(3.0, "Take Profit %", minval=0.5, maxval=10.0, step=0.5, group=grp_risk)
 

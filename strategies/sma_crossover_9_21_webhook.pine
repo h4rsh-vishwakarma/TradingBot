@@ -4,21 +4,21 @@ strategy("SMA Crossover 9/21 - Webhook", overlay=true, initial_capital=1000, def
 //---------------------------------------------------------------------------------------------------------------------}
 //WEBHOOK CONFIGURATION
 //---------------------------------------------------------------------------------------------------------------------{
-grp_webhook = "🔔 Webhook Configuration"
+grp_webhook = " Webhook Configuration"
 enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
 webhook_secret = input.string("sma_crossover_9_21_2026_secure", "Webhook Secret", group=grp_webhook, tooltip="Must match bot configuration")
 
 //---------------------------------------------------------------------------------------------------------------------}
 //RISK MANAGEMENT
 //---------------------------------------------------------------------------------------------------------------------{
-grp_risk = "⚠️ Risk Management"
+grp_risk = " Risk Management"
 stop_loss_pct = input.float(2.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1, group=grp_risk, tooltip="Classic SMA: 1.5-2.5%")
 take_profit_pct = input.float(4.0, "Take Profit %", minval=0.5, maxval=10.0, step=0.5, group=grp_risk, tooltip="Classic SMA: 3-5%")
 
 //---------------------------------------------------------------------------------------------------------------------}
 //SMA SETTINGS
 //---------------------------------------------------------------------------------------------------------------------{
-grp_sma = "📈 SMA Parameters"
+grp_sma = " SMA Parameters"
 fastLen = input.int(9, "Fast SMA Length", minval=1, maxval=50, group=grp_sma, tooltip="Classic: 9")
 slowLen = input.int(21, "Slow SMA Length", minval=1, maxval=100, group=grp_sma, tooltip="Classic: 21")
 

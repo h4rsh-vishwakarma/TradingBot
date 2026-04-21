@@ -15,7 +15,9 @@ import sqlite3
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+IST = timezone(timedelta(hours=5, minutes=30))
 from pathlib import Path
 
 import requests
@@ -35,7 +37,7 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "5736858710")
 SIGNAL_DB_PATH = PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "signal_queue.db"
 QUIET_LOOKBACK_MINUTES = 60
-TRADINGVIEW_STUCK_MINUTES = 180
+TRADINGVIEW_STUCK_MINUTES = 360
 
 
 def send_alert(message):
@@ -117,14 +119,14 @@ def _get_signal_activity_snapshot():
         last_seen_text = datetime.utcfromtimestamp(last_seen).strftime("%Y-%m-%d %H:%M:%S UTC")
         return {
             "ok": True,
-            "detail": f"{count} queued signal(s) in last {QUIET_LOOKBACK_MINUTES}m (latest {last_seen_text})",
+            "detail": f"{count} bot-visible signal(s) in last {QUIET_LOOKBACK_MINUTES}m (latest {last_seen_text})",
             "last_seen": last_seen,
             "count": count,
         }
 
     return {
         "ok": False,
-        "detail": f"No queued signals in last {QUIET_LOOKBACK_MINUTES}m",
+        "detail": f"No bot-visible signals in last {QUIET_LOOKBACK_MINUTES}m",
         "last_seen": None,
         "count": 0,
     }
@@ -150,16 +152,19 @@ def assess_tradingview_feed():
         last_seen = cursor.fetchone()[0]
 
     if not last_seen:
-        return "warn", "No TradingView signals recorded yet"
+        return "warn", "No bot-visible TradingView signals recorded yet"
 
     age_minutes = int((datetime.utcnow().timestamp() - last_seen) / 60)
     last_seen_text = datetime.utcfromtimestamp(last_seen).strftime("%Y-%m-%d %H:%M:%S UTC")
     if age_minutes >= TRADINGVIEW_STUCK_MINUTES:
         return "down", (
-            f"TradingView feed may be stuck: no signals for {age_minutes}m "
-            f"(last {last_seen_text})"
+            f"Signal pipeline may be stuck: no signals reached the bot for {age_minutes}m "
+            f"(last bot-visible signal {last_seen_text}). Verify TradingView alerts, webhook delivery, and queue ingestion."
         )
-    return "warn", f"Quiet market: no signals in last {QUIET_LOOKBACK_MINUTES}m (last {last_seen_text})"
+    return "warn", (
+        f"No signals reached the bot in last {QUIET_LOOKBACK_MINUTES}m "
+        f"(last bot-visible signal {last_seen_text}). This may be quiet market or an upstream alert issue."
+    )
 
 
 def _status_line(icon: str, label: str, detail: str) -> str:
@@ -185,7 +190,7 @@ def _build_message(title: str, overall_status: str, checklist_lines: list[str], 
     lines.extend(
         [
             "━━━━━━━━━━━━━━━━━━",
-            f"<i>{datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</i>",
+            f"<i>{datetime.now(IST).strftime('%Y-%m-%d %I:%M %p IST')}</i>",
         ]
     )
     return "\n".join(lines)
@@ -238,11 +243,11 @@ def run_scan():
     has_recent_signals, signal_detail = check_recent_signal_activity()
     feed_status, feed_detail = assess_tradingview_feed()
     if feed_status == "active":
-        checklist_lines.append(_status_line("✅", "TradingView Feed", feed_detail))
+        checklist_lines.append(_status_line("✅", "Signal Ingestion", feed_detail))
     elif feed_status == "warn":
-        checklist_lines.append(_status_line("⚠️", "TradingView Feed", feed_detail))
+        checklist_lines.append(_status_line("⚠️", "Signal Ingestion", feed_detail))
     else:
-        checklist_lines.append(_status_line("❌", "TradingView Feed", feed_detail))
+        checklist_lines.append(_status_line("❌", "Signal Ingestion", feed_detail))
         issues.append(feed_detail)
 
     if "missing" in signal_detail:

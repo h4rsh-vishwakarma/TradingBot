@@ -54,13 +54,29 @@ def emergency_stop():
         print("Aborted.")
         return
 
+    closed = []
     from tradingview_webhook_bot.exchange.binance_client import BinanceClient
     client = BinanceClient()
-    closed = client.close_all_positions()
+    closed.extend(client.close_all_positions())
+
+    lighter_key = os.getenv("LIGHTER_API_PRIVATE_KEY") or os.getenv("LIGHTER_PRIVATE_KEY")
+    if lighter_key:
+        try:
+            from tradingview_webhook_bot.exchange.lighter_client import LighterClient
+            lighter = LighterClient()
+            closed.extend(lighter.close_all_positions())
+            lighter.close()
+        except Exception as exc:
+            logger.error("Lighter emergency stop failed: %s", exc)
+            closed.append({"exchange": "lighter", "status": "FAILED", "msg": str(exc)})
 
     print(f"\nClosed {len(closed)} positions:")
     for c in closed:
-        print(f"  {c['side']} {c['qty']} {c['symbol']}")
+        side = c.get("side", c.get("action", "?"))
+        qty = c.get("qty", c.get("quantity", ""))
+        symbol = c.get("symbol", c.get("exchange", "?"))
+        status = c.get("status", "SUCCESS")
+        print(f"  {status}: {side} {qty} {symbol}")
 
     # Activate kill switch file
     activate_kill_switch()

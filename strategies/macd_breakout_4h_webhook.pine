@@ -1,0 +1,84 @@
+//@version=5
+// 
+// MACD_Breakout [Webhook] v3  4H CHART
+// 
+// WHY 4H: 15m had 3100 trades = 0.40%/day fees  negative
+//         4H has  ~200 trades = 0.03%/day fees  viable
+// SL 2%, TP 6% (R:R 1:3)  sized for 4H candles
+// 
+// SYMBOL PARAMS:
+//   FILUSDT   Len=13, Mult=2.02
+//   LDOUSDT   Len=13, Mult=2.02
+//   OPUSDT    Len=16, Mult=2.52
+//   DOGEUSDT  Len=12, Mult=2.00
+// 
+strategy("MACD Breakout [Webhook] v3  4H", shorttitle="MB-4H",
+     overlay=false,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.06,
+     calc_on_order_fills=false, calc_on_every_tick=false)
+
+//  Inputs 
+grp_c = "Core Settings"
+grp_r = "Risk Management"
+grp_f = "Filters"
+
+macd_len = input.int(13,    "MACD Fast Length",      group=grp_c, minval=5, maxval=30, tooltip="FILUSDT=13, LDOUSDT=13, OPUSDT=16, DOGEUSDT=12")
+atr_mult = input.float(2.02,"Slow Mult",             group=grp_c, minval=1.0, maxval=5.0, step=0.01, tooltip="FILUSDT=2.02, LDOUSDT=2.02, OPUSDT=2.52")
+sl_pct   = input.float(2.0, "Stop Loss %",           group=grp_r, minval=0.5, maxval=10.0, step=0.1)
+tp_pct   = input.float(6.0, "Take Profit %",         group=grp_r, minval=1.0, maxval=20.0, step=0.1)
+adx_th   = input.int(20,    "ADX Threshold",         group=grp_f, minval=10, maxval=40)
+min_gap  = input.int(2,     "Min Bars Between Signals", group=grp_f, minval=1, maxval=10, tooltip="2 bars on 4H = 8h minimum gap")
+
+//  Indicators 
+slow_len              = math.round(macd_len * atr_mult)
+[macdLine, sig, hist] = ta.macd(close, macd_len, slow_len, 9)
+[_, _, adx]           = ta.dmi(14, 14)
+atr14                 = ta.atr(14)
+atrMa                 = ta.sma(atr14, 100)
+
+//  Filters 
+adxOK = adx > adx_th
+volOK = atr14 < 2.5 * atrMa
+var int  consec = 0
+var int  cdBars = 0
+var bool inCool = false
+if strategy.closedtrades > 0
+    lastPnl = strategy.closedtrades.profit(strategy.closedtrades - 1)
+    consec  := lastPnl < 0 ? consec + 1 : 0
+    if consec >= 3
+        inCool := true
+        cdBars := 3
+        consec := 0
+if inCool
+    cdBars -= 1
+    if cdBars <= 0
+        inCool := false
+var int lastSigBar = 0
+gapOK    = bar_index - lastSigBar >= min_gap
+allF     = adxOK and volOK and (not inCool) and gapOK
+
+//  Signals 
+// MACD crossing zero line = momentum breakout
+longCond  = ta.crossover(macdLine, 0)  and allF
+shortCond = ta.crossunder(macdLine, 0) and allF
+
+//  Execute 
+if longCond
+    lastSigBar := bar_index
+    strategy.entry("Long", strategy.long)
+    strategy.exit("XL", "Long", loss=close*sl_pct/100, profit=close*tp_pct/100)
+if shortCond
+    lastSigBar := bar_index
+    strategy.entry("Short", strategy.short)
+    strategy.exit("XS", "Short", loss=close*sl_pct/100, profit=close*tp_pct/100)
+
+//  Plots 
+plot(macdLine, "MACD",    color=color.blue,   linewidth=2)
+plot(sig,      "Signal",  color=color.orange, linewidth=1)
+hline(0, "Zero", color=color.gray)
+bgcolor(inCool ? color.new(color.orange,90) : na, title="Cooldown")
+
+//  Alerts 
+alertcondition(longCond,  "LONG 4H", '{"symbol":"{{ticker}}","action":"buy","strategy":"MACD_Breakout","timeframe":"4h","price":"{{close}}","sl_pct":2.0,"tp_pct":6.0}')
+alertcondition(shortCond, "SHORT 4H", '{"symbol":"{{ticker}}","action":"sell","strategy":"MACD_Breakout","timeframe":"4h","price":"{{close}}","sl_pct":2.0,"tp_pct":6.0}')

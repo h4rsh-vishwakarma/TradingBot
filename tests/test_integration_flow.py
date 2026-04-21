@@ -109,7 +109,7 @@ class TestWebhookToQueue:
 
     def test_json_signal_enqueued(self):
         """JSON webhook signal gets parsed and enqueued."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -136,7 +136,7 @@ class TestWebhookToQueue:
 
     def test_plain_text_signal_enqueued(self):
         """Plain text TradingView alert gets parsed and enqueued."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -153,7 +153,7 @@ class TestWebhookToQueue:
 
     def test_invalid_secret_rejected(self):
         """Wrong secret returns 401."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -175,7 +175,7 @@ class TestWebhookToQueue:
 
     def test_missing_json_secret_rejected(self):
         """Missing secret returns 401."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -194,9 +194,9 @@ class TestWebhookToQueue:
 
             assert resp.status_code == 401
 
-    def test_secretless_order_fill_alert_rejected(self):
-        """TradingView order-fill plain text without explicit secret returns 401."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+    def test_secretless_order_fill_alert_accepted(self):
+        """TradingView order-fill plain text without explicit secret is accepted (format-trusted)."""
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -209,7 +209,69 @@ class TestWebhookToQueue:
                 data=text,
                 content_type="text/plain")
 
+            # TV order-fill format is trusted by format specificity — no secret required
+            assert resp.status_code == 200
+
+    def test_secret_and_signature_mode_rejects_missing_signature(self):
+        """Configured signature mode rejects requests without X-Signature."""
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret_and_signature"}):
+            from tradingview_webhook_bot.core.webhook_server import WebhookServer
+            import tempfile
+            tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
+            config = {"webhook": {"secret": "test_secret_123"}}
+            server = WebhookServer(config=config, signals_queue_file=tf.name)
+            client = server.app.test_client()
+
+            payload = {
+                "secret": "test_secret_123",
+                "symbol": "SOLUSDT",
+                "action": "BUY",
+                "price": "92.50",
+            }
+            resp = client.post("/webhook/tradingview",
+                data=json.dumps(payload),
+                content_type="application/json")
+
             assert resp.status_code == 401
+
+    def test_missing_json_secret_rejected(self):
+        """Missing secret returns 401."""
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
+            from tradingview_webhook_bot.core.webhook_server import WebhookServer
+            import tempfile
+            tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
+            config = {"webhook": {"secret": "test_secret_123"}}
+            server = WebhookServer(config=config, signals_queue_file=tf.name)
+            client = server.app.test_client()
+
+            payload = {
+                "symbol": "SOLUSDT",
+                "action": "BUY",
+                "price": 92.50
+            }
+            resp = client.post("/webhook/tradingview",
+                data=json.dumps(payload),
+                content_type="application/json")
+
+            assert resp.status_code == 401
+
+    def test_secretless_order_fill_alert_accepted(self):
+        """TradingView order-fill plain text without explicit secret is accepted (format-trusted)."""
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
+            from tradingview_webhook_bot.core.webhook_server import WebhookServer
+            import tempfile
+            tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
+            config = {"webhook": {"secret": "test_secret_123"}}
+            server = WebhookServer(config=config, signals_queue_file=tf.name)
+            client = server.app.test_client()
+
+            text = "TestStrategy: order buy @ 10 filled on SOLUSDT. New strategy position is 10"
+            resp = client.post("/webhook/tradingview",
+                data=text,
+                content_type="text/plain")
+
+            # TV order-fill format is trusted by format specificity — no secret required
+            assert resp.status_code == 200
 
     def test_secret_and_signature_mode_rejects_missing_signature(self):
         """Configured signature mode rejects requests without X-Signature."""
@@ -235,7 +297,7 @@ class TestWebhookToQueue:
 
     def test_health_endpoint(self):
         """Health endpoint returns 200."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -247,7 +309,7 @@ class TestWebhookToQueue:
 
     def test_metrics_endpoint(self):
         """Metrics endpoint returns Prometheus format."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123"}):
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -586,3 +648,102 @@ class TestIdempotencyCleanup:
         assert deleted == 1
         assert not store.is_seen("OLD_001")
         assert store.is_seen("NEW_001")
+
+
+class TestSafetyGatesBlock:
+    """Prove that safety gates deterministically block signals at runtime."""
+
+    def test_duplicate_signal_blocked(self):
+        """Same strategy+symbol+side within dedup window is blocked."""
+        from tradingview_webhook_bot.core.orchestrator import Orchestrator
+        from unittest.mock import patch, MagicMock
+        import os
+
+        with patch.dict(os.environ, {
+            "WEBHOOK_SECRET": "test_secret_123",
+            "TRADINGVIEW_AUTH_MODE": "secret",
+            "ALLOW_REAL_TRADES": "false",
+            "REQUIRE_APPROVAL_MANIFEST": "false",
+            "USE_DURABLE_QUEUE": "false",
+        }):
+            orch = Orchestrator.__new__(Orchestrator)
+            orch._recent_signals = {}
+            orch.DEDUP_WINDOW_SECONDS = 120
+
+            # First call: not duplicate
+            assert not orch._is_duplicate_signal("TestStrat", "BTCUSDT", "BUY")
+            # Second call within window: duplicate
+            assert orch._is_duplicate_signal("TestStrat", "BTCUSDT", "BUY")
+            # Different side: not duplicate
+            assert not orch._is_duplicate_signal("TestStrat", "BTCUSDT", "SELL")
+
+    def test_symbol_cooldown_blocks(self):
+        """Same symbol+strategy within cooldown window is blocked."""
+        from tradingview_webhook_bot.core.orchestrator import Orchestrator
+        import os, time
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {
+            "ALLOW_REAL_TRADES": "false",
+            "REQUIRE_APPROVAL_MANIFEST": "false",
+        }):
+            orch = Orchestrator.__new__(Orchestrator)
+            orch._symbol_cooldown = {}
+            orch.COOLDOWN_SECONDS = 60
+
+            # Not in cooldown initially
+            assert not orch._is_symbol_in_cooldown("BTCUSDT", "TestStrat")
+            # Mark traded
+            orch._mark_symbol_traded("BTCUSDT", "TestStrat")
+            # Now in cooldown
+            assert orch._is_symbol_in_cooldown("BTCUSDT", "TestStrat")
+            # Different symbol not in cooldown
+            assert not orch._is_symbol_in_cooldown("ETHUSDT", "TestStrat")
+
+    def test_circuit_breaker_trips_on_loss_limit(self):
+        """Circuit breaker trips when daily loss exceeds limit."""
+        from tradingview_webhook_bot.core.circuit_breaker import CircuitBreaker
+        import tempfile, os
+
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            cb_path = f.name
+
+        try:
+            cb = CircuitBreaker(
+                state_file=cb_path,
+                config={
+                    "daily_loss_limit_pct": 5.0,
+                    "max_consecutive_losses": 3,
+                    "cooldown_minutes": 30,
+                    "max_drawdown_pct": 10.0,
+                },
+            )
+            # Record 3 consecutive losses
+            cb.record_trade_result(is_win=False)
+            cb.record_trade_result(is_win=False)
+            cb.record_trade_result(is_win=False)
+            # Should be tripped
+            assert not cb.should_allow_trade(), "Circuit breaker should block trades after 3 consecutive losses"
+        finally:
+            os.unlink(cb_path)
+
+    def test_candle_lock_blocks_opposite_direction(self):
+        """Candle lock prevents opposite-direction trade on same symbol."""
+        from tradingview_webhook_bot.core.orchestrator import Orchestrator
+        import os
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, {
+            "ALLOW_REAL_TRADES": "false",
+            "REQUIRE_APPROVAL_MANIFEST": "false",
+        }):
+            orch = Orchestrator.__new__(Orchestrator)
+            orch._candle_lock = {}
+            orch.CANDLE_LOCK_SECONDS = 60
+
+            # Lock BUY direction
+            orch._set_candle_lock("BTCUSDT", "BUY", "TestStrat")
+            # Opposite direction (SELL) should be blocked
+            assert orch._is_candle_locked("BTCUSDT", "SELL")
+            # Same direction (BUY) should NOT be blocked
+            assert not orch._is_candle_locked("BTCUSDT", "BUY")

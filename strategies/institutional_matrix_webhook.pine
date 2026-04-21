@@ -4,7 +4,7 @@ strategy("Hackathon V3: Institutional Matrix (MTF + Auto-Fibs) + Webhook", overl
 //---------------------------------------------------------------------------------------------------------------------}
 //WEBHOOK CONFIGURATION - MATCHES BOT EXPECTATIONS
 //---------------------------------------------------------------------------------------------------------------------{
-grp_webhook = "🔔 Webhook Configuration"
+grp_webhook = " Webhook Configuration"
 enable_webhook = input.bool(true, "Enable Webhook Alerts", group=grp_webhook)
 webhook_url = input.string("http://13.236.143.201/webhook/tradingview", "Webhook URL", group=grp_webhook, tooltip="Your bot webhook endpoint")
 webhook_secret = input.string("hybrid_tradingview_cluster_2026_secure", "Webhook Secret", group=grp_webhook, tooltip="Must match bot configuration")
@@ -114,8 +114,8 @@ plot(st_val, color = st_dir == -1 ? color.green : color.red, linewidth=2, title=
 bgcolor(htf_bull ? color.new(color.green, 90) : htf_bear ? color.new(color.red, 90) : na, title="Institutional Trend Cloud")
 
 // Rocket Emojis for Entries
-plotchar(long_signal and strategy.position_size == 0, char="🚀", location=location.belowbar, color=color.lime, size=size.tiny, title="Long Entry")
-plotchar(short_signal and strategy.position_size == 0, char="🔥", location=location.abovebar, color=color.red, size=size.tiny, title="Short Entry")
+plotchar(long_signal and strategy.position_size == 0, char="", location=location.belowbar, color=color.lime, size=size.tiny, title="Long Entry")
+plotchar(short_signal and strategy.position_size == 0, char="", location=location.abovebar, color=color.red, size=size.tiny, title="Short Entry")
 
 // --- 9. THE MATRIX DASHBOARD ---
 var table dash = table.new(position.top_right, 2, 6, border_width = 1, border_color = color.gray)

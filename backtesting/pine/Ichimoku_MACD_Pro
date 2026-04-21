@@ -1,0 +1,70 @@
+//@version=5
+strategy("23 Ichimoku MACD Pro [Webhook]", overlay=true, commission_type=strategy.commission.percent, commission_value=0.1, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Ichimoku Settings
+tenkan_len   = input.int(9,  title="Tenkan Period")
+kijun_len    = input.int(26, title="Kijun Period")
+senkou_b_len = input.int(52, title="Senkou B Period")
+chikou_len   = input.int(26, title="Displacement")
+
+// MACD Settings
+macd_fast   = input.int(12, title="MACD Fast Length")
+macd_slow   = input.int(26, title="MACD Slow Length")
+macd_signal = input.int(9,  title="MACD Signal Length")
+
+// Ichimoku Calculations
+tenkan   = (ta.highest(high, tenkan_len)   + ta.lowest(low, tenkan_len))   / 2
+kijun    = (ta.highest(high, kijun_len)    + ta.lowest(low, kijun_len))    / 2
+senkou_a = (tenkan + kijun) / 2
+senkou_b = (ta.highest(high, senkou_b_len) + ta.lowest(low, senkou_b_len)) / 2
+
+// Cloud
+cloud_top    = math.max(senkou_a[chikou_len], senkou_b[chikou_len])
+cloud_bottom = math.min(senkou_a[chikou_len], senkou_b[chikou_len])
+
+// Plots
+p1 = plot(tenkan,   "Tenkan",   color=color.blue)
+p2 = plot(kijun,    "Kijun",    color=color.red)
+p3 = plot(senkou_a, "Senkou A", color=color.new(color.green, 70), offset=chikou_len)
+p4 = plot(senkou_b, "Senkou B", color=color.new(color.red,   70), offset=chikou_len)
+fill(p3, p4, color=senkou_a >= senkou_b ? color.new(color.green, 85) : color.new(color.red, 85))
+
+// MACD
+[macd_line, signal_line, hist] = ta.macd(close, macd_fast, macd_slow, macd_signal)
+
+// MACD Crossovers
+macd_cross_up   = ta.crossover(macd_line,  signal_line)
+macd_cross_down = ta.crossunder(macd_line, signal_line)
+
+// Cloud Conditions
+price_above_cloud = close > cloud_top
+price_below_cloud = close < cloud_bottom
+price_in_cloud    = close >= cloud_bottom and close <= cloud_top
+
+// Entry Conditions
+long_entry  = price_above_cloud and hist > 0 and macd_cross_up
+short_entry = price_below_cloud and hist < 0 and macd_cross_down
+
+// Exit Conditions: price enters cloud OR MACD histogram flips
+hist_flip_down = ta.crossunder(hist, 0)
+hist_flip_up   = ta.crossover(hist,  0)
+
+long_exit  = price_in_cloud or price_below_cloud or hist_flip_down
+short_exit = price_in_cloud or price_above_cloud or hist_flip_up
+
+// Strategy Execution
+if long_entry and strategy.position_size <= 0
+    strategy.entry("Long", strategy.long)
+    alert("action=buy symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if short_entry and strategy.position_size >= 0
+    strategy.entry("Short", strategy.short)
+    alert("action=sell symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if long_exit and strategy.position_size > 0
+    strategy.close("Long")
+    alert("action=close symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if short_exit and strategy.position_size < 0
+    strategy.close("Short")
+    alert("action=close symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)

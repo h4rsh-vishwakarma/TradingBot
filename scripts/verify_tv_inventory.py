@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sqlite3
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -24,9 +26,9 @@ def _inspect_pine(path: Path) -> dict[str, str]:
     except Exception:
         return {"has_buy": "NO", "has_sell": "NO", "has_secret": "NO"}
     return {
-        "has_buy": "YES" if "Webhook BUY" in text else "NO",
-        "has_sell": "YES" if "Webhook SELL" in text else "NO",
-        "has_secret": "YES" if '"secret"' in text else "NO",
+        "has_buy": "YES" if re.search(r"alertcondition\s*\([^\n]*long", text, re.IGNORECASE) else "NO",
+        "has_sell": "YES" if re.search(r"alertcondition\s*\([^\n]*short", text, re.IGNORECASE) else "NO",
+        "has_secret": "YES" if re.search(r"[\"']secret[\"']\s*:", text) else "NO",
     }
 
 
@@ -39,8 +41,12 @@ def _find_matching_scripts(search_dirs: list[Path], strategy: str, symbol: str, 
     for base in search_dirs:
         if not base.exists():
             continue
-        for path in base.glob("*.pine"):
-            name_key = _normalize(path.stem)
+        for script_path in base.rglob("*.pine"):
+            name_key = _normalize(script_path.stem)
+            if symbol_key and symbol_key not in name_key:
+                continue
+            if timeframe_key and timeframe_key not in name_key:
+                continue
             score = 0
             if strategy_key and strategy_key in name_key:
                 score += 10
@@ -49,13 +55,62 @@ def _find_matching_scripts(search_dirs: list[Path], strategy: str, symbol: str, 
             if timeframe_key and timeframe_key in name_key:
                 score += 3
             if score > 0:
-                matches.append((score, path))
+                matches.append((score, script_path))
 
     matches.sort(key=lambda item: (-item[0], len(item[1].name)))
-    return [path for _, path in matches]
+    return [script_path for _, script_path in matches]
 
 
-def build_inventory_report(manifest_path: Path, strategies_dir: Path, generated_dir: Path) -> pd.DataFrame:
+def _check_signal_queue(db_path: Path, strategy: str, symbol: str, lookback_days: int = 7) -> dict:
+    if not db_path.exists():
+        return {"signal_count": 0, "last_signal": None, "live_verified": False}
+
+    try:
+        cutoff = (datetime.utcnow() - timedelta(days=lookback_days)).timestamp()
+        with sqlite3.connect(str(db_path)) as conn:
+            cursor = conn.execute(
+                "SELECT COUNT(*), MAX(created_at) FROM signals WHERE created_at >= ? AND payload LIKE ?",
+                (cutoff, f"%{strategy}%"),
+            )
+            count, last_ts = cursor.fetchone()
+
+            if count and count > 0 and symbol and symbol != "*":
+                cursor = conn.execute(
+                    "SELECT COUNT(*), MAX(created_at) FROM signals WHERE created_at >= ? AND payload LIKE ? AND payload LIKE ?",
+                    (cutoff, f"%{strategy}%", f"%{symbol}%"),
+                )
+                count, last_ts = cursor.fetchone()
+
+        if count and count > 0:
+            last_signal = datetime.utcfromtimestamp(last_ts).strftime("%Y-%m-%d %H:%M UTC") if last_ts else "unknown"
+            return {"signal_count": int(count), "last_signal": last_signal, "live_verified": True}
+    except Exception:
+        pass
+
+    return {"signal_count": 0, "last_signal": None, "live_verified": False}
+
+
+def _action_needed(best: Path | None, inspection: dict[str, str], status: str) -> str:
+    if status == "READY":
+        return "No action needed"
+    if status == "LIVE_VERIFIED":
+        if best and inspection["has_secret"] == "NO":
+            return "TradingView alert is live, but local Pine copy is missing embedded secret for future reuse"
+        return "Live signals verified from TradingView"
+    if status == "CONFIG_MISMATCH":
+        missing = []
+        if inspection["has_buy"] == "NO":
+            missing.append("long alertcondition")
+        if inspection["has_sell"] == "NO":
+            missing.append("short alertcondition")
+        if inspection["has_secret"] == "NO":
+            missing.append("embedded secret")
+        detail = ", ".join(missing) if missing else "standard webhook fields"
+        return f"Update local Pine/webhook template: missing {detail}"
+    return "No local Pine artifact or live TradingView evidence found"
+
+
+def build_inventory_report(manifest_path: Path, strategies_dir: Path, generated_dir: Path, signal_db_path: Path | None = None) -> pd.DataFrame:
     approvals = _load_manifest(manifest_path)
     rows = []
     search_dirs = [generated_dir, strategies_dir]
@@ -65,6 +120,7 @@ def build_inventory_report(manifest_path: Path, strategies_dir: Path, generated_
         exchange = str(approval.get("exchange", ""))
         symbols = approval.get("symbols", ["*"])
         timeframes = approval.get("timeframes", ["*"])
+        approval_class = str(approval.get("approval_class", "unclassified"))
 
         for symbol in symbols:
             for timeframe in timeframes:
@@ -73,18 +129,41 @@ def build_inventory_report(manifest_path: Path, strategies_dir: Path, generated_
                 candidates = _find_matching_scripts(search_dirs, strategy, symbol_text, timeframe_text)
                 best = candidates[0] if candidates else None
                 inspection = _inspect_pine(best) if best else {"has_buy": "NO", "has_sell": "NO", "has_secret": "NO"}
-                status = "READY" if best and inspection["has_buy"] == "YES" and inspection["has_sell"] == "YES" else "MISSING"
+                pine_ready = bool(best) and inspection["has_buy"] == "YES" and inspection["has_sell"] == "YES" and inspection["has_secret"] == "YES"
+
+                signal_info = {"signal_count": 0, "last_signal": None, "live_verified": False}
+                if signal_db_path:
+                    signal_info = _check_signal_queue(signal_db_path, strategy, symbol_text)
+
+                if pine_ready:
+                    status = "READY"
+                    source = f"Pine: {best}"
+                elif signal_info["live_verified"]:
+                    status = "LIVE_VERIFIED"
+                    source = f"{signal_info['signal_count']} signals (last: {signal_info['last_signal']})"
+                elif best:
+                    status = "CONFIG_MISMATCH"
+                    source = f"Pine: {best}"
+                else:
+                    status = "MISSING"
+                    source = ""
+
                 rows.append(
                     {
                         "Strategy": strategy,
                         "Exchange": exchange,
                         "Symbol": symbol,
                         "Timeframe": timeframe,
+                        "Approval Class": approval_class,
                         "Matched Script": str(best) if best else "",
                         "Webhook BUY": inspection["has_buy"],
                         "Webhook SELL": inspection["has_sell"],
                         "Embedded Secret": inspection["has_secret"],
+                        "Live Signals": signal_info["signal_count"],
+                        "Last Signal": signal_info["last_signal"] or "",
+                        "Source": source,
                         "Status": status,
+                        "Action Needed": _action_needed(best, inspection, status),
                     }
                 )
 
@@ -99,10 +178,13 @@ def main() -> int:
     parser.add_argument("--output", default="storage/reports/tv_inventory_report.csv")
     args = parser.parse_args()
 
+    signal_db = Path("tradingview_webhook_bot/storage/signal_queue.db")
+
     report = build_inventory_report(
         manifest_path=Path(args.manifest),
         strategies_dir=Path(args.strategies_dir),
         generated_dir=Path(args.generated_dir),
+        signal_db_path=signal_db,
     )
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -111,7 +193,7 @@ def main() -> int:
     if report.empty:
         print("No approvals found.")
         return 0
-    ready = int((report["Status"] == "READY").sum())
+    ready = int(((report["Status"] == "READY") | (report["Status"] == "LIVE_VERIFIED")).sum())
     print(f"Approved rows: {len(report)} | Ready: {ready} | Missing: {len(report) - ready}")
     return 0
 

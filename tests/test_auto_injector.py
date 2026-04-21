@@ -39,7 +39,7 @@ def test_recent_signal_activity_detects_quiet_hour(tmp_path, monkeypatch):
     has_recent_signals, detail = auto_injector.check_recent_signal_activity(lookback_minutes=60)
 
     assert has_recent_signals is False
-    assert "No queued signals" in detail
+    assert "No bot-visible signals" in detail
 
 
 def test_recent_signal_activity_detects_live_signals(tmp_path, monkeypatch):
@@ -51,7 +51,7 @@ def test_recent_signal_activity_detects_live_signals(tmp_path, monkeypatch):
     has_recent_signals, detail = auto_injector.check_recent_signal_activity(lookback_minutes=60)
 
     assert has_recent_signals is True
-    assert "queued signal" in detail
+    assert "bot-visible signal" in detail
 
 
 def test_run_scan_sends_quiet_hour_confirmation(monkeypatch):
@@ -65,12 +65,12 @@ def test_run_scan_sends_quiet_hour_confirmation(monkeypatch):
     monkeypatch.setattr(
         auto_injector,
         "check_recent_signal_activity",
-        lambda lookback_minutes=60: (False, "No queued signals in last 60m"),
+        lambda lookback_minutes=60: (False, "No bot-visible signals in last 60m"),
     )
     monkeypatch.setattr(
         auto_injector,
         "assess_tradingview_feed",
-        lambda: ("warn", "Quiet market: no signals in last 60m (last 2026-03-28 11:00:00 UTC)"),
+        lambda: ("warn", "No signals reached the bot in last 60m (last bot-visible signal 2026-03-28 11:00:00 UTC). This may be quiet market or an upstream alert issue."),
     )
     monkeypatch.setattr(auto_injector, "send_alert", sent_messages.append)
 
@@ -81,8 +81,8 @@ def test_run_scan_sends_quiet_hour_confirmation(monkeypatch):
     assert "✅ <b>Webhook:</b> UP" in sent_messages[0]
     assert "✅ <b>Orchestrator:</b> RUNNING" in sent_messages[0]
     assert "✅ <b>Dashboard:</b> UP" in sent_messages[0]
-    assert "⚠️ <b>TradingView Feed:</b> Quiet market" in sent_messages[0]
-    assert "No queued signals in last 60m" in sent_messages[0]
+    assert "⚠️ <b>Signal Ingestion:</b> No signals reached the bot in last 60m" in sent_messages[0]
+    assert "No bot-visible signals in last 60m" in sent_messages[0]
 
 
 def test_run_scan_alerts_when_signal_db_is_missing(monkeypatch):
@@ -127,12 +127,12 @@ def test_run_scan_alerts_when_tradingview_feed_looks_stuck(monkeypatch):
     monkeypatch.setattr(
         auto_injector,
         "check_recent_signal_activity",
-        lambda lookback_minutes=60: (False, "No queued signals in last 60m"),
+        lambda lookback_minutes=60: (False, "No bot-visible signals in last 60m"),
     )
     monkeypatch.setattr(
         auto_injector,
         "assess_tradingview_feed",
-        lambda: ("down", "TradingView feed may be stuck: no signals for 240m (last 2026-03-28 08:00:00 UTC)"),
+        lambda: ("down", "Signal pipeline may be stuck: no signals reached the bot for 240m (last bot-visible signal 2026-03-28 08:00:00 UTC). Verify TradingView alerts, webhook delivery, and queue ingestion."),
     )
     monkeypatch.setattr(auto_injector, "send_alert", sent_messages.append)
 
@@ -140,5 +140,19 @@ def test_run_scan_alerts_when_tradingview_feed_looks_stuck(monkeypatch):
 
     assert len(sent_messages) == 1
     assert "HOURLY HEARTBEAT ALERT" in sent_messages[0]
-    assert "TradingView feed may be stuck" in sent_messages[0]
-    assert "❌ <b>TradingView Feed:</b>" in sent_messages[0]
+    assert "Signal pipeline may be stuck" in sent_messages[0]
+    assert "❌ <b>Signal Ingestion:</b>" in sent_messages[0]
+
+
+def test_assess_tradingview_feed_uses_bot_visible_wording(tmp_path, monkeypatch):
+    db_path = tmp_path / "signal_queue.db"
+    old_timestamp = auto_injector.datetime.utcnow().timestamp() - (90 * 60)
+    _build_signal_db(db_path, [old_timestamp])
+    monkeypatch.setattr(auto_injector, "SIGNAL_DB_PATH", db_path)
+    monkeypatch.setattr(auto_injector, "TRADINGVIEW_STUCK_MINUTES", 360)
+
+    status, detail = auto_injector.assess_tradingview_feed()
+
+    assert status == "warn"
+    assert "No signals reached the bot in last 60m" in detail
+    assert "bot-visible signal" in detail

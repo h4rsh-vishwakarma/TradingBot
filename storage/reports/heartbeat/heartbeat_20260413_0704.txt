@@ -1,0 +1,46 @@
+<b>HOURLY TRADING HEARTBEAT</b>
+━━━━━━━━━━━━━━━━━━
+<b>Status: HEALTHY</b>
+
+✅ <b>Webhook:</b> UP
+✅ <b>Orchestrator:</b> RUNNING
+✅ <b>Dashboard:</b> UP
+✅ <b>Inventory:</b> READY
+✅ <b>Manifest Scope:</b> 10 strategies / *
+✅ <b>Dead Letter Queue:</b> Clean
+✅ <b>Tournament:</b> Fresh (5.0h ago)
+✅ <b>Signal Ingestion:</b> Last signal 46m ago (2026-04-13 06:18:43 UTC)
+✅ <b>Signal Queue:</b> 3 signal(s) in last 60m
+
+📡 <b>Signal Flow</b>
+• Last approved signal: 2026-04-13 06:18 UTC | Donchian Trend | LINKUSDT
+• Last bot-visible signal: 2026-04-13 06:18 UTC | Donchian Trend | LINKUSDT
+• Signals in last 60m: 3
+• Blocked in last 60m: 0
+• Unauthorized in last 60m: 0
+
+📍 <b>Open Positions</b>
+• Count: 5
+• BTCUSDT | — | SHORT | Entry 71675.32 | Realized $+0.00
+• ETHUSDT | — | LONG | Entry 2251.05 | Realized $-0.97
+• SUIUSDT | — | SHORT | Entry 0.89 | Realized $+0.00
+• AVAXUSDT | — | SHORT | Entry 8.67 | Realized $+0.00
+• LDOUSDT | — | SHORT | Entry 0.31 | Realized $+0.00
+
+💰 <b>P&amp;L</b>
+• Day P&amp;L: $+3.79
+• Paper Window P&amp;L: $-0.17
+
+🛡 <b>Risk / Integrity</b>
+• Critical drifts today: 0
+• High drifts today: 0
+• Queue stalls: 0
+• Duplicate executions: 0
+• Missing SL/TP: 0
+• Freeze diff: none
+
+<b>Issues:</b>
+• None
+
+━━━━━━━━━━━━━━━━━━
+<i>2026-04-13 12:34 PM IST</i>

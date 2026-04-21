@@ -1,0 +1,53 @@
+//@version=5
+strategy("24 Keltner Breakout [Webhook]", overlay=true, commission_type=strategy.commission.percent, commission_value=0.1, default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+
+// Inputs
+ema_len   = input.int(20,    title="EMA Length")
+atr_len   = input.int(10,    title="ATR Length")
+atr_mult  = input.float(2.0, title="ATR Multiplier")
+rsi_len   = input.int(14,    title="RSI Length")
+rsi_long  = input.int(55,    title="RSI Long Threshold")
+rsi_short = input.int(45,    title="RSI Short Threshold")
+
+// Keltner Channel
+basis    = ta.ema(close, ema_len)
+atr_val  = ta.atr(atr_len)
+upper_kc = basis + atr_mult * atr_val
+lower_kc = basis - atr_mult * atr_val
+
+// RSI
+rsi = ta.rsi(close, rsi_len)
+
+// Plots
+plot(basis,    "Midline EMA20", color=color.orange)
+plot(upper_kc, "Upper KC",      color=color.new(color.blue, 40))
+plot(lower_kc, "Lower KC",      color=color.new(color.blue, 40))
+
+// Breakout Conditions
+long_break  = ta.crossover(close,  upper_kc)
+short_break = ta.crossunder(close, lower_kc)
+
+// Entry Conditions
+long_entry  = long_break  and rsi > rsi_long
+short_entry = short_break and rsi < rsi_short
+
+// Exit Conditions: price returns to midline OR touches opposite channel
+long_exit  = close < basis or ta.crossunder(close, lower_kc)
+short_exit = close > basis or ta.crossover(close,  upper_kc)
+
+// Strategy Execution
+if long_entry and strategy.position_size <= 0
+    strategy.entry("Long", strategy.long)
+    alert("action=buy symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if short_entry and strategy.position_size >= 0
+    strategy.entry("Short", strategy.short)
+    alert("action=sell symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if long_exit and strategy.position_size > 0
+    strategy.close("Long")
+    alert("action=close symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)
+
+if short_exit and strategy.position_size < 0
+    strategy.close("Short")
+    alert("action=close symbol=" + syminfo.ticker + " size=" + str.tostring(strategy.position_size), alert.freq_once_per_bar)

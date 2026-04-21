@@ -1,0 +1,67 @@
+{
+  "quarantined_at": "2026-04-13T10:30:00Z",
+  "reason": "R-04: Stale testnet positions from pre-paper-window trades on non-approved pairs. Isolated from ETH 4h paper-lane metrics. Do not count in Apr 14 P&L or decision.",
+  "quarantined_by": "Harsh",
+  "positions": [
+    {
+      "key": "binance:BTCUSDT",
+      "symbol": "BTCUSDT",
+      "side": "SHORT",
+      "qty": -0.0162,
+      "entry": 71675.32,
+      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane",
+      "status": "CLOSED"
+    },
+    {
+      "key": "binance:SUIUSDT",
+      "symbol": "SUIUSDT",
+      "side": "SHORT",
+      "qty": -1070.8,
+      "entry": 0.89,
+      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane",
+      "status": "CLOSED"
+    },
+    {
+      "key": "binance:AVAXUSDT",
+      "symbol": "AVAXUSDT",
+      "side": "SHORT",
+      "qty": -35.0,
+      "entry": 8.67,
+      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane",
+      "status": "CLOSED"
+    },
+    {
+      "key": "binance:LDOUSDT",
+      "symbol": "LDOUSDT",
+      "side": "SHORT",
+      "qty": -1000.0,
+      "entry": 0.31,
+      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane",
+      "status": "CLOSED"
+    },
+    {
+      "key": "binance:LINKUSDT",
+      "symbol": "LINKUSDT",
+      "side": "SHORT",
+      "qty": -6.8,
+      "entry": 9.34,
+      "note": "Pre-window testnet SHORT - stale, outside approved ETH lane",
+      "status": "CLOSED"
+    },
+    {
+      "key": "binance:XRPUSDT",
+      "symbol": "XRPUSDT",
+      "side": "LONG",
+      "qty": 15.8,
+      "entry": 1.3318,
+      "note": "Test signal from webhook debug session - not real trade",
+      "status": "CLOSED"
+    }
+  ],
+  "approved_lane_positions": [
+    "binance:ETHUSDT"
+  ],
+  "action_required": "All positions manually closed on Binance Testnet 2026-04-13. No further action needed.",
+  "flattened_at": "2026-04-13T07:18:30Z",
+  "status": "RESOLVED"
+}

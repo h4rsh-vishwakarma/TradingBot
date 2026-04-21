@@ -1,0 +1,52 @@
+//@version=5
+// Aggressive_Entry [Webhook] v2 -- TOURNAMENT MATCHED
+// USE ON 15m CHART | ADX>20 + ATR guard + cooldown
+// FILUSDT Len=9(fast) Mult=3.03 | LDOUSDT Len=7 Mult=2.53 | OPUSDT Len=4 Mult=1.83
+strategy("Aggressive Entry [Webhook] v2", shorttitle="AE-WH", overlay=true,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.1,
+     calc_on_order_fills=false, calc_on_every_tick=false)
+fast_len  = input.int(9, "Fast EMA", minval=3, maxval=30)
+slow_mult = input.float(3.03, "Slow EMA Mult", minval=1.0, maxval=5.0, step=0.01)
+sl_pct    = input.float(1.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1)
+tp_pct    = input.float(3.0, "Take Profit %", minval=0.1, maxval=10.0, step=0.1)
+adx_th    = input.int(20, "ADX Threshold", minval=10, maxval=40)
+slow_len  = math.round(fast_len * slow_mult)
+ema_fast  = ta.ema(close, fast_len)
+ema_slow  = ta.ema(close, slow_len)
+vol_ma    = ta.sma(volume, 20)
+volSpike  = volume > 1.5 * vol_ma
+rsi14     = ta.rsi(close, 14)
+[_, _, adx] = ta.dmi(14, 14)
+adxOK     = adx > adx_th
+atr14     = ta.atr(14)
+atrMa     = ta.sma(atr14, 100)
+volOK     = atr14 < 2.0 * atrMa
+var int  consec = 0
+var int  cdBars = 0
+var bool inCool = false
+if strategy.closedtrades > 0
+    lastPnl = strategy.closedtrades.profit(strategy.closedtrades - 1)
+    consec  := lastPnl < 0 ? consec + 1 : 0
+    if consec >= 3
+        inCool := true
+        cdBars := 4
+        consec := 0
+if inCool
+    cdBars := cdBars - 1
+    if cdBars <= 0
+        inCool := false
+coolOK    = not inCool
+longCond  = ta.crossover(ema_fast, ema_slow)  and rsi14 > 50 and volSpike and adxOK and volOK and coolOK
+shortCond = ta.crossunder(ema_fast, ema_slow) and rsi14 < 50 and volSpike and adxOK and volOK and coolOK
+if longCond
+    strategy.entry("Long", strategy.long)
+if shortCond
+    strategy.entry("Short", strategy.short)
+strategy.exit("XL", "Long",  loss=close * sl_pct / 100, profit=close * tp_pct / 100)
+strategy.exit("XS", "Short", loss=close * sl_pct / 100, profit=close * tp_pct / 100)
+plot(ema_fast, "Fast", color=color.orange)
+plot(ema_slow, "Slow", color=color.blue, linewidth=2)
+bgcolor(inCool ? color.new(color.orange, 90) : na)
+alertcondition(longCond,  "Long Entry",  '{\symbol\:\{{ticker}}\,ction\:uy\,\strategy\:\Aggressive_Entry\,\price\:\{{close}}\}'  )
+alertcondition(shortCond, "Short Entry", '{\symbol\:\{{ticker}}\,ction\:\sell\,\strategy\:\Aggressive_Entry\,\price\:\{{close}}\}'  )

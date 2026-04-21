@@ -97,7 +97,7 @@ Evidence:
 
 ### 7. Frozen Shortlist
 
-- only `3-5` paper-trade candidates may be active at once
+- only `2-10` paper-trade candidates may be active at once
 - shortlisted strategies must have:
   - approved manifest entry
   - generated webhook-ready Pine file
@@ -150,7 +150,7 @@ Use these thresholds for final sign-off.
 
 ### Shortlist Limits
 
-- shortlist size: `3-5`
+- shortlist size: `2-10`
 - max gross drawdown threshold from alpha engine: project-configured active rule
 - max net drawdown threshold from alpha engine: project-configured active rule
 
@@ -197,3 +197,35 @@ python scripts/run_alpha_pipeline.py --notify-telegram
 - `PAPER_ONLY`: code and controls pass, but paper window is incomplete
 - `READY_FOR_TINY_CAPITAL`: all hard requirements pass and paper window passes
 - `READY_FOR_CAPPED_SCALE`: tiny-capital stage passes under a separate review
+
+
+## Paper Window Hard-Stop Conditions (NO_GO Triggers)
+
+If ANY of the following occur during the 7-day paper window, the result is **immediate NO_GO**:
+
+### Critical (Stop immediately)
+1. **Duplicate execution** — same signal executes twice on exchange
+2. **Auth bypass** — signal accepted without valid secret
+3. **Manifest bypass** — unapproved strategy reaches execution
+4. **Critical reconciler drift** — SIDE_MISMATCH or repeated UNEXPECTED_FLAT/OPEN (>3 in 24h)
+5. **Circuit breaker failure** — trades continue after daily loss limit hit
+
+### High (Investigate within 1 hour)
+6. **Missing SL/TP** — any approved strategy entry trade has no SL or TP placed
+7. **Queue stall** — no signals processed for >6 hours during market hours
+8. **Inventory regression** — LIVE_VERIFIED drops to MISSING mid-window
+9. **DLQ growth** — dead letter queue exceeds 5 signals in 24h
+10. **Unexplained signal skip** — signal blocked without a logged reason in Telegram
+
+### Warning (Log and continue)
+11. **Single reconciler drift** — MEDIUM severity, auto-corrected
+12. **Candle lock / cooldown blocks** — expected behavior for anti-flip-flop
+13. **No signals for 4h** — may be quiet market (check TradingView chart)
+
+### Pass Criteria (Day 8 review)
+- Zero critical incidents
+- Zero high incidents unresolved
+- PF > 0.8 (allowing for thin edge in 7 days)
+- Max DD < 15% of paper capital
+- Signal-to-execution latency < 5 seconds (median)
+- All daily reports sent successfully

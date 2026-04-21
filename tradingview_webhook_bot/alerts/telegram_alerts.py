@@ -3,12 +3,24 @@ Telegram alert system for critical trading events.
 Sends formatted notifications for circuit breaker trips, errors, and important events.
 """
 
-import os
-import requests
-import time
-from typing import Optional, Dict
-from enum import Enum
+import html
 import logging
+import os
+import re
+import threading
+import time
+from enum import Enum
+from typing import Dict, Optional
+
+from datetime import timezone, timedelta
+import requests
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+# Global send throttle — enforce min gap between Telegram API calls to avoid 429 bursts
+_tg_send_lock = threading.Lock()
+_tg_last_send_time = 0.0
+_TG_MIN_SEND_INTERVAL = 0.5  # seconds between consecutive sends
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +57,27 @@ class TelegramAlert:
         # Rate limiting
         self.last_alert_time = {}
         self.rate_limit_seconds = 60  # Don't spam same alert within 60s
+
+    @staticmethod
+    def _normalize_display_text(text: str) -> str:
+        """Normalize Telegram-facing text for consistent presentation."""
+        normalized = str(text or "").strip()
+        if not normalized:
+            return normalized
+
+        normalized = html.unescape(normalized)
+        for tag in ("<b>", "</b>", "<code>", "</code>", "<i>", "</i>"):
+            normalized = normalized.replace(tag, "")
+
+        replacements = [
+            (r"\bBUY↔SELL\b", "LONG↔SHORT"),
+            (r"\bSELL↔BUY\b", "SHORT↔LONG"),
+            (r"\bBUY\b", "LONG"),
+            (r"\bSELL\b", "SHORT"),
+        ]
+        for pattern, replacement in replacements:
+            normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
+        return normalized
     
     def _should_send(self, alert_key: str) -> bool:
         """Check if alert should be sent (rate limiting)."""
@@ -78,12 +111,15 @@ class TelegramAlert:
         if alert_key and not force:
             if not self._should_send(alert_key):
                 return False
+
+        title = self._normalize_display_text(title)
+        message = self._normalize_display_text(message)
         
         # Format message
         text = f"{severity.value}\n\n"
-        text += f"<b>{title}</b>\n\n"
+        text += f"{title}\n\n"
         text += message
-        text += f"\n\n<i>Time: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}</i>"
+        text += f"\n\nTime: {time.strftime('%Y-%m-%d %I:%M:%S %p IST', time.localtime(time.time() + 19800))}"
         
         try:
             url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
@@ -94,8 +130,17 @@ class TelegramAlert:
                 'disable_web_page_preview': True
             }
 
+            # Global throttle: enforce minimum gap between any two Telegram sends
+            global _tg_last_send_time
+            with _tg_send_lock:
+                now = time.time()
+                gap = now - _tg_last_send_time
+                if gap < _TG_MIN_SEND_INTERVAL:
+                    time.sleep(_TG_MIN_SEND_INTERVAL - gap)
+                _tg_last_send_time = time.time()
+
             # Retry with backoff for HTTP 429 (rate limit)
-            max_retries = 2
+            max_retries = 5
             for attempt in range(max_retries):
                 response = requests.post(url, json=payload, timeout=15)
 
@@ -105,11 +150,12 @@ class TelegramAlert:
                         self.last_alert_time[alert_key] = time.time()
                     return True
                 elif response.status_code == 429:
-                    # Telegram rate limit — extract retry_after, cap at 3s
+                    # Telegram rate limit — extract retry_after, cap at 60s
                     try:
-                        retry_after = min(response.json().get('parameters', {}).get('retry_after', 2), 3)
+                        retry_after = min(response.json().get("parameters", {}).get("retry_after", 5), 60)
                     except Exception:
-                        retry_after = 2
+                        retry_after = 5
+                    _tg_last_send_time = time.time() + retry_after
                     logger.warning(f"Rate limited (429). Retrying in {retry_after}s (attempt {attempt+1}/{max_retries})")
                     time.sleep(retry_after)
                 else:
@@ -173,31 +219,47 @@ class TelegramAlert:
             alert_key="api_errors"
         )
     
-    def position_opened(self, signal_id: str, symbol: str, side: str, 
-                       entry_price: float, position_size: float):
-        """Alert: Position opened (INFO level)."""
+    def position_opened(self, signal_id: str, symbol: str, side: str,
+                       entry_price: float, position_size: float,
+                       sl_price: float = 0.0, tp_price: float = 0.0):
+        """Alert: Position opened with SL/TP (INFO level)."""
+        trade_type = "Open Long" if side.upper() == "BUY" else "Open Short"
+        emoji = "🟢" if side.upper() == "BUY" else "🔴"
+
+        sl_tp = ""
+        if sl_price > 0:
+            sl_tp += f"<b>Stop-Loss:</b> ${sl_price:,.2f}\n"
+        if tp_price > 0:
+            sl_tp += f"<b>Take-Profit:</b> ${tp_price:,.2f}\n"
+
         self.send(
             AlertSeverity.INFO,
-            f"📈 Position Opened: {side} {symbol}",
-            f"<b>Signal:</b> {signal_id}\n"
+            f"{emoji} {trade_type}: {symbol}",
+            f"<b>Type:</b> {trade_type}\n"
             f"<b>Entry:</b> ${entry_price:,.2f}\n"
-            f"<b>Size:</b> {position_size} contracts\n",
+            f"<b>Size:</b> {position_size} contracts\n"
+            f"{sl_tp}"
+            f"<b>Signal:</b> {signal_id}",
             alert_key=f"opened_{signal_id}"
         )
     
     def position_closed(self, symbol: str, side: str, exit_type: str,
                        pnl: float, balance: float):
         """Alert: Position closed with P&L."""
-        emoji = "✅" if pnl >= 0 else "❌"
+        # side is the closing side: SELL closes a long, BUY closes a short
+        trade_type = "Close Long" if side.upper() == "SELL" else "Close Short"
+        pnl_emoji = "✅" if pnl >= 0 else "❌"
+        trade_emoji = "🔻" if side.upper() == "SELL" else "🔺"
         severity = AlertSeverity.INFO if pnl >= 0 else AlertSeverity.WARNING
-        
+
         self.send(
             severity,
-            f"{emoji} Position Closed: {side} {symbol}",
-            f"<b>Exit Type:</b> {exit_type}\n"
-            f"<b>P&L:</b> ${pnl:.2f}\n"
+            f"{trade_emoji} {trade_type}: {symbol}",
+            f"<b>Type:</b> {trade_type}\n"
+            f"<b>Exit Reason:</b> {exit_type}\n"
+            f"{pnl_emoji} <b>P&L:</b> ${pnl:.2f}\n"
             f"<b>New Balance:</b> ${balance:.2f}",
-            alert_key=None  # Always send P&L updates
+            alert_key=None
         )
     
     def daily_summary(self, stats: Dict):

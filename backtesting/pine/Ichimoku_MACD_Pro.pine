@@ -1,0 +1,50 @@
+//@version=5
+// Ichimoku_MACD_Pro [Webhook] v2 -- TOURNAMENT MATCHED -- USE ON 15m CHART
+// ADX>20 filter + ATR volatility guard + 3-loss cooldown
+// FILUSDT Len=11 Mult=2.06 | LDOUSDT Len=14 Mult=2.56 | OPUSDT Len=14 Mult=2.56
+strategy("Ichimoku MACD Pro [Webhook] v2", shorttitle="IMP-WH", overlay=true,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.1,
+     calc_on_order_fills=false, calc_on_every_tick=false)
+tenkan_len = input.int(11, "Tenkan/MACD Fast", minval=5, maxval=30, tooltip="FILUSDT=11, LDOUSDT=14, OPUSDT=14")
+kijun_mult = input.float(2.06, "Kijun Mult", minval=1.0, maxval=5.0, step=0.01, tooltip="FILUSDT=2.06, LDOUSDT=2.56, OPUSDT=2.56")
+sl_pct     = input.float(1.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1)
+tp_pct     = input.float(3.0, "Take Profit %", minval=0.1, maxval=10.0, step=0.1)
+adx_th     = input.int(20, "ADX Threshold", minval=10, maxval=40)
+kijun_len  = math.round(tenkan_len * kijun_mult)
+tenkan     = (ta.highest(high, tenkan_len) + ta.lowest(low, tenkan_len)) / 2
+kijun      = (ta.highest(high, kijun_len)  + ta.lowest(low, kijun_len))  / 2
+[macdL, sigL, histL] = ta.macd(close, tenkan_len, kijun_len, 9)
+[_, _, adx] = ta.dmi(14, 14)
+adxOK      = adx > adx_th
+atr14      = ta.atr(14)
+atrMa      = ta.sma(atr14, 100)
+volOK      = atr14 < 2.0 * atrMa
+var int  consec = 0
+var int  cdBars = 0
+var bool inCool = false
+if strategy.closedtrades > 0
+    lastPnl = strategy.closedtrades.profit(strategy.closedtrades - 1)
+    consec  := lastPnl < 0 ? consec + 1 : 0
+    if consec >= 3
+        inCool := true
+        cdBars := 4
+        consec := 0
+if inCool
+    cdBars := cdBars - 1
+    if cdBars <= 0
+        inCool := false
+coolOK    = not inCool
+longCond  = ta.crossover(tenkan, kijun)  and macdL > sigL and adxOK and volOK and coolOK
+shortCond = ta.crossunder(tenkan, kijun) and macdL < sigL and adxOK and volOK and coolOK
+if longCond
+    strategy.entry("Long", strategy.long)
+if shortCond
+    strategy.entry("Short", strategy.short)
+strategy.exit("XL", "Long",  loss=close * sl_pct / 100, profit=close * tp_pct / 100)
+strategy.exit("XS", "Short", loss=close * sl_pct / 100, profit=close * tp_pct / 100)
+plot(tenkan, "Tenkan", color=color.red,  linewidth=1)
+plot(kijun,  "Kijun",  color=color.blue, linewidth=2)
+bgcolor(inCool ? color.new(color.orange, 90) : na, title="Cooldown")
+alertcondition(longCond,  "Long Entry",  '{"symbol":"{{ticker}}","action":"buy","strategy":"Ichimoku_MACD_Pro","price":"{{close}}"}')
+alertcondition(shortCond, "Short Entry", '{"symbol":"{{ticker}}","action":"sell","strategy":"Ichimoku_MACD_Pro","price":"{{close}}"}')
