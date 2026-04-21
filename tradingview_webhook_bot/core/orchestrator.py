@@ -113,6 +113,23 @@ class Orchestrator:
         self.idempotency = IdempotencyStore(self.idempotency_db)
         self.exchange_binance = BinanceClient()
 
+        # Research lane client: uses separate testnet key for paper_only strategies
+        # Isolates Garima paper trades from Harsh decision-lane trades (Q-04)
+        _research_key = os.getenv("BINANCE_RESEARCH_API_KEY")
+        _research_secret = os.getenv("BINANCE_RESEARCH_API_SECRET")
+        if _research_key and _research_secret:
+            try:
+                self.exchange_binance_research = BinanceClient(
+                    api_key=_research_key, api_secret=_research_secret
+                )
+                logger.info("Research Binance client initialized (paper_only lane isolation active)")
+            except Exception as _e:
+                logger.warning(f"Research Binance client failed, falling back to primary: {_e}")
+                self.exchange_binance_research = self.exchange_binance
+        else:
+            logger.warning("BINANCE_RESEARCH_API_KEY not set — paper_only uses primary key (isolation OFF)")
+            self.exchange_binance_research = self.exchange_binance
+
         try:
             if os.getenv("HL_WALLET_ADDRESS") and os.getenv("HL_PRIVATE_KEY"):
                 self.exchange_hl = HyperliquidClient()
@@ -312,6 +329,30 @@ class Orchestrator:
                 return True, f"Approved by manifest ({operator} @ {approved_at}{class_note})", approval
 
         return False, f"{strategy_name} / {symbol_upper} is not approved in the live manifest", {}
+
+    def _get_approval_class(self, strategy_name: str, symbol: str, exchange: str) -> str:
+        """Look up approval_class from manifest without blocking. Used for exit routing."""
+        try:
+            manifest = self._load_approval_manifest()
+            import re as _re
+            symbol_upper = _re.sub(r"\.(P|PERP)$", "", str(symbol or "").upper().strip())
+            strategy_norm = self._normalize_strategy(strategy_name)
+            exchange_lower = str(exchange or "").lower()
+            for a in manifest.get("approvals", []):
+                if (self._normalize_strategy(a.get("strategy", "")) == strategy_norm
+                        and str(a.get("exchange", exchange_lower)).lower() == exchange_lower):
+                    syms = [str(s).upper() for s in a.get("symbols", ["*"])]
+                    if "*" in syms or symbol_upper in syms:
+                        return str(a.get("approval_class", "")).strip()
+        except Exception:
+            pass
+        return ""
+
+    def _binance_client_for(self, approval_class: str):
+        """Return the correct Binance client based on approval class (lane isolation Q-04)."""
+        if approval_class.lower() == "paper_only":
+            return self.exchange_binance_research
+        return self.exchange_binance
 
     def _notify_signal_decision(self, title: str, reason: str, signal_id: str = "", symbol: str = "",
                                 strategy: str = "", action: str = "", severity=AlertSeverity.INFO):
@@ -633,6 +674,14 @@ class Orchestrator:
                     return True
                 approval_label = str(approval.get("label") or approval.get("status") or "APPROVED_MANIFEST")
 
+            # Resolve approval_class for lane routing (entries have it from approval dict;
+            # exits look it up separately so paper_only exits also use the research key).
+            if not is_exit_hint:
+                _approval_class = str(approval.get("approval_class", "")).strip()
+            else:
+                _approval_class = self._get_approval_class(strat_name, symbol, target_exchange)
+            _active_binance = self._binance_client_for(_approval_class)
+
             # --- 1.5. SIGNAL DEDUP CHECK ---
             if self._is_duplicate_signal(strat_name, symbol, side_hint):
                 self._notify_signal_decision(
@@ -835,7 +884,7 @@ class Orchestrator:
                 logger.info(f"Exit signal: closing {ledger_pos_key} position ({current_pos.quantity}) with {side} {qty}")
                 try:
                     if target_exchange == "binance":
-                        cancel_ok = self.exchange_binance.cancel_open_orders(symbol)
+                        cancel_ok = _active_binance.cancel_open_orders(symbol)
                     elif target_exchange == "lighter" and self.exchange_lighter:
                         cancel_ok = self.exchange_lighter.cancel_open_orders(symbol)
                     else:
@@ -902,9 +951,9 @@ class Orchestrator:
                         avail = self.exchange_lighter.get_account_balance() or 0
                         sizing_price = self.exchange_lighter.get_mark_price(symbol) or price_signal
                     else:
-                        health = self.exchange_binance.get_account_health()
+                        health = _active_binance.get_account_health()
                         avail = float(health.get("available_balance", 0)) if health else 0
-                        sizing_price = self.exchange_binance.get_mainnet_mark_price(symbol) or price_signal
+                        sizing_price = _active_binance.get_mainnet_mark_price(symbol) or price_signal
                     if avail > 0 and sizing_price > 0:
                         qty = (avail * equity_pct) / sizing_price
                         logger.info(f"Equity sizing [{target_exchange}]: {equity_pct*100}% of ${avail:.2f} @ ${sizing_price:.2f} = {qty:.6f} {symbol}")
@@ -977,11 +1026,11 @@ class Orchestrator:
                     logger.error(f"HL execution error: {e}")
                     execution_res = {"status": "FAILED", "reason": str(e)}
             else:
-                execution_res = self.exchange_binance.execute_futures_order(symbol, side, qty, price_signal, signal_id=signal_id)
+                execution_res = _active_binance.execute_futures_order(symbol, side, qty, price_signal, signal_id=signal_id)
                 if execution_res.get("status") == "SUCCESS":
                     fill_price = float(
                         execution_res.get("avg_price") or
-                        self.exchange_binance.get_mainnet_mark_price(symbol) or
+                        _active_binance.get_mainnet_mark_price(symbol) or
                         price_signal
                     )
 
@@ -1071,12 +1120,12 @@ class Orchestrator:
                     sig_tp = float(payload_raw.get("tp_pct", 0) or 0)
                     sl_pct = sig_sl if 0 < sig_sl < 20.0 else float(os.getenv("STOP_LOSS_PCT", "3.0"))
                     tp_pct = sig_tp if 0 < sig_tp < 50.0 else float(os.getenv("TAKE_PROFIT_PCT", "4.5"))
-                    sl_res = self.exchange_binance.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
+                    sl_res = _active_binance.place_stop_loss(symbol, side, qty, fill_price, sl_pct=sl_pct, signal_id=signal_id)
                     if sl_res.get("status") == "SUCCESS":
                         logger.info(f"SL placed for {symbol} @ ${sl_res.get('stopPrice')}")
                     else:
                         logger.warning(f"SL placement failed for {symbol}: {sl_res.get('msg')}")
-                    tp_res = self.exchange_binance.place_take_profit(symbol, side, qty, fill_price, tp_pct=tp_pct, signal_id=signal_id)
+                    tp_res = _active_binance.place_take_profit(symbol, side, qty, fill_price, tp_pct=tp_pct, signal_id=signal_id)
                     if tp_res.get("status") == "SUCCESS":
                         logger.info(f"TP placed for {symbol} @ ${tp_res.get('tpPrice')}")
                     else:

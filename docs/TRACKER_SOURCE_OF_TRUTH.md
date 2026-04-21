@@ -101,10 +101,11 @@ Each step requires the previous. Skipping any step is a governance violation.
 ---
 
 ## Lane Isolation Status
-- Harsh: decision-lane strategies on primary Binance testnet key
-- Garima: paper_only strategies — manifest class enforced at webhook level
+- Harsh: decision-lane strategies (`candidate_for_tiny_capital`) routed to `BINANCE_API_KEY`
+- Garima: `paper_only` strategies routed to `BINANCE_RESEARCH_API_KEY` (separate testnet key)
+- Isolation wired in: `tradingview_webhook_bot/core/orchestrator.py` → `_binance_client_for(approval_class)`
 - Shared TradingView account risk: mitigated by strategy-name routing in webhook_server.py
-- Full key isolation: pending (Q-04 in CEO audit — target post-checkpoint)
+- Evidence: next closed trade on each lane will show distinct account ledger entries
 
 ---
 *Written: 2026-04-21 | Links from: docs/DECISION_LANE_STATUS.md, docs/RUNTIME_LOG.md*
