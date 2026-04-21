@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-21
 
-> Auto-generated — last updated `2026-04-21T13:00:00Z`
+> Auto-generated — last updated `2026-04-21T15:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,15 +8,15 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: GO  (25/25 gates passed)** |
-| Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-21T13:00:00Z |
+| Verdict | **VERDICT: NO-GO  (2 of 27 gates FAILED)** |
+| Gates passed | ? |
+| Last run | 2026-04-21T15:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
-| Version | v10 |
-| Updated | 2026-04-16T13:00:00Z |
+| Version | v11 |
+| Updated | 2026-04-21T13:50:38Z |
 | Total candidates | 2 |
 | ALPHA (live-ready) | 2 |
 | RESEARCH (no Pine yet) | 0 |
@@ -37,30 +37,29 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 54 |
-| Completed | 54 |
-| Last signal | 2026-04-18 04:00 UTC |
-| Last strategy | G91 ATR Compression Breakout / LDOUSDT |
+| Signals received | 9 |
+| Completed | 9 |
+| Last signal | 2026-04-21 13:51 UTC |
+| Last strategy | EMA_Stack_15M / BTCUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260418_0705 |
+| Last heartbeat file | heartbeat_20260421_1505 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
 - `binance:BTCUSDT` qty=-0.0162 @ 76177.66790123
-- `binance:ETHUSDT` qty=0.136 @ 2324.58
-- `binance:SUIUSDT` qty=-330.0 @ 0.9903
-- `binance:AVAXUSDT` qty=-32.0 @ 9.578
-- `binance:LDOUSDT` qty=-790.0 @ 0.419
-- `binance:LINKUSDT` qty=-0.01 @ 9.419
-- `binance:XRPUSDT` qty=0.5 @ 1.4463
-- `binance:OPUSDT` qty=-2000.0 @ 0.1303
-- `binance:MAGICUSDT` qty=313.3 @ 0.0671
-- `binance:UNIUSDT` qty=80.0 @ 3.466
+- `binance:ETHUSDT` qty=0.098 @ 2264.77
+- `binance:SUIUSDT` qty=142.6 @ 0.9482
+- `binance:AVAXUSDT` qty=-59.0 @ 9.294663636363
+- `binance:LINKUSDT` qty=-0.06 @ 9.118236559139
+- `binance:XRPUSDT` qty=-14.2 @ 1.4214
+- `binance:OPUSDT` qty=-5310.0 @ 0.123999299435
+- `binance:MAGICUSDT` qty=-82.1 @ 0.062
+- `binance:BTCUSDT:EMA_Stack_15M` qty=0.003187505299436952 @ 75783.9
 
 ## Stale Position Quarantine
 | Item | Value |
@@ -85,8 +84,20 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 | Dashboard | https://tradingbot.operatorbrief.xyz/ | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
-## Commits Today (2026-04-18)
+## Commits Today (2026-04-21)
 ```
+e64baa1 | 2026-04-21 20:03:03 +0530 | infra: freeze auto_promote + auto-push RUNTIME_LOG to GitHub hourly
+68448e0 | 2026-04-21 19:21:19 +0530 | feat: add EMA Stack 15M as personal_live strategy (v11 manifest)
+88963db | 2026-04-21 19:15:15 +0530 | governance: A-05 — record side/qty/entry_price in trade_history on close
+29e4ba1 | 2026-04-21 19:09:40 +0530 | governance: Q-04 — wire lane isolation using BINANCE_RESEARCH_API_KEY
+9c2159d | 2026-04-21 18:50:39 +0530 | governance: Q-01 Q-02 Q-03 — fix RUNTIME_LOG symbols + add TRACKER_SOURCE_OF_TRUTH
+c95d7b5 | 2026-04-21 18:47:45 +0530 | merge: resolve conflicts accepting origin/main versions
+ec11252 | 2026-04-18 12:25:57 +0000 | fix: timeframe-aware closed-trade threshold + normalized name matching
+db8dadb | 2026-04-18 12:18:15 +0000 | feat: promotion_score + family/symbol concentration gate (Phase 1/2)
+42be1a1 | 2026-04-18 12:14:09 +0000 | feat: gross_dd in discovery + min_closed_trades gate (Phase 1/2)
+b25feff | 2026-04-18 11:50:29 +0000 | fix: exit signals bypass cooldown + log cooldown blocks to Sheets
+bb143fd | 2026-04-18 10:01:36 +0000 | governance: G-01..G-05 CEO audit fixes — ETH-only lock, split reporting, tracker note
+5ddcfd1 | 2026-04-18 07:45:35 +0000 | governance: sync runtime state to GitHub — manifest v10 freeze, F-01..F-04 fixes
 399bd27 | 2026-04-18 04:42:28 +0000 | fix: update secretless order-fill test + telegram 429 retry hardening
 7a42f6c | 2026-04-15 12:51:24 +0000 | fix: remove orphaned TV alert aliases + mark strategies no-script
 9cff284 | 2026-04-15 12:26:28 +0000 | test: update exit-fallback test to verify cross-routing prevention
