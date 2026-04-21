@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-21
 
-> Auto-generated — last updated `2026-04-21T17:10:01Z`
+> Auto-generated — last updated `2026-04-21T18:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (2 of 27 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-21T17:10:01Z |
+| Last run | 2026-04-21T18:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -46,12 +46,12 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260421_1705 |
+| Last heartbeat file | heartbeat_20260421_1805 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
-- `binance:BTCUSDT` qty=-0.0162 @ 76177.66790123
+- `binance:BTCUSDT` qty=-0.0162 @ 76002.80016765
 - `binance:ETHUSDT` qty=0.098 @ 2264.77
 - `binance:SUIUSDT` qty=142.6 @ 0.9482
 - `binance:AVAXUSDT` qty=-59.0 @ 9.294663636363
@@ -59,7 +59,6 @@
 - `binance:XRPUSDT` qty=-14.2 @ 1.4214
 - `binance:OPUSDT` qty=-5310.0 @ 0.123999299435
 - `binance:MAGICUSDT` qty=-82.1 @ 0.062
-- `binance:BTCUSDT:EMA_Stack_15M` qty=0.003187505299436952 @ 75783.9
 
 ## Stale Position Quarantine
 | Item | Value |
@@ -86,6 +85,7 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 
 ## Commits Today (2026-04-21)
 ```
+a82dfba | 2026-04-21 17:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-21T17:10:01Z
 0f9e8a8 | 2026-04-21 16:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-21T16:10:01Z
 2d0714c | 2026-04-21 15:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-21T15:10:01Z
 e64baa1 | 2026-04-21 20:03:03 +0530 | infra: freeze auto_promote + auto-push RUNTIME_LOG to GitHub hourly
