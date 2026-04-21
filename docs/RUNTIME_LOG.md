@@ -1,6 +1,6 @@
-# Runtime Log — 2026-04-18
+# Runtime Log — 2026-04-21
 
-> Auto-generated — last updated `2026-04-18T07:10:01Z`
+> Auto-generated — last updated `2026-04-21T13:00:00Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: GO  (25/25 gates passed)** |
 | Gates passed | VERDICT: GO  (25/25 gates passed) |
-| Last run | 2026-04-18T07:10:01Z |
+| Last run | 2026-04-21T13:00:00Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -21,15 +21,15 @@
 | ALPHA (live-ready) | 2 |
 | RESEARCH (no Pine yet) | 0 |
 
-### Apr 14 Production Decision Lane
+### Production Decision Lane (ETH 4h ONLY)
 | Strategy | Symbols | Timeframe | Label |
 |---|---|---|---|
-| CCI Trend | ['*'] | ['240'] | ALPHA |
-| Donchian Trend | ['*'] | ['240'] | ALPHA |
+| CCI Trend | ['ETHUSDT'] | ['240'] | ALPHA |
+| Donchian Trend | ['ETHUSDT'] | ['240'] | ALPHA |
 
 ### All ALPHA Strategies
-- CCI Trend | ['*'] | label=ALPHA
-- Donchian Trend | ['*'] | label=ALPHA
+- CCI Trend | ['ETHUSDT'] | label=ALPHA
+- Donchian Trend | ['ETHUSDT'] | label=ALPHA
 
 ### RESEARCH (placeholder — not yet on TradingView)
 
@@ -82,7 +82,7 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 | Service | URL | Status |
 |---|---|---|
 | Webhook | https://tradingbot.operatorbrief.xyz/health | UP |
-| Dashboard | http://15.207.152.119:8501 | UP |
+| Dashboard | https://tradingbot.operatorbrief.xyz/ | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
 ## Commits Today (2026-04-18)

@@ -36,7 +36,7 @@ alpha = [a for a in candidates if str(a.get('label', '')).upper() != 'RESEARCH']
 lane_rows = ''
 for a in alpha[:2]:
     name = a['strategy']
-    syms = str(a.get('symbols', ['*']))
+    syms = str(a.get('symbols', ['ETHUSDT']))
     tf = str(a.get('timeframes', ['240']))
     label = a.get('label', '')
     lane_rows += f'| {name} | {syms} | {tf} | {label} |\n'
@@ -133,7 +133,7 @@ log = f"""# Runtime Log — {today}
 | ALPHA (live-ready) | {len(alpha)} |
 | RESEARCH (no Pine yet) | {len(research)} |
 
-### Apr 14 Production Decision Lane
+### Production Decision Lane (ETH 4h ONLY)
 | Strategy | Symbols | Timeframe | Label |
 |---|---|---|---|
 {lane_rows}
@@ -182,7 +182,7 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 | Service | URL | Status |
 |---|---|---|
 | Webhook | https://tradingbot.operatorbrief.xyz/health | UP |
-| Dashboard | http://15.207.152.119:8501 | UP |
+| Dashboard | https://tradingbot.operatorbrief.xyz/ | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
 ## Commits Today ({today})

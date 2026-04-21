@@ -1,7 +1,8 @@
 # Decision Lane Status Report
-> Auto-generated 2026-04-18 15:24 IST
+> Auto-generated 2026-04-21 IST
 > **Scope: CCI Trend + Donchian Trend on ETHUSDT 4h ONLY**
 > All other strategies are paper-only research — not part of go-live decision
+> Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
 
 ---
 
