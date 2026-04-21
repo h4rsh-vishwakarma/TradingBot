@@ -127,12 +127,15 @@ class PositionLedger:
             realized_qty = min(abs(pos.quantity), qty)
             trade_pnl = ((price - pos.avg_price) * realized_qty * direction) - fee
             
-            # Record trade in history for Hybrid scoring
+            # Record trade in history for Hybrid scoring and checkpoint audit
             self.trade_history.append({
                 "timestamp": datetime.utcnow().isoformat(),
                 "symbol": symbol,
+                "side": "SELL" if pos.quantity > 0 else "BUY",
+                "qty": realized_qty,
+                "entry_price": pos.avg_price,
+                "exit_price": price,
                 "pnl": trade_pnl,
-                "exit_price": price
             })
             
             pos.quantity += trade_qty
