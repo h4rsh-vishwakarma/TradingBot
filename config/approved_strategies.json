@@ -1,6 +1,6 @@
 {
-  "version": 10,
-  "updated_at": "2026-04-18T09:52:56Z",
+  "version": 11,
+  "updated_at": "2026-04-21T13:50:38Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -573,6 +573,25 @@
       "notes": "PF=9.06-17.29, WR=72-87%, Sharpe=2.55-3.73, DSR>0, PBO=0.00",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
+    },
+    {
+      "strategy": "EMA Stack 15M",
+      "exchange": "binance",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT"
+      ],
+      "timeframes": [
+        "15"
+      ],
+      "operator": "harsh",
+      "approved_at": "2026-04-21",
+      "backtest_hash": "tv_backtest_ema_stack_15m_pf156",
+      "label": "PERSONAL_LIVE",
+      "notes": "Personal HF strategy. EMA 5/13/50 stack scalper 15M. PF=1.56, 461 trades/6yr, SL=0.8%, TP=1.6%. Separate from ETH 4H decision lane.",
+      "approval_class": "personal_live",
+      "class_reason": "Harsh personal trading \u2014 not part of checkpoint decision lane"
     }
   ]
 }
