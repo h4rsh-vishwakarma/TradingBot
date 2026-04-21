@@ -205,3 +205,28 @@ with open('docs/RUNTIME_LOG.md', 'w') as f:
     f.write(log)
 print('Written: docs/RUNTIME_LOG.md')
 print('Length:', len(log.splitlines()), 'lines')
+
+# Auto-push to GitHub so runtime log stays fresh (replaces disabled hourly cron push)
+try:
+    _push = subprocess.run(
+        ['git', 'add', 'docs/RUNTIME_LOG.md'],
+        capture_output=True, text=True
+    )
+    _diff = subprocess.run(
+        ['git', 'diff', '--cached', '--stat'],
+        capture_output=True, text=True
+    )
+    if 'RUNTIME_LOG' in _diff.stdout:
+        subprocess.run(
+            ['git', 'commit', '-m', f'chore: auto-update RUNTIME_LOG {ts}'],
+            capture_output=True, text=True
+        )
+        subprocess.run(
+            ['git', 'push', 'origin', 'main'],
+            capture_output=True, text=True
+        )
+        print('GitHub push: RUNTIME_LOG.md updated')
+    else:
+        print('GitHub push: no changes to push')
+except Exception as _e:
+    print(f'GitHub push skipped: {_e}')

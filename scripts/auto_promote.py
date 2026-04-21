@@ -227,4 +227,13 @@ def check_and_promote():
 
 
 if __name__ == "__main__":
+    # Governance freeze guard (CEO audit A-07): block auto-promotion during checkpoint window.
+    # Remove this block only after Sainath checkpoint verdict is issued.
+    _freeze_flag = os.path.join(os.path.dirname(MANIFEST_PATH), ".auto_promote_freeze")
+    _env_freeze = os.getenv("AUTO_PROMOTE_FREEZE", "true").lower()
+    if _env_freeze == "true" or os.path.exists(_freeze_flag):
+        msg = "[auto_promote] FREEZE ACTIVE — checkpoint in progress. No promotions written. Set AUTO_PROMOTE_FREEZE=false to override."
+        print(msg)
+        send_telegram(f"⚠️ <b>Auto-Promote BLOCKED</b>\n{msg}")
+        sys.exit(0)
     check_and_promote()
