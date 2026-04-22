@@ -212,3 +212,28 @@ G-series strategies use their own backtest logic via scripts/my_strategies.py + 
 | Gate after all fixes | gate check | 26/27 PASS (only trade-count remains) |
 
 *Updated: 2026-04-22 post-checkpoint session*
+
+
+---
+
+## 11. TV Alert Cleanup — CONFIRMED DONE (Apr 22 post-checkpoint)
+
+User confirmed all rogue TradingView alerts deleted:
+
+| Alert | Symbol | Status |
+|-------|--------|--------|
+| CCI Trend alerts on LINK/AVAX/SUI/BTC | off-symbol | DELETED |
+| Donchian Trend alerts on non-ETHUSDT | off-symbol | DELETED |
+| CCI_Trend (underscore variant) | any | DELETED |
+| Donchian_Trend (underscore variant) | any | DELETED |
+| Demo_Momentum_Test (TestStrategy) | SOLUSDT | DELETED |
+| 44_PSAR_Volume_Surge | BTCUSDT | DELETED |
+
+Server-side blocklist (BLOCKED_STRATEGY_NAMES) also active as belt-and-suspenders.
+Last CCI_Trend signal received: 2026-04-19 04:01 UTC (LDOUSDT — now blocked).
+Last Donchian_Trend signal received: 2026-04-17 16:04 UTC (BTCUSDT — now blocked).
+
+Ledger reconciled after position flatten: 9 ghost positions cleaned at 09:54 UTC.
+Exchange: 0 open positions. Ledger: 0 open positions. System fully clean.
+
+*Updated: 2026-04-22 09:54 UTC*
