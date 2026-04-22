@@ -1,5 +1,5 @@
 # Decision Lane Status Report
-> Auto-regenerated 2026-04-22 15:41 IST
+> Auto-regenerated 2026-04-22 17:18 IST
 > **Scope: CCI Trend + Donchian Trend on ETHUSDT 4h ONLY**
 > All other strategies are paper-only research — not part of go-live decision
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
@@ -109,5 +109,19 @@ Key findings from CEO review:
 
 ---
 
-*This file is regenerated on demand. Last refresh: 2026-04-22 15:41 IST*
+## Garima-Side G-Item Closure (2026-04-22 17:18 IST)
+
+| Task | Status | Notes |
+|------|--------|-------|
+| G-01: Hold all promotions until gate clears | ✅ Closed | No paper_only strategy promoted. Manifest v11 unchanged. |
+| G-02: Shortlist trim done | ✅ Closed | Trim complete. Add-coverage deferred to post-verdict. |
+| G-03: search_budget wire into deployment-time DSR | 🔒 Freeze-blocked | Code wiring deferred post-verdict. Freeze discipline maintained. |
+| G-04: G88/G90 asset-routing verified (Pine + TV inventory) | ✅ Closed | G88=OPUSDT, G90=OPUSDT confirmed in TV inventory. Swap deferred post-verdict. |
+
+**Garima-side summary:** 3 of 4 G-items closed. G-03 correctly freeze-blocked — not deferred by oversight, blocked by governance freeze. No open Garima-side action items until checkpoint gate clears.
+
+
+---
+
+*This file is regenerated on demand. Last refresh: 2026-04-22 17:18 IST*
 *Do not confuse full-system RUNTIME_LOG.md with this decision-lane-only report.*
