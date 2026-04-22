@@ -29,6 +29,10 @@ QUANTITY_RULES = {
     "LTCUSDT":  (0.001, 0.001),
 }
 
+# Price tick size rules: loaded from exchangeInfo PRICE_FILTER
+# Used to round GTX limit prices and compute minimum SL distance
+PRICE_RULES: dict = {}  # symbol -> tickSize (float)
+
 def fix_quantity(symbol, quantity, price=None):
     """Adjust quantity to match Binance precision and minimum notional ($5) rules."""
     min_qty, step_size = QUANTITY_RULES.get(symbol, (0.001, 0.001))
@@ -235,7 +239,15 @@ class BinanceClient:
                 # Post-only limit at mark price → guaranteed maker fee (0.02%/side)
                 # GTX = Good-Till-Crossing (post-only), rejected if it would cross book
                 # Round price to symbol precision (8 decimal places max)
-                price_str = str(round(float(price), 8)) if price else None
+                # Round to symbol tickSize so GTX is never rejected for precision
+                _tick = PRICE_RULES.get(symbol, 0.0)
+                if _tick > 0 and price:
+                    import math as _math
+                    _prec = max(0, int(round(-_math.log10(_tick))))
+                    _rounded = round(float(price), _prec)
+                    price_str = str(_rounded)
+                else:
+                    price_str = str(round(float(price), 8)) if price else None
                 if price_str:
                     params = {
                         "symbol": symbol, "side": side, "type": "LIMIT",
@@ -279,6 +291,17 @@ class BinanceClient:
             logger.error(f"❌ Binance API Error: code={e.code} msg={e.message} status={getattr(e, 'status_code', 'N/A')}")
             if e.code == -2011:
                 return {"status": "SKIPPED", "reason": "duplicate_id", "msg": e.message}
+            if e.code == -1007:
+                # Binance backend timeout — order status genuinely unknown.
+                # Wait 2s then check actual order status before declaring failure.
+                time.sleep(2)
+                status = self.get_order_status(symbol, client_order_id)
+                if status.get("filled"):
+                    logger.info(f"✅ -1007 timeout recovered: order {client_order_id} WAS filled @ {status.get('avg_price')}")
+                    return {"status": "SUCCESS", "avg_price": status["avg_price"],
+                            "orderId": status.get("orderId"), "recovered_from_timeout": True}
+                logger.warning(f"⏱️ -1007 timeout: order {client_order_id} not filled — treating as TIMEOUT")
+                return {"status": "TIMEOUT", "client_order_id": client_order_id, "symbol": symbol}
             status_code = getattr(e, 'status_code', 0)
             if status_code in [429, 500, 502, 503, 504]:
                 raise RuntimeError(f"Transient Binance Failure: {e.message}")
@@ -302,9 +325,34 @@ class BinanceClient:
             # Stop side is opposite of entry
             stop_side = "SELL" if side == "BUY" else "BUY"
             if side == "BUY":
-                stop_price = round(entry_price * (1 - sl_pct / 100), 2)
+                stop_price = entry_price * (1 - sl_pct / 100)
             else:
-                stop_price = round(entry_price * (1 + sl_pct / 100), 2)
+                stop_price = entry_price * (1 + sl_pct / 100)
+
+            # Ensure SL is at least 3 ticks from current mark price so it never
+            # immediately triggers on micro-price coins (MAGIC, OP, LDO etc.)
+            _tick = PRICE_RULES.get(symbol, 0.0)
+            if _tick > 0:
+                try:
+                    mark = self.get_mainnet_mark_price(symbol)
+                    if mark and mark > 0:
+                        min_gap = 3 * _tick
+                        if side == "BUY":
+                            # SL must be below mark by at least min_gap
+                            if mark - stop_price < min_gap:
+                                stop_price = mark - min_gap
+                                logger.info(f"SL distance adjusted (tick floor): {symbol} stop→{stop_price:.8g}")
+                        else:
+                            # SL must be above mark by at least min_gap
+                            if stop_price - mark < min_gap:
+                                stop_price = mark + min_gap
+                                logger.info(f"SL distance adjusted (tick floor): {symbol} stop→{stop_price:.8g}")
+                except Exception:
+                    pass
+            # Round to tickSize precision
+            import math as _math
+            _prec = max(0, int(round(-_math.log10(_tick)))) if _tick > 0 else 2
+            stop_price = round(stop_price, _prec)
 
             quantity = fix_quantity(symbol, quantity, price=stop_price)
             params = {
@@ -417,7 +465,9 @@ class BinanceClient:
                         min_qty = float(f['minQty'])
                         step = float(f['stepSize'])
                         QUANTITY_RULES[sym] = (min_qty, step)
-            logger.info(f"📐 Loaded {len(QUANTITY_RULES)} symbol precision rules from exchangeInfo")
+                    elif f['filterType'] == 'PRICE_FILTER':
+                        PRICE_RULES[sym] = float(f['tickSize'])
+            logger.info(f"📐 Loaded {len(QUANTITY_RULES)} qty + {len(PRICE_RULES)} price rules from exchangeInfo")
         except Exception as e:
             logger.warning(f"⚠️ exchangeInfo fetch failed, using hardcoded rules: {e}")
 

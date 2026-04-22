@@ -643,7 +643,36 @@ class Orchestrator:
                 signal_data["secret"] = self.webhook_secret
 
             target_exchange = str(payload_raw.get("exchange") or event.get("exchange") or "binance").lower()
-            strat_name = payload_raw.get("strategy") or event.get("strategy") or "SMC"
+            strat_name_raw = payload_raw.get("strategy") or event.get("strategy")
+            if not strat_name_raw or not str(strat_name_raw).strip():
+                logger.warning(f"Signal blocked: empty strategy field — would mis-route to bare ledger key | id={signal_id}")
+                self._notify_signal_decision(
+                    title="Signal Blocked",
+                    reason="Empty strategy field. Signal rejected to prevent bare-key ledger write. Fix the TradingView alert to include the strategy name.",
+                    signal_id=signal_id,
+                    symbol=payload_raw.get("symbol", "UNKNOWN"),
+                    strategy="BARE",
+                    action=payload_raw.get("action", "N/A"),
+                    severity=AlertSeverity.WARNING,
+                )
+                return True
+            strat_name = str(strat_name_raw).strip()
+
+            # Server-side blocklist for rogue/duplicate TV alerts
+            # Set BLOCKED_STRATEGY_NAMES=CCI_Trend,Donchian_Trend,44_PSAR_Volume_Surge in env_vars
+            _blocked_names = [s.strip() for s in os.getenv("BLOCKED_STRATEGY_NAMES", "").split(",") if s.strip()]
+            if _blocked_names and strat_name in _blocked_names:
+                logger.warning(f"Signal blocked: '{strat_name}' is in BLOCKED_STRATEGY_NAMES | id={signal_id}")
+                self._notify_signal_decision(
+                    title="Signal Blocked",
+                    reason=f"Strategy '{strat_name}' is in the server-side blocklist (BLOCKED_STRATEGY_NAMES). Delete the TradingView alert for this strategy.",
+                    signal_id=signal_id,
+                    symbol=payload_raw.get("symbol", "UNKNOWN"),
+                    strategy=strat_name,
+                    action=payload_raw.get("action", "N/A"),
+                    severity=AlertSeverity.WARNING,
+                )
+                return True
             symbol_raw = str(payload_raw.get("symbol") or event.get("symbol") or "BTCUSDT").upper()
             if not self._exchange_enabled(target_exchange):
                 logger.warning(f"Exchange {target_exchange} not enabled by ALLOWED_EXCHANGES")
@@ -1018,10 +1047,12 @@ class Orchestrator:
                     logger.warning(f"Equity sizing failed, using signal qty: {e}")
 
             # Max qty cap for new entries. Exits must be allowed to close full size.
+            # Only cap if the symbol has an explicit override — no default 1.0 fallback
+            # (the 1.0 default was making MAGICUSDT/OPUSDT trades worthless at $0.06 notional)
             if not is_exit:
-                max_allowed = self.MAX_QTY.get(symbol, 1.0)
-                if qty > max_allowed:
-                    logger.warning(f"Qty capped: {qty} -> {max_allowed} for {symbol}")
+                max_allowed = self.MAX_QTY.get(symbol)
+                if max_allowed is not None and qty > max_allowed:
+                    logger.warning(f"Qty capped (symbol override): {qty} -> {max_allowed} for {symbol}")
                     qty = max_allowed
                 final_notional = abs(float(qty) * float(price_signal or 0))
                 if self.max_notional > 0 and final_notional > self.max_notional:
