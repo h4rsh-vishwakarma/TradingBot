@@ -1,5 +1,5 @@
 # Decision Lane Status Report
-> Auto-generated 2026-04-21 IST
+> Auto-regenerated 2026-04-22 15:41 IST
 > **Scope: CCI Trend + Donchian Trend on ETHUSDT 4h ONLY**
 > All other strategies are paper-only research — not part of go-live decision
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
@@ -8,13 +8,30 @@
 
 ## Decision Lane — ALPHA Strategies (ETH 4h only)
 
-| Strategy | Exchange | Symbols | Timeframe | Operator | Approved |
-|----------|----------|---------|-----------|----------|---------|
-| CCI Trend | binance | ['ETHUSDT'] | ['240'] | harsh | 2026-04-07 |
-| Donchian Trend | binance | ['ETHUSDT'] | ['240'] | harsh | 2026-04-07 |
+| Strategy | Symbols | Timeframe | Operator | Approved |
+|----------|---------|-----------|----------|---------|
+| CCI Trend | ['ETHUSDT'] | ['240'] | harsh | 2026-04-07 |
+| Donchian Trend | ['ETHUSDT'] | ['240'] | harsh | 2026-04-07 |
 
+> **TV alerts repaired 2026-04-22:** All off-symbol CCI/Donchian alerts deleted.
+> ETHUSDT 4H only alerts remain. Underscore variants deleted.
 > **ML Lorentzian demoted to paper_only 2026-04-16** per A-03 governance freeze.
-> Reinstate only after: 7-day paper window + >=5 closed trades + DSR validation.
+
+---
+
+## Gate Verdict (live as of 2026-04-22 15:41 IST)
+
+```
+VERDICT: NO-GO  (1 of 27 gates FAILED)
+[FAIL] Candidates have min closed paper trades (4H=5,1H=10,15m=20) -- CCI Trend:1(NEED 5); Donchian Trend:1(NEED 5)
+```
+
+**Gate history:**
+- Before Apr 22 session: NO-GO (3/27 FAIL)
+- After FIX-1/FIX-2 (morning): NO-GO (1/27 FAIL)
+- After FIX-3 through FIX-11 + TV cleanup (afternoon): NO-GO (1/27 FAIL)
+- **Remaining blocker:** CCI Trend needs 5 closed paper trades (has 1); Donchian Trend needs 5 (has 1)
+- **ETA to gate clear:** 8-10 business days of ETHUSDT 4H signals at historical rate
 
 ---
 
@@ -22,75 +39,75 @@
 
 | Metric | Value |
 |--------|-------|
-| Gate verdict | VERDICT: NO-GO  (1 of 25 gates FAILED) |
-| Decision-lane signals (ETH CCI+Donchian) | 0 |
-| Decision-lane completed | 0 |
-| Total system signals (all strategies) | 56 |
-| Non-lane signals (paper/research — excluded from decision evidence) | 56 |
+| Decision-lane signals (ETH CCI+Donchian, last 24h) | 0 |
+| Research/other signals (excluded from decision) | 17 |
+| Decision-lane closed trades (all-time) | 0 |
+| Decision-lane realized P&L | $0.0 |
 
-### Decision Lane Open Positions (ETHUSDT only — counts as evidence)
-| Symbol | Qty | Entry Price | Side |
-|--------|-----|-------------|------|
-| binance:ETHUSDT | 0.136 | 2324.58 | LONG |
+*No decision-lane (ETH CCI+Donchian) signals in last 24h.*
 
-### Research Lane Open Positions (paper_only — NOT decision-lane evidence)
-| Symbol | Qty | Entry Price | Note |
-|--------|-----|-------------|------|
-| binance:BTCUSDT | -0.0162 | 76177.66790123 | paper_only — NOT decision evidence |
-| binance:SUIUSDT | -330.0 | 0.9903 | paper_only — NOT decision evidence |
-| binance:AVAXUSDT | -32.0 | 9.578 | paper_only — NOT decision evidence |
-| binance:LDOUSDT | -1273.0 | 0.4216190887667 | paper_only — NOT decision evidence |
-| binance:LINKUSDT | -0.02 | 9.561 | paper_only — NOT decision evidence |
-| binance:XRPUSDT | 0.5 | 1.4463 | paper_only — NOT decision evidence |
-| binance:OPUSDT | -2000.0 | 0.1303 | paper_only — NOT decision evidence |
-| binance:MAGICUSDT | 585.0 | 0.0711051073447 | paper_only — NOT decision evidence |
-| binance:UNIUSDT | 80.0 | 3.466 | paper_only — NOT decision evidence |
-
-> **Important:** Research lane positions above are paper_only monitoring.
-> They do NOT count as decision-lane evidence for checkpoint assessment.
 
 ---
 
-## Evidence Mode — Long + Short (intentional)
+## Decision Lane Open Positions (ledger_decision.json)
 
-The decision lane runs **both LONG and SHORT** during the current paper window.
-CCI Trend and Donchian Trend are trend-following strategies that generate signals in both directions.
-Short positions are valid evidence, not bugs. Long-only mode was evaluated but rejected:
-it would halve the signal sample and bias the window. If the checkpoint requires long-only mode,
-this can be switched before the next window with a single manifest flag.
+*No open decision-lane positions — exchange and ledger clean.*
+
 
 ---
 
-## Paper-Only Research Lane (9 strategies)
+## Decision Lane Closed Trades (most recent 10)
 
-These strategies are monitored but **not eligible for capital allocation** without:
-1. 7-day closed paper window with 5+ trades
-2. DSR (Deflated Sharpe Ratio) validation
-3. Explicit promotion review by Harsh + Sainath
+*No closed decision-lane trades yet.*
 
-| Strategy | Operator | Notes |
-|----------|----------|-------|
-| G100 HigherHigh Structure | garima | PF=8.71, WR=84.5%, Sharpe=2.94, DSR>0 |
-| G88 Vortex Donchian | garima | PF=6.11, WR=80.7%, Sharpe=2.64, DSR>0 |
-| G89 Coppock Donchian | garima | PF=5.75, WR=80.1%, Sharpe=2.58, DSR>0 |
-| G90 BB PercentB RSI | garima | PF=5.06, WR=80.0%, Sharpe=2.54, DSR>0 |
-| G91 ATR Compression Breakout | garima | PF=10.88-13.49, WR=73-87%, Sharpe=2.73-3.24, DSR>0 |
-| G92 RSI Divergence MACD | garima | PF=9.61-10.54, WR=80-87%, Sharpe=2.61-2.75, DSR>0 |
-| G94 Pivot Point Reclaim | garima | PF=10.01-19.84, WR=74-85%, Sharpe=2.65-3.50, DSR>0, PBO=0.00 |
-| G95 Inside Bar Breakout | garima | PF=11.26-14.90, WR=73-85%, Sharpe=2.73-3.36, DSR>0 |
-| G99 Chande Momentum BB | garima | PF=9.06-17.29, WR=72-87%, Sharpe=2.55-3.73, DSR>0, PBO=0.00 |
 
 ---
 
-## Governance Rules
+## Research Lane Open Positions (ledger_research.json — NOT decision evidence)
 
-- **Decision scope locked:** CCI Trend + Donchian Trend on ETHUSDT 4h only
-- **Symbol enforcement (G-01):** Both ALPHA strategies restricted to ETHUSDT in manifest as of 2026-04-18
-- **Reporting split (G-02):** This file shows decision-lane-only evidence. RUNTIME_LOG.md shows full system.
-- **ML Lorentzian:** testnet research only — no live paper trades counted
-- **Combo builder output:** DISCOVERY_ONLY — hard RuntimeError guard prevents manifest promotion
-- **Promotion gate:** paper_only to ALPHA requires DSR + OOS + 5+ closed trades + Sainath review
-- **Research positions:** non-ETH open positions are paper_only and excluded from checkpoint evidence
+*No open research-lane positions — exchange and ledger clean.*
+
+Research lane realized P&L: $0.0
+
+> **Important:** Research lane positions above do NOT count as decision-lane evidence.
+> They are paper_only monitoring under A-10 lane isolation.
 
 ---
-*Auto-generated 2026-04-18 15:24 IST | Manifest v10 | Gate: VERDICT: NO-GO  (1 of 25 gates FAILED)*
+
+## Post-Checkpoint Fixes Applied (2026-04-22)
+
+| Fix | Impact |
+|-----|--------|
+| FIX-3: SL minimum tick distance | Prevents "immediately trigger" on micro-price coins |
+| FIX-4: PRICE_RULES tickSize loaded | 705 symbols get correct precision on startup |
+| FIX-5: -1007 timeout recovery | Ghost position prevention |
+| FIX-6: GTX price rounded to tickSize | Prevents precision rejection fallback to MARKET |
+| FIX-7: Empty strategy field blocked | No more bare-key ledger writes |
+| FIX-8: MAX_QTY default 1.0 removed | MAGIC/OP no longer get capped to $0.06 notional |
+| FIX-9: BLOCKED_STRATEGY_NAMES | Server-side blocklist active |
+| FIX-10: CB 5% → 8% | Stale-position drift no longer trips CB |
+| FIX-11: Env blocklist added | CCI_Trend, Donchian_Trend, 44_PSAR blocked |
+| Flatten 9 stale positions | Exchange: 0 open, Ledger: 0 open, CB baseline reset |
+| vectorbt 0.28.5 in venv | Backtesting pipeline validated |
+
+---
+
+## CEO Checkpoint Assessment (Sainath, 2026-04-22)
+
+**Status: pre-production** — well-instrumented, not yet production-ready.
+
+Key findings from CEO review:
+- GitHub now validates narrow ETH-only decision lane ✅
+- Manifest v11 explicit (2 candidates, both ETHUSDT 4H) ✅
+- TRACKER_SOURCE_OF_TRUTH.md separates lane evidence from research ✅
+- RUNTIME_LOG.md reflects v11, 2 candidates, NO-GO (1/27) ✅
+- **Remaining gap:** Too few closed decision-lane paper trades (need 5, have 1 each) ❌
+
+**What must not be widened yet:** candidate_for_tiny_capital, G94, ML Lorentzian, combos, broader asset scope.
+
+**Critical path:** ETH-only alert repair ✅ → stale position clear ✅ → execution bug fixes ✅ → wait for 5 closed ETHUSDT trades → refresh docs → checkpoint verdict.
+
+---
+
+*This file is regenerated on demand. Last refresh: 2026-04-22 15:41 IST*
+*Do not confuse full-system RUNTIME_LOG.md with this decision-lane-only report.*
