@@ -591,7 +591,7 @@
       "label": "PERSONAL_LIVE",
       "notes": "Personal HF strategy. EMA 5/13/50 stack scalper 15M. PF=1.56, 461 trades/6yr, SL=0.8%, TP=1.6%. Separate from ETH 4H decision lane.",
       "approval_class": "personal_live",
-      "class_reason": "Harsh personal trading \u2014 not part of checkpoint decision lane"
+      "class_reason": "Harsh personal trading -- not part of checkpoint decision lane"
     }
   ]
 }

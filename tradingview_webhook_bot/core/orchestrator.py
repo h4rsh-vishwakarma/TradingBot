@@ -89,6 +89,10 @@ class Orchestrator:
         self.queue_path = os.path.join(base_storage, "signals.jsonl")
         self.offset_path = os.path.join(base_storage, "signals.offset")
         self.ledger_path = os.path.join(base_storage, "ledger_state.json")
+        _dl_default = os.path.join(base_storage, "ledger_decision.json")
+        _rl_default = os.path.join(base_storage, "ledger_research.json")
+        self.decision_ledger_path = os.getenv("DECISION_LANE_LEDGER_PATH", _dl_default)
+        self.research_ledger_path = os.getenv("RESEARCH_LANE_LEDGER_PATH", _rl_default)
         self.idempotency_db = os.path.join(base_storage, "idempotency.db")
         self.dlq_path = os.path.join(base_storage, "dead_letter.jsonl")
         self.report_path = os.getenv("TOURNAMENT_REPORT_PATH",
@@ -100,9 +104,13 @@ class Orchestrator:
         self.require_approval_manifest = os.getenv("REQUIRE_APPROVAL_MANIFEST", "true").lower() == "true"
 
         self.ledger = PositionLedger(self.ledger_path)
+        self.ledger_decision = PositionLedger(self.decision_ledger_path)
+        self.ledger_research = PositionLedger(self.research_ledger_path)
         self.telegram = TelegramAlert()
         self.reconciler = Reconciler(self.ledger)
         self.sheets_logger = GoogleSheetsLogger()
+        self._sheets_wal_path = os.path.join(base_storage, "sheets_wal.jsonl")
+        self._replay_sheets_wal()
         self.analytics = AnalyticsWriter()
 
         # Dual queue: SQLite (primary, durable) + JSONL (legacy fallback)
@@ -207,6 +215,42 @@ class Orchestrator:
         self.execution_metrics_path = str(execution_metrics_path())
 
     # ── Persistent execution locks (survive restarts, safe across instances) ──
+
+    def _replay_sheets_wal(self):
+        """On startup, replay any sheet writes that were dropped on previous restart."""
+        import json as _json
+        if not os.path.exists(self._sheets_wal_path):
+            return
+        pending = []
+        try:
+            with open(self._sheets_wal_path) as _wf:
+                for _line in _wf:
+                    _line = _line.strip()
+                    if _line:
+                        try:
+                            pending.append(_json.loads(_line))
+                        except Exception:
+                            pass
+        except Exception as _re:
+            logger.warning(f"WAL read failed: {_re}")
+            return
+        if not pending:
+            return
+        logger.info(f"WAL replay: {len(pending)} pending sheet write(s) from previous run")
+        replayed = 0
+        for _rec in pending:
+            try:
+                _rec_clean = {k: v for k, v in _rec.items() if k != '_wal_id'}
+                self.sheets_logger.log_trade(**_rec_clean)
+                replayed += 1
+            except Exception as _re2:
+                logger.warning(f"WAL replay entry failed: {_re2}")
+        # Clear WAL after replay attempt
+        try:
+            open(self._sheets_wal_path, 'w').close()
+        except Exception:
+            pass
+        logger.info(f"WAL replay done: {replayed}/{len(pending)} entries written to sheet")
 
     def _load_exec_locks(self):
         """Load persisted symbol execution locks from disk."""
@@ -353,6 +397,18 @@ class Orchestrator:
         if approval_class.lower() == "paper_only":
             return self.exchange_binance_research
         return self.exchange_binance
+
+    def _ledger_for(self, approval_class: str):
+        ac = approval_class.lower()
+        if ac == "paper_only":
+            return self.ledger_research
+        live_classes = {c.strip().lower() for c in os.getenv(
+            "LIVE_APPROVAL_CLASSES",
+            "candidate_for_tiny_capital,live_approved,approved,personal_live"
+        ).split(",")}
+        if ac in live_classes:
+            return self.ledger_decision
+        return self.ledger
 
     def _notify_signal_decision(self, title: str, reason: str, signal_id: str = "", symbol: str = "",
                                 strategy: str = "", action: str = "", severity=AlertSeverity.INFO):
@@ -681,6 +737,7 @@ class Orchestrator:
             else:
                 _approval_class = self._get_approval_class(strat_name, symbol, target_exchange)
             _active_binance = self._binance_client_for(_approval_class)
+            _active_ledger = self._ledger_for(_approval_class)
 
             # --- 1.5. SIGNAL DEDUP CHECK ---
             if self._is_duplicate_signal(strat_name, symbol, side_hint):
@@ -835,7 +892,7 @@ class Orchestrator:
             if not is_exit:
                 try:
                     # Check exact strategy key first
-                    current_check = self.ledger.get_position(ledger_pos_key)
+                    current_check = _active_ledger.get_position(ledger_pos_key)
                     pos_qty = float(current_check.quantity)
                     # Cross-strategy position matching DISABLED 2026-04-15
                     # Rationale: exit signals must only close the same strategy's position.
@@ -853,7 +910,7 @@ class Orchestrator:
             if is_exit:
                 strategy_pos_key = ledger_pos_key
                 aggregate_pos_key = f"{target_exchange}:{symbol}"
-                current_pos = self.ledger.get_position(strategy_pos_key)
+                current_pos = _active_ledger.get_position(strategy_pos_key)
                 if current_pos.quantity == 0:
                     # Cross-strategy aggregate fallback DISABLED 2026-04-15
                     # Exit must match the exact strategy key — no cross-routing.
@@ -1037,13 +1094,13 @@ class Orchestrator:
             # --- 7. LOGGING & ALERTS ---
             if execution_res.get("status") == "SUCCESS":
                 self.idempotency.mark_seen(signal_id)
-                pre_snapshot = self.ledger.get_position(ledger_pos_key).model_copy(deep=True)
+                pre_snapshot = _active_ledger.get_position(ledger_pos_key).model_copy(deep=True)
                 # Resolve actual filled qty from exchange response (fix_quantity rounds up inside
                 # execute_futures_order, so ledger must use the same adjusted qty to avoid drift).
                 _exec_qty = float(execution_res.get("executedQty") or execution_res.get("origQty") or 0)
                 ledger_qty = _exec_qty if _exec_qty > 0 else qty
                 try:
-                    pos_snapshot = self.ledger.apply_fill(ledger_pos_key, side, ledger_qty, fill_price)
+                    pos_snapshot = _active_ledger.apply_fill(ledger_pos_key, side, ledger_qty, fill_price)
                 except Exception as e:
                     logger.critical(f"LEDGER WRITE FAILED: {e}. Trade OK but ledger desynced!")
                     def _alert_desync():
@@ -1052,7 +1109,7 @@ class Orchestrator:
                                 message=f"Ledger write failed for {side} {qty} {symbol} @ {fill_price}. MANUAL FIX NEEDED.", force=True)
                         except: pass
                     self._thread_pool.submit(_alert_desync)
-                    pos_snapshot = self.ledger.get_position(ledger_pos_key)
+                    pos_snapshot = _active_ledger.get_position(ledger_pos_key)
 
                 self._mark_symbol_traded(symbol, strat_name)
 
@@ -1132,12 +1189,44 @@ class Orchestrator:
                         logger.warning(f"TP placement failed for {symbol}: {tp_res.get('msg')}")
 
                 self.processed_count += 1
-                # Async: non-blocking Sheets write
-                def _log_trade():
+                # Write-ahead log (WAL): persist record synchronously so it survives a restart.
+                # The thread pool task clears the WAL entry on success; startup replays any leftovers.
+                import json as _wjson, uuid as _wuuid
+                _wal_id = str(_wuuid.uuid4())[:12]
+                _wal_rec = {
+                    "_wal_id": _wal_id,
+                    "signal_id": signal_id,
+                    "symbol": f"{target_exchange.upper()}:{symbol}",
+                    "action": side,
+                    "qty": qty,
+                    "price": fill_price,
+                    "strategy": strat_name,
+                    "indicator": indicator_name,
+                    "pnl": pos_snapshot.daily_realized_pnl,
+                }
+                try:
+                    with open(self._sheets_wal_path, "a") as _walf:
+                        _walf.write(_wjson.dumps(_wal_rec) + "\n")
+                except Exception as _wex:
+                    logger.warning(f"WAL write failed: {_wex}")
+
+                # Async: non-blocking Sheets write; clears WAL entry on success
+                def _log_trade(_rec=_wal_rec):
                     try:
-                        self.sheets_logger.log_trade(signal_id=signal_id, symbol=f"{target_exchange.upper()}:{symbol}",
-                            action=side, qty=qty, price=fill_price, strategy=strat_name, indicator=indicator_name,
-                            pnl=pos_snapshot.daily_realized_pnl)
+                        self.sheets_logger.log_trade(
+                            signal_id=_rec["signal_id"], symbol=_rec["symbol"],
+                            action=_rec["action"], qty=_rec["qty"], price=_rec["price"],
+                            strategy=_rec["strategy"], indicator=_rec["indicator"],
+                            pnl=_rec["pnl"])
+                        # Remove this entry from WAL now that it's safely in sheets
+                        try:
+                            _wid = _rec["_wal_id"]
+                            with open(self._sheets_wal_path) as _rf:
+                                _lines = [l for l in _rf if _wid not in l]
+                            with open(self._sheets_wal_path, "w") as _wf2:
+                                _wf2.writelines(_lines)
+                        except Exception:
+                            pass
                     except Exception as e:
                         logger.warning(f"Sheets trade log failed (async): {e}")
                 self._thread_pool.submit(_log_trade)

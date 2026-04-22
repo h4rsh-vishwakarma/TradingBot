@@ -48,6 +48,11 @@ def _build_orchestrator(tmp_path):
     orch.allow_real = True
     orch.daily_loss_limit = -50.0
     orch.ledger_path = str(tmp_path / "ledger_state.json")
+    orch.ledger = MagicMock()
+    orch.ledger_decision = MagicMock()
+    orch.ledger_research = MagicMock()
+    orch.exchange_binance_research = MagicMock()
+    orch._sheets_wal_path = str(tmp_path / "sheets_wal.jsonl")
     orch.dlq_path = str(tmp_path / "dead_letter.jsonl")
     orch.approval_manifest_path = str(manifest_path)
     orch.require_approval_manifest = True

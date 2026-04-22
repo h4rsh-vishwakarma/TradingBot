@@ -87,7 +87,7 @@ def load_manifest() -> tuple[dict, list[dict]]:
 
 
 def manifest_scope_summary(approvals: list[dict]) -> tuple[bool, str, list[dict]]:
-    valid_classes = {"paper_only", "candidate_for_tiny_capital"}
+    valid_classes = {"paper_only", "candidate_for_tiny_capital", "personal_live"}
     missing = []
     invalid = []
     candidates = []
@@ -337,7 +337,10 @@ def stale_position_gate() -> tuple[bool, str]:
     acknowledged and skipped — they must still be flattened before go-live.
     """
     import json as _json
-    ledger_path = os.getenv("LEDGER_PATH",
+    # A-10: use decision-lane ledger when available, fall back to combined ledger_state.json
+    _dl_path = os.getenv("DECISION_LANE_LEDGER_PATH",
+        str(PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "ledger_decision.json"))
+    ledger_path = _dl_path if os.path.exists(_dl_path) else os.getenv("LEDGER_PATH",
         str(PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "ledger_state.json"))
     manifest_path = PROJECT_ROOT / "config" / "approved_strategies.json"
     quarantine_path = PROJECT_ROOT / "storage" / "stale_position_quarantine.json"
