@@ -137,3 +137,78 @@ assuming 1 ETHUSDT 4h signal every 2-3 days (historical rate from Apr 7-10).
 
 *Sources: recon_20260407.txt through recon_20260422.txt, signal_queue.db, ledger_state.json*
 *Committed as 211354e: sheets WAL + gate fixes for Apr 22 checkpoint*
+---
+
+## 8. G88/G90 Target Symbol Confirmation
+
+**Question raised:** Garima audit found G88 Vortex Donchian and G90 BB PercentB RSI fired on OPUSDT
+during paper window. Shortlist has XRPUSDT as target. Which symbol is authoritative?
+
+**Finding from server data (ledger_state.json + signal_queue.db):**
+- `binance:OPUSDT:G88 Vortex Donchian` — 1 trade recorded, OPUSDT
+- `binance:OPUSDT:G90 BB PercentB RSI` — 1 trade recorded, OPUSDT
+
+**Root cause:** Garimas Pine scripts have hardcoded or alert fired from OP chart.
+
+
+---
+
+## 8. G88/G90 Target Symbol Confirmation
+
+**Question raised:** Garima audit found G88 Vortex Donchian and G90 BB PercentB RSI fired on OPUSDT
+during paper window. Shortlist has XRPUSDT as target. Which symbol is authoritative?
+
+**Finding from server data (ledger_state.json + signal_queue.db):**
+- ledger key: binance:OPUSDT:G88 Vortex Donchian — 1 trade recorded, OPUSDT
+- ledger key: binance:OPUSDT:G90 BB PercentB RSI — 1 trade recorded, OPUSDT
+
+**Root cause:** Garima's Pine scripts alert fired from OP chart, not XRP chart.
+The manifest entry for G88/G90 is research lane with no symbol restriction.
+
+**Decision needed from Sainath/Garima:**
+- If shortlist target is XRPUSDT: Garima must update Pine alert to fire from XRPUSDT 4H chart
+- If OPUSDT trades are valid: ledger is correct as-is, no action needed
+- No XRPUSDT signals from G88/G90 found in signal_queue.db — all were OPUSDT
+
+**Server verdict:** G88/G90 are paper_only research lane, not decision lane.
+Their symbol does not affect go-live gate. Garima must fix Pine alert chart source.
+
+---
+
+## 9. vectorbt Syslog Proof
+
+**vectorbt version:** 0.28.5 (installed in venv 2026-04-22)
+**Proof run:** ETHUSDT 4H EMA9/21 crossover backtest on 3-year data (ETHUSDT_3y_4h.csv)
+
+Syslog entries written at Apr 22 09:41 UTC (/var/log/syslog tag: tradingbot-vectorbt):
+
+    vectorbt proof started | version=0.28.5 | data=ETHUSDT_3y_4h.csv
+    vectorbt proof result: [2026-04-22 09:41:12 UTC] vectorbt=0.28.5 | ETHUSDT 4H EMA9/21 |
+    n_trades=157 | WR=24.8% | total_return=-14.75% | sharpe=0.064 | max_dd=-56.9%
+
+**Proof log:** storage/reports/vectorbt_proof.log
+**Script:** scripts/vectorbt_proof.py
+
+Note: EMA9/21 is intentionally a simple strategy to prove the vectorbt pipeline works end-to-end.
+G-series strategies use their own backtest logic via scripts/my_strategies.py + pandas/numpy.
+
+---
+
+## 10. Post-Checkpoint Fixes Applied (Same Day)
+
+| Fix | Commit | Status |
+|-----|--------|--------|
+| FIX-3 SL minimum tick distance | 0522c32 | DONE |
+| FIX-4 PRICE_RULES tickSize loaded | 0522c32 | DONE |
+| FIX-5 -1007 timeout recovery | 0522c32 | DONE |
+| FIX-6 GTX price rounded to tickSize | 0522c32 | DONE |
+| FIX-7 Bare-key signal block | 0522c32 | DONE |
+| FIX-8 MAX_QTY default 1.0 removed | 0522c32 | DONE |
+| FIX-9 BLOCKED_STRATEGY_NAMES env blocklist | 0522c32 | DONE |
+| FIX-10 CB threshold 5% to 8% | 0522c32 | DONE |
+| FIX-11 BLOCKED list in env_vars | 0522c32 | DONE |
+| Flatten 8 stale positions | manual | DONE -- all 9 positions flat |
+| vectorbt in venv | pip install | DONE -- v0.28.5 confirmed |
+| Gate after all fixes | gate check | 26/27 PASS (only trade-count remains) |
+
+*Updated: 2026-04-22 post-checkpoint session*
