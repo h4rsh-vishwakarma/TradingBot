@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-22
 
-> Auto-generated — last updated `2026-04-22T02:10:01Z`
+> Auto-generated — last updated `2026-04-22T03:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,9 +8,9 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (2 of 27 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (3 of 27 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-22T02:10:01Z |
+| Last run | 2026-04-22T03:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -46,12 +46,12 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260422_0205 |
-| Verdict | HEALTHY |
+| Last heartbeat file | heartbeat_20260422_0305 |
+| Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions
-- `binance:BTCUSDT` qty=-0.0162 @ 76002.80016765
+- `binance:BTCUSDT` qty=-0.0194 @ 76129.54446989
 - `binance:ETHUSDT` qty=0.098 @ 2264.77
 - `binance:SUIUSDT` qty=142.6 @ 0.9482
 - `binance:AVAXUSDT` qty=-59.0 @ 9.294663636363
@@ -85,6 +85,7 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 
 ## Commits Today (2026-04-22)
 ```
+216cbe3 | 2026-04-22 02:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-22T02:10:01Z
 bee2b03 | 2026-04-22 01:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-22T01:10:01Z
 bd1b626 | 2026-04-22 00:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-22T00:10:02Z
 50b07df | 2026-04-21 23:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-21T23:10:02Z
