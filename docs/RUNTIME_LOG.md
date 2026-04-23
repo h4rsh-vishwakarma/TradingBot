@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-23
 
-> Auto-generated — last updated `2026-04-23T02:10:01Z`
+> Auto-generated — last updated `2026-04-23T03:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,9 +8,9 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (1 of 27 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (2 of 27 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-23T02:10:01Z |
+| Last run | 2026-04-23T03:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -46,8 +46,8 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260423_0205 |
-| Verdict | HEALTHY |
+| Last heartbeat file | heartbeat_20260423_0305 |
+| Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions -- Decision Lane (Harsh / live-approved)
@@ -83,6 +83,7 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 
 ## Commits Today (2026-04-23)
 ```
+733f3ef | 2026-04-23 02:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-23T02:10:01Z
 51b9b47 | 2026-04-23 01:10:02 +0000 | chore: auto-update RUNTIME_LOG 2026-04-23T01:10:01Z
 22cbd74 | 2026-04-23 00:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-23T00:10:01Z
 71061fc | 2026-04-22 23:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-22T23:10:01Z
