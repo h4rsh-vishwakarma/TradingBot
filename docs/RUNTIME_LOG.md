@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-23
 
-> Auto-generated — last updated `2026-04-23T13:10:02Z`
+> Auto-generated — last updated `2026-04-23T14:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,13 +10,13 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (2 of 27 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-23T13:10:02Z |
+| Last run | 2026-04-23T14:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
-| Version | v12 |
-| Updated | 2026-04-23T09:55:42Z |
+| Version | v14 |
+| Updated | 2026-04-23T13:47:09.093889+00:00 |
 | Total candidates | 2 |
 | ALPHA (live-ready) | 2 |
 | RESEARCH (no Pine yet) | 0 |
@@ -46,7 +46,7 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260423_1305 |
+| Last heartbeat file | heartbeat_20260423_1405 |
 | Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
@@ -83,6 +83,8 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 
 ## Commits Today (2026-04-23)
 ```
+78460bb | 2026-04-23 13:49:39 +0000 | fix(audit): fix all 15 issues found in full application audit
+b5be85a | 2026-04-23 13:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-23T13:10:02Z
 b090526 | 2026-04-23 12:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-23T12:10:01Z
 cdd6191 | 2026-04-23 11:33:46 +0000 | fix(report): 3 bugs in daily top-10 — REJECT filter, diversity bypass, add live section
 595ed7a | 2026-04-23 11:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-23T11:10:01Z
