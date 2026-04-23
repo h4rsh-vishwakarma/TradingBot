@@ -134,6 +134,12 @@ def rank_and_emit(
         return 1
 
     total_rows = len(df)
+    # Pre-filter: strip REJECT tier and statistically useless 1-trade entries
+    HARD_TRADE_FLOOR = 20
+    if "Tier" in df.columns:
+        df = df[~df["Tier"].str.contains("REJECT", na=False)].copy()
+    if "Total_Trades" in df.columns:
+        df = df[df["Total_Trades"] >= HARD_TRADE_FLOOR].copy()
     filter_mode = "bypass"
     filtered = df
 
@@ -163,8 +169,8 @@ def rank_and_emit(
     # they fail the quality floor. This gives the user visibility into the
     # discovery pipeline output alongside the filter-passing rows.
     if diversify and "Source" in df.columns:
-        # Full df, scored but not filtered — for diversity picking
-        df_scored = df.sort_values("Risk_Adjusted_Score", ascending=False).copy()
+        # Use filtered df so quality gate is respected during diversity pick
+        df_scored = filtered.sort_values("Risk_Adjusted_Score", ascending=False).copy()
         df_scored["Rank"] = range(1, len(df_scored) + 1)
         df_scored["Filter_Mode"] = filter_mode
         top_out = _diversify_by_source(df_scored, top_n=top_n, min_per_source=2)
