@@ -500,9 +500,11 @@ def min_closed_trades_gate(candidates: list[dict]) -> tuple[bool, str]:
                     continue
                 if not rec.get("is_exit"):
                     continue
-                strat = str(rec.get("strategy", "")).strip()
+                strat = str(rec.get(strategy, )).strip()
+                rec_sym = str(rec.get(symbol, )).upper().strip()
                 if strat:
-                    strategy_exits[strat] = strategy_exits.get(strat, 0) + 1
+                    strategy_exits.setdefault(strat, {})
+                    strategy_exits[strat][rec_sym] = strategy_exits[strat].get(rec_sym, 0) + 1
     except Exception as exc:
         return False, f"Error reading execution_metrics.jsonl: {exc}"
 
@@ -512,9 +514,13 @@ def min_closed_trades_gate(candidates: list[dict]) -> tuple[bool, str]:
         name = str(cand.get('strategy', 'unknown'))
         name_norm = _normalize_strat_name(name)
         count = 0
-        for telemetry_name, c in strategy_exits.items():
+        for telemetry_name, sym_counts in strategy_exits.items():
             if _normalize_strat_name(telemetry_name) == name_norm:
-                count += c
+                # Only count exits on symbols approved for this candidate
+                cand_syms = [str(s).upper() for s in (cand.get('symbols') or [])]
+                for sym, c in sym_counts.items():
+                    if '*' in cand_syms or sym in cand_syms:
+                        count += c
         tf = str((cand.get('timeframes') or ['4h'])[0])
         threshold = _min_trades_for_timeframe(tf)
         ok = count >= threshold

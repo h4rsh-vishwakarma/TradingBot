@@ -58,7 +58,7 @@ class PositionLedger:
             os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
             data = {
                 "positions": {s: p.model_dump() for s, p in self.positions.items()},
-                "trade_history": self.trade_history[-50:]
+                "trade_history": self.trade_history[-500:]
             }
             # Atomic write: write to temp file, then rename
             dir_name = os.path.dirname(self.storage_path)

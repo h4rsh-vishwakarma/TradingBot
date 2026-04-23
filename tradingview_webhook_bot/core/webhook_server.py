@@ -4,6 +4,12 @@ import sys, os, json, time, re, csv, threading
 from pathlib import Path
 from flask import Flask
 from flask import request, jsonify
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    _LIMITER_AVAILABLE = True
+except ImportError:
+    _LIMITER_AVAILABLE = False
 from tradingview_webhook_bot.core.metrics import metrics
 from datetime import datetime
 
@@ -265,6 +271,14 @@ class WebhookServer:
 
     def __init__(self, config, signals_queue_file):
         self.app = Flask(__name__)
+        if _LIMITER_AVAILABLE:
+            self._limiter = Limiter(
+                get_remote_address, app=self.app,
+                default_limits=["200 per minute"],
+                storage_uri="memory://",
+            )
+        else:
+            self._limiter = None
         self.config = config
         raw_secret = config['webhook']['secret'].strip()
         # Resolve ${ENV_VAR} references in secret
@@ -415,6 +429,13 @@ class WebhookServer:
     def setup_routes(self):
         @self.app.route('/webhook/tradingview', methods=['POST'])
         def receive_signal():
+            # Flask-Limiter rate check (60 req/min per IP)
+            if self._limiter:
+                from flask_limiter.errors import RateLimitExceeded
+                try:
+                    self._limiter.check()
+                except Exception:
+                    return jsonify({'error': 'rate limit exceeded'}), 429
             try:
                 # Rate limiting
                 if self._check_rate_limit():

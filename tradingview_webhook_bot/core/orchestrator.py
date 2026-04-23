@@ -277,13 +277,17 @@ class Orchestrator:
         except Exception as e:
             logger.warning(f"Could not persist exec lock for {symbol}: {e}")
 
-    def _is_candle_locked(self, symbol: str, side: str) -> bool:
-        lock = self._candle_lock.get(symbol)
+    def _is_candle_locked(self, symbol: str, side: str, strategy: str = "") -> bool:
+        # Key is (symbol, strategy) so two different strategies on same symbol don't block each other.
+        key = f"{symbol}:{strategy}" if strategy else symbol
+        lock = self._candle_lock.get(key) or self._candle_lock.get(symbol)
         if not lock:
             return False
         elapsed = time.time() - lock["time"]
+        lock_key = f"{symbol}:{lock.get('strategy', '')}" if lock.get('strategy') else symbol
         if elapsed >= self.CANDLE_LOCK_SECONDS:
-            del self._candle_lock[symbol]
+            self._candle_lock.pop(lock_key, None)
+            self._candle_lock.pop(symbol, None)
             return False
         if lock["side"] != side:
             logger.info(f"Candle Lock: {symbol} locked to {lock.get('side', '')} by {lock.get('strategy', '')} ({self.CANDLE_LOCK_SECONDS - elapsed:.0f}s left). Blocking {side}.")
@@ -291,8 +295,9 @@ class Orchestrator:
         return False
 
     def _set_candle_lock(self, symbol: str, side: str, strategy: str):
-        self._candle_lock[symbol] = {"side": side, "time": time.time(), "strategy": strategy}
-        logger.info(f"Candle locked: {symbol} -> {side} by {strategy} for {self.CANDLE_LOCK_SECONDS}s")
+        key = f"{symbol}:{strategy}" if strategy else symbol
+        self._candle_lock[key] = {"side": side, "time": time.time(), "strategy": strategy}
+        logger.info(f"Candle locked: {symbol}/{strategy} -> {side} for {self.CANDLE_LOCK_SECONDS}s")
 
     @staticmethod
     def _normalize_strategy(name):
@@ -357,7 +362,7 @@ class Orchestrator:
                     cls.strip().lower()
                     for cls in os.getenv(
                         "LIVE_APPROVAL_CLASSES",
-                        "candidate_for_tiny_capital,live_approved,approved",
+                        "candidate_for_tiny_capital,live_approved,approved,personal_live",
                     ).split(",")
                     if cls.strip()
                 }
@@ -800,7 +805,7 @@ class Orchestrator:
                 return True
 
             # --- 1.7. CANDLE LOCK ---
-            if self._is_candle_locked(symbol, side_hint):
+            if self._is_candle_locked(symbol, side_hint, strat_name):
                 try:
                     self.sheets_logger.log_blocked_trade(
                         symbol=symbol, side=side_hint, strategy=strat_name,

@@ -15,11 +15,19 @@
   },
   "trading": {
     "symbols_allowed": [
-      "SUIUSDT",
-      "INJUSDT",
+      "AAVEUSDT",
+      "ARBUSDT",
+      "AVAXUSDT",
+      "BTCUSDT",
+      "ETHUSDT",
       "LDOUSDT",
+      "LINKUSDT",
+      "MAGICUSDT",
       "NEARUSDT",
-      "APTUSDT"
+      "OPUSDT",
+      "SOLUSDT",
+      "SUIUSDT",
+      "XRPUSDT"
     ],
     "timeframes_allowed": [
       "1",

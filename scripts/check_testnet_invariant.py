@@ -43,6 +43,17 @@ def live_approval_classes() -> set[str]:
 def check() -> tuple[bool, str]:
     classes = live_approval_classes()
     testnet = is_testnet()
+    allow_real = os.getenv("ALLOW_REAL_TRADES", "false").strip().lower() == "true"
+
+    # Guard: ALLOW_REAL_TRADES=true on mainnet means real capital is live.
+    # Fire a loud warning so an accidental env flip is caught immediately.
+    if allow_real and not testnet:
+        return False, (
+            "SAFETY GUARD: ALLOW_REAL_TRADES=true and at least one exchange is on MAINNET. "
+            "This means real capital trades will execute. If this is intentional, set "
+            "LIVE_TRADING_CONFIRMED=true in env_vars to acknowledge and bypass this guard."
+        )
+
     if "paper_only" in classes and not testnet:
         return False, (
             "TESTNET INVARIANT VIOLATED: LIVE_APPROVAL_CLASSES contains \"paper_only\" "
