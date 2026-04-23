@@ -1,597 +1,629 @@
 {
-  "version": 11,
-  "updated_at": "2026-04-21T13:50:38Z",
-  "approvals": [
-    {
-      "strategy": "CCI Trend",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-07T10:23:25Z",
-      "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
-      "label": "ALPHA",
-      "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['LDOUSDT', 'ETHUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance."
-    },
-    {
-      "strategy": "Donchian Trend",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-07T10:23:28Z",
-      "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
-      "label": "ALPHA",
-      "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['ETHUSDT', 'SUIUSDT', 'LDOUSDT', 'LINKUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance."
-    },
-    {
-      "strategy": "G19 Donchian Volume Surge",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-13T12:09:19Z",
-      "backtest_hash": "manual_approval_g19_donchian_volume_surge_202604131209",
-      "label": "ALPHA",
-      "notes": "TV PF=18.97, WR=85%, 699 trades",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G15 Aroon Donchian Breakout",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-13T12:09:44Z",
-      "backtest_hash": "manual_approval_g15_aroon_donchian_breakout_202604131209",
-      "label": "ALPHA",
-      "notes": "TV PF=15.29, WR=84.2%",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "RSI_x_BB_x_PSAR",
-      "exchange": "binance",
-      "symbols": [
-        "ARBUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-13T12:11:30Z",
-      "backtest_hash": "combo_oos_RSI_x_BB_x_PSAR_ARBUSDT_20260413",
-      "label": "RESEARCH",
-      "notes": "Auto-discovered combo: RSI oversold + BB bounce + PSAR flip. OOS PF=127.108 WR=72.7% DD=-0.04%. Pine: strategies/pine_combos/",
-      "approval_class": "paper_only",
-      "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days.",
-      "oos_pf": 127.108,
-      "oos_wr": 72.7,
-      "oos_dd": -0.04
-    },
-    {
-      "strategy": "CCI_x_STOCH_x_OBV",
-      "exchange": "binance",
-      "symbols": [
-        "NEARUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-13T12:11:30Z",
-      "backtest_hash": "combo_oos_CCI_x_STOCH_x_OBV_NEARUSDT_20260413",
-      "label": "RESEARCH",
-      "notes": "Auto-discovered combo: CCI extreme + Stoch oversold + OBV trend. OOS PF=22.167 WR=62.5% DD=-0.57%.",
-      "approval_class": "paper_only",
-      "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days.",
-      "oos_pf": 22.167,
-      "oos_wr": 62.5,
-      "oos_dd": -0.57
-    },
-    {
-      "strategy": "RSI_x_PSAR_x_STREND",
-      "exchange": "binance",
-      "symbols": [
-        "ARBUSDT",
-        "AAVEUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-13T12:11:30Z",
-      "backtest_hash": "combo_oos_RSI_x_PSAR_x_STREND_20260413",
-      "label": "RESEARCH",
-      "notes": "Auto-discovered combo: RSI oversold + PSAR flip + Supertrend. ARB: PF=12.873 WR=65.4% DD=-0.88% | AAVE: PF=12.651 WR=52.4% DD=-1.06%.",
-      "approval_class": "paper_only",
-      "class_reason": "Demoted 2026-04-15: zero signals received across full history. No TradingView alert deployed. Cannot generate live testnet data.",
-      "oos_pf": 12.873,
-      "oos_wr": 65.4,
-      "oos_dd": -0.88
-    },
-    {
-      "strategy": "RSI_x_PSAR_x_OBV",
-      "exchange": "binance",
-      "symbols": [
-        "LINKUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-13T12:11:30Z",
-      "backtest_hash": "combo_oos_RSI_x_PSAR_x_OBV_LINKUSDT_20260413",
-      "label": "RESEARCH",
-      "notes": "Auto-discovered combo: RSI oversold + PSAR flip + OBV trend. OOS PF=8.619 WR=56.2% DD=-0.44%.",
-      "approval_class": "paper_only",
-      "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days.",
-      "oos_pf": 8.619,
-      "oos_wr": 56.2,
-      "oos_dd": -0.44
-    },
-    {
-      "strategy": "G28 Donchian Short14",
-      "exchange": "binance",
-      "symbols": [
-        "SUIUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-13T13:14:24Z",
-      "backtest_hash": "manual_approval_g28_donchian_short14_202604131314",
-      "label": "ALPHA",
-      "notes": "TV PF=10.13, WR=86.5%, ROI/d=0.77%, DD=-1.62%, 518 trades",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G68 OBV CCI Cross",
-      "exchange": "binance",
-      "symbols": [
-        "SUIUSDT",
-        "MAGICUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-13T13:14:40Z",
-      "backtest_hash": "manual_approval_g68_obv_cci_cross_202604131314",
-      "label": "ALPHA",
-      "notes": "TV PF=9.48-12.61, WR=83-85%, ROI/d=0.78-0.83%, DD=-1.62%",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G27 CCI Donchian Wide",
-      "exchange": "binance",
-      "symbols": [
-        "SUIUSDT",
-        "LDOUSDT",
-        "MAGICUSDT",
-        "AVAXUSDT",
-        "LINKUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-13T13:19:38Z",
-      "backtest_hash": "manual_approval_g27_cci_donchian_wide_202604131319",
-      "label": "ALPHA",
-      "notes": "TV PF 8-11, WR 83-85 pct, ROI/d 0.9-1.1 pct, DD under 3.2 pct",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G79 Fisher Donchian",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT",
-        "XRPUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-14T06:58:50Z",
-      "backtest_hash": "manual_approval_g79_fisher_donchian_202604140631",
-      "label": "ALPHA",
-      "notes": "Fisher Transform cross. ETH: CAGR=3890%, ROI/day=1.01%, champion of batch. XRP: CAGR=2297%, PF=12-16. DOT excluded \u2014 17-26% DD across all G-family, unsafe.",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G80 UO Donchian",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT",
-        "XRPUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-14T06:31:43Z",
-      "backtest_hash": "manual_approval_g80_uo_donchian_202604140631",
-      "label": "ALPHA",
-      "notes": "Ultimate Oscillator 50 cross, TV PF 10-13, CAGR 926-1255 pct",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G83 DeMarker Donchian",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT",
-        "XRPUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-14T06:32:04Z",
-      "backtest_hash": "manual_approval_g83_demarker_donchian_202604140632",
-      "label": "ALPHA",
-      "notes": "DeMarker 0.3 0.7 cross, TV PF 11-18 ETH, CAGR 324-549 pct",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G86 Klinger Donchian",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT",
-        "XRPUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-14T06:32:32Z",
-      "backtest_hash": "manual_approval_g86_klinger_donchian_202604140632",
-      "label": "ALPHA",
-      "notes": "Klinger Volume Osc, TV PF 12-14, CAGR 1033-1569 pct",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G77 ROC Donchian",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT",
-        "XRPUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-14T06:32:42Z",
-      "backtest_hash": "manual_approval_g77_roc_donchian_202604140632",
-      "label": "ALPHA",
-      "notes": "ROC 12 cross, TV PF 13-16, CAGR 770-1121 pct",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G81 TSI Donchian",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT",
-        "XRPUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-14T06:32:53Z",
-      "backtest_hash": "manual_approval_g81_tsi_donchian_202604140632",
-      "label": "ALPHA",
-      "notes": "True Strength Index zero cross, TV PF 11-14, CAGR 348-589 pct",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G84 VWMA Cross Donchian",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT",
-        "XRPUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-14T06:33:44Z",
-      "backtest_hash": "manual_approval_g84_vwma_cross_donchian_202604140633",
-      "label": "ALPHA",
-      "notes": "VWMA 20 50 cross, TV PF 12-13, CAGR 334-540 pct",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G45_CCI Donchian Fusion",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT",
-        "LINKUSDT",
-        "SOLUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-14T13:16:04Z",
-      "backtest_hash": "manual_approval_g45_cci_donchian_fusion_202604141316",
-      "label": "ALPHA",
-      "notes": "TV PF 18.48 ETH, WR 85.4 pct, DD 1.61 pct",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "ML Lorentzian Classification",
-      "exchange": "binance",
-      "symbols": [
-        "*"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-15T12:00:00Z",
-      "backtest_hash": "backtest_ml_lorentzian_LDOUSDT_4h_20260415",
-      "label": "RESEARCH",
-      "notes": "ML Lorentzian Classification (JdeP). LDOUSDT 4h. Sharpe=7.28, PF=high, DD low. Kernel regression + k-NN feature space. Approved for testnet live execution. | symbols widened to wildcard 2026-04-15: existing TV alert sends SOLUSDT; primary target LDOUSDT 4h.",
-      "approval_class": "paper_only",
-      "class_reason": "Demoted from candidate_for_tiny_capital to paper_only 2026-04-16 per A-03 governance freeze. Backtest-only evidence (Sharpe=7.28 on LDOUSDT 4h). No live paper signals confirmed yet. Reinstate to candidate_for_tiny_capital only after 7-day paper window with >=5 closed trades and DSR validation.",
-      "demoted_at": "2026-04-16T13:00:00Z"
-    },
-    {
-      "strategy": "Machine Learning Lorentzian Classification",
-      "exchange": "binance",
-      "symbols": [
-        "*"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-15T12:00:00Z",
-      "backtest_hash": "backtest_ml_lorentzian_v2_LDOUSDT_4h_20260415",
-      "label": "RESEARCH",
-      "notes": "ML Lorentzian Classification v2 variant. LDOUSDT 4h. Sharpe=6.93. Kernel regression + k-NN feature space. Approved for testnet live execution. | symbols widened to wildcard 2026-04-15: existing TV alert sends SOLUSDT; primary target LDOUSDT 4h.",
-      "approval_class": "paper_only",
-      "class_reason": "Demoted from candidate_for_tiny_capital to paper_only 2026-04-16 per A-03 governance freeze. Backtest-only evidence (Sharpe=7.28 on LDOUSDT 4h). No live paper signals confirmed yet. Reinstate to candidate_for_tiny_capital only after 7-day paper window with >=5 closed trades and DSR validation.",
-      "demoted_at": "2026-04-16T13:00:00Z"
-    },
-    {
-      "strategy": "SMC",
-      "exchange": "binance",
-      "symbols": [
-        "SOLUSDT",
-        "BTCUSDT",
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "60",
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-15T12:30:00Z",
-      "backtest_hash": "legacy_smc_luxalgo_signal_history_20260415",
-      "label": "RESEARCH",
-      "notes": "LuxAlgo SMC strategy. Was live Mar 2026 on SOLUSDT/BTCUSDT 1h with correct secret. Added as paper_only for signal observation. No OOS backtest on file.",
-      "approval_class": "paper_only",
-      "class_reason": "Legacy strategy reinstated as paper_only 2026-04-15. Correct secret confirmed in logs. Signals being observed before capital routing."
-    },
-    {
-      "strategy": "G100 HigherHigh Structure",
-      "exchange": "binance",
-      "symbols": [
-        "SUIUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-16T06:32:52Z",
-      "backtest_hash": "manual_approval_g100_higherhigh_structure_202604160632",
-      "label": "paper_only",
-      "notes": "PF=8.71, WR=84.5%, Sharpe=2.94, DSR>0",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G88 Vortex Donchian",
-      "exchange": "binance",
-      "symbols": [
-        "OPUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-16T06:33:23Z",
-      "backtest_hash": "manual_approval_g88_vortex_donchian_202604160633",
-      "label": "paper_only",
-      "notes": "PF=6.11, WR=80.7%, Sharpe=2.64, DSR>0",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G89 Coppock Donchian",
-      "exchange": "binance",
-      "symbols": [
-        "OPUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-16T06:33:35Z",
-      "backtest_hash": "manual_approval_g89_coppock_donchian_202604160633",
-      "label": "paper_only",
-      "notes": "PF=5.75, WR=80.1%, Sharpe=2.58, DSR>0",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G90 BB PercentB RSI",
-      "exchange": "binance",
-      "symbols": [
-        "OPUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-16T06:33:55Z",
-      "backtest_hash": "manual_approval_g90_bb_percentb_rsi_202604160633",
-      "label": "paper_only",
-      "notes": "PF=5.06, WR=80.0%, Sharpe=2.54, DSR>0",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G91 ATR Compression Breakout",
-      "exchange": "binance",
-      "symbols": [
-        "LDOUSDT",
-        "XRPUSDT",
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-16T06:34:09Z",
-      "backtest_hash": "manual_approval_g91_atr_compression_breakout_202604160634",
-      "label": "paper_only",
-      "notes": "PF=10.88-13.49, WR=73-87%, Sharpe=2.73-3.24, DSR>0",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G92 RSI Divergence MACD",
-      "exchange": "binance",
-      "symbols": [
-        "LDOUSDT",
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-16T06:35:36Z",
-      "backtest_hash": "manual_approval_g92_rsi_divergence_macd_202604160635",
-      "label": "paper_only",
-      "notes": "PF=9.61-10.54, WR=80-87%, Sharpe=2.61-2.75, DSR>0",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G94 Pivot Point Reclaim",
-      "exchange": "binance",
-      "symbols": [
-        "SUIUSDT",
-        "LDOUSDT",
-        "LINKUSDT",
-        "AVAXUSDT",
-        "XRPUSDT",
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-16T06:35:57Z",
-      "backtest_hash": "manual_approval_g94_pivot_point_reclaim_202604160635",
-      "label": "paper_only",
-      "notes": "PF=10.01-19.84, WR=74-85%, Sharpe=2.65-3.50, DSR>0, PBO=0.00",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G95 Inside Bar Breakout",
-      "exchange": "binance",
-      "symbols": [
-        "SUIUSDT",
-        "ETHUSDT",
-        "XRPUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-16T06:36:19Z",
-      "backtest_hash": "manual_approval_g95_inside_bar_breakout_202604160636",
-      "label": "paper_only",
-      "notes": "PF=11.26-14.90, WR=73-85%, Sharpe=2.73-3.36, DSR>0",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "G99 Chande Momentum BB",
-      "exchange": "binance",
-      "symbols": [
-        "SUIUSDT",
-        "OPUSDT",
-        "XRPUSDT",
-        "ETHUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "garima",
-      "approved_at": "2026-04-16T06:36:34Z",
-      "backtest_hash": "manual_approval_g99_chande_momentum_bb_202604160636",
-      "label": "paper_only",
-      "notes": "PF=9.06-17.29, WR=72-87%, Sharpe=2.55-3.73, DSR>0, PBO=0.00",
-      "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation."
-    },
-    {
-      "strategy": "EMA Stack 15M",
-      "exchange": "binance",
-      "symbols": [
-        "BTCUSDT",
-        "ETHUSDT",
-        "SOLUSDT"
-      ],
-      "timeframes": [
-        "15"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-21",
-      "backtest_hash": "tv_backtest_ema_stack_15m_pf156",
-      "label": "PERSONAL_LIVE",
-      "notes": "Personal HF strategy. EMA 5/13/50 stack scalper 15M. PF=1.56, 461 trades/6yr, SL=0.8%, TP=1.6%. Separate from ETH 4H decision lane.",
-      "approval_class": "personal_live",
-      "class_reason": "Harsh personal trading -- not part of checkpoint decision lane"
-    }
-  ]
+    "version": 12,
+    "updated_at": "2026-04-23T09:55:42Z",
+    "approvals": [
+        {
+            "strategy": "CCI Trend",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "harsh",
+            "approved_at": "2026-04-07T10:23:25Z",
+            "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
+            "label": "ALPHA",
+            "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['LDOUSDT', 'ETHUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18.",
+            "approval_class": "candidate_for_tiny_capital",
+            "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance.",
+            "shortlist_priority": true
+        },
+        {
+            "strategy": "Donchian Trend",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "harsh",
+            "approved_at": "2026-04-07T10:23:28Z",
+            "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
+            "label": "ALPHA",
+            "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['ETHUSDT', 'SUIUSDT', 'LDOUSDT', 'LINKUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18.",
+            "approval_class": "candidate_for_tiny_capital",
+            "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance.",
+            "shortlist_priority": true
+        },
+        {
+            "strategy": "G19 Donchian Volume Surge",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-13T12:09:19Z",
+            "backtest_hash": "manual_approval_g19_donchian_volume_surge_202604131209",
+            "label": "ALPHA",
+            "notes": "TV PF=18.97, WR=85%, 699 trades",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G15 Aroon Donchian Breakout",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-13T12:09:44Z",
+            "backtest_hash": "manual_approval_g15_aroon_donchian_breakout_202604131209",
+            "label": "ALPHA",
+            "notes": "TV PF=15.29, WR=84.2%",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "RSI_x_BB_x_PSAR",
+            "exchange": "binance",
+            "symbols": [
+                "ARBUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "harsh",
+            "approved_at": "2026-04-13T12:11:30Z",
+            "backtest_hash": "combo_oos_RSI_x_BB_x_PSAR_ARBUSDT_20260413",
+            "label": "RESEARCH",
+            "notes": "Auto-discovered combo: RSI oversold + BB bounce + PSAR flip. OOS PF=127.108 WR=72.7% DD=-0.04%. Pine: strategies/pine_combos/",
+            "approval_class": "paper_only",
+            "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days.",
+            "oos_pf": 127.108,
+            "oos_wr": 72.7,
+            "oos_dd": -0.04,
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "CCI_x_STOCH_x_OBV",
+            "exchange": "binance",
+            "symbols": [
+                "NEARUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "harsh",
+            "approved_at": "2026-04-13T12:11:30Z",
+            "backtest_hash": "combo_oos_CCI_x_STOCH_x_OBV_NEARUSDT_20260413",
+            "label": "RESEARCH",
+            "notes": "Auto-discovered combo: CCI extreme + Stoch oversold + OBV trend. OOS PF=22.167 WR=62.5% DD=-0.57%.",
+            "approval_class": "paper_only",
+            "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days.",
+            "oos_pf": 22.167,
+            "oos_wr": 62.5,
+            "oos_dd": -0.57,
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "RSI_x_PSAR_x_STREND",
+            "exchange": "binance",
+            "symbols": [
+                "ARBUSDT",
+                "AAVEUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "harsh",
+            "approved_at": "2026-04-13T12:11:30Z",
+            "backtest_hash": "combo_oos_RSI_x_PSAR_x_STREND_20260413",
+            "label": "RESEARCH",
+            "notes": "Auto-discovered combo: RSI oversold + PSAR flip + Supertrend. ARB: PF=12.873 WR=65.4% DD=-0.88% | AAVE: PF=12.651 WR=52.4% DD=-1.06%.",
+            "approval_class": "paper_only",
+            "class_reason": "Demoted 2026-04-15: zero signals received across full history. No TradingView alert deployed. Cannot generate live testnet data.",
+            "oos_pf": 12.873,
+            "oos_wr": 65.4,
+            "oos_dd": -0.88,
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "RSI_x_PSAR_x_OBV",
+            "exchange": "binance",
+            "symbols": [
+                "LINKUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "harsh",
+            "approved_at": "2026-04-13T12:11:30Z",
+            "backtest_hash": "combo_oos_RSI_x_PSAR_x_OBV_LINKUSDT_20260413",
+            "label": "RESEARCH",
+            "notes": "Auto-discovered combo: RSI oversold + PSAR flip + OBV trend. OOS PF=8.619 WR=56.2% DD=-0.44%.",
+            "approval_class": "paper_only",
+            "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days.",
+            "oos_pf": 8.619,
+            "oos_wr": 56.2,
+            "oos_dd": -0.44,
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G28 Donchian Short14",
+            "exchange": "binance",
+            "symbols": [
+                "SUIUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-13T13:14:24Z",
+            "backtest_hash": "manual_approval_g28_donchian_short14_202604131314",
+            "label": "ALPHA",
+            "notes": "TV PF=10.13, WR=86.5%, ROI/d=0.77%, DD=-1.62%, 518 trades",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G68 OBV CCI Cross",
+            "exchange": "binance",
+            "symbols": [
+                "SUIUSDT",
+                "MAGICUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-13T13:14:40Z",
+            "backtest_hash": "manual_approval_g68_obv_cci_cross_202604131314",
+            "label": "ALPHA",
+            "notes": "TV PF=9.48-12.61, WR=83-85%, ROI/d=0.78-0.83%, DD=-1.62%",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G27 CCI Donchian Wide",
+            "exchange": "binance",
+            "symbols": [
+                "SUIUSDT",
+                "LDOUSDT",
+                "MAGICUSDT",
+                "AVAXUSDT",
+                "LINKUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-13T13:19:38Z",
+            "backtest_hash": "manual_approval_g27_cci_donchian_wide_202604131319",
+            "label": "ALPHA",
+            "notes": "TV PF 8-11, WR 83-85 pct, ROI/d 0.9-1.1 pct, DD under 3.2 pct",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G79 Fisher Donchian",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT",
+                "XRPUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-14T06:58:50Z",
+            "backtest_hash": "manual_approval_g79_fisher_donchian_202604140631",
+            "label": "ALPHA",
+            "notes": "Fisher Transform cross. ETH: CAGR=3890%, ROI/day=1.01%, champion of batch. XRP: CAGR=2297%, PF=12-16. DOT excluded \u2014 17-26% DD across all G-family, unsafe.",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G80 UO Donchian",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT",
+                "XRPUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-14T06:31:43Z",
+            "backtest_hash": "manual_approval_g80_uo_donchian_202604140631",
+            "label": "ALPHA",
+            "notes": "Ultimate Oscillator 50 cross, TV PF 10-13, CAGR 926-1255 pct",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G83 DeMarker Donchian",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT",
+                "XRPUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-14T06:32:04Z",
+            "backtest_hash": "manual_approval_g83_demarker_donchian_202604140632",
+            "label": "ALPHA",
+            "notes": "DeMarker 0.3 0.7 cross, TV PF 11-18 ETH, CAGR 324-549 pct",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G86 Klinger Donchian",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT",
+                "XRPUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-14T06:32:32Z",
+            "backtest_hash": "manual_approval_g86_klinger_donchian_202604140632",
+            "label": "ALPHA",
+            "notes": "Klinger Volume Osc, TV PF 12-14, CAGR 1033-1569 pct",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G77 ROC Donchian",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT",
+                "XRPUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-14T06:32:42Z",
+            "backtest_hash": "manual_approval_g77_roc_donchian_202604140632",
+            "label": "ALPHA",
+            "notes": "ROC 12 cross, TV PF 13-16, CAGR 770-1121 pct",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G81 TSI Donchian",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT",
+                "XRPUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-14T06:32:53Z",
+            "backtest_hash": "manual_approval_g81_tsi_donchian_202604140632",
+            "label": "ALPHA",
+            "notes": "True Strength Index zero cross, TV PF 11-14, CAGR 348-589 pct",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G84 VWMA Cross Donchian",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT",
+                "XRPUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-14T06:33:44Z",
+            "backtest_hash": "manual_approval_g84_vwma_cross_donchian_202604140633",
+            "label": "ALPHA",
+            "notes": "VWMA 20 50 cross, TV PF 12-13, CAGR 334-540 pct",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G45_CCI Donchian Fusion",
+            "exchange": "binance",
+            "symbols": [
+                "ETHUSDT",
+                "LINKUSDT",
+                "SOLUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-14T13:16:04Z",
+            "backtest_hash": "manual_approval_g45_cci_donchian_fusion_202604141316",
+            "label": "ALPHA",
+            "notes": "TV PF 18.48 ETH, WR 85.4 pct, DD 1.61 pct",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "ML Lorentzian Classification",
+            "exchange": "binance",
+            "symbols": [
+                "*"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "harsh",
+            "approved_at": "2026-04-15T12:00:00Z",
+            "backtest_hash": "backtest_ml_lorentzian_LDOUSDT_4h_20260415",
+            "label": "RESEARCH",
+            "notes": "ML Lorentzian Classification (JdeP). LDOUSDT 4h. Sharpe=7.28, PF=high, DD low. Kernel regression + k-NN feature space. Approved for testnet live execution. | symbols widened to wildcard 2026-04-15: existing TV alert sends SOLUSDT; primary target LDOUSDT 4h.",
+            "approval_class": "paper_only",
+            "class_reason": "Demoted from candidate_for_tiny_capital to paper_only 2026-04-16 per A-03 governance freeze. Backtest-only evidence (Sharpe=7.28 on LDOUSDT 4h). No live paper signals confirmed yet. Reinstate to candidate_for_tiny_capital only after 7-day paper window with >=5 closed trades and DSR validation.",
+            "demoted_at": "2026-04-16T13:00:00Z",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "Machine Learning Lorentzian Classification",
+            "exchange": "binance",
+            "symbols": [
+                "*"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "harsh",
+            "approved_at": "2026-04-15T12:00:00Z",
+            "backtest_hash": "backtest_ml_lorentzian_v2_LDOUSDT_4h_20260415",
+            "label": "RESEARCH",
+            "notes": "ML Lorentzian Classification v2 variant. LDOUSDT 4h. Sharpe=6.93. Kernel regression + k-NN feature space. Approved for testnet live execution. | symbols widened to wildcard 2026-04-15: existing TV alert sends SOLUSDT; primary target LDOUSDT 4h.",
+            "approval_class": "paper_only",
+            "class_reason": "Demoted from candidate_for_tiny_capital to paper_only 2026-04-16 per A-03 governance freeze. Backtest-only evidence (Sharpe=7.28 on LDOUSDT 4h). No live paper signals confirmed yet. Reinstate to candidate_for_tiny_capital only after 7-day paper window with >=5 closed trades and DSR validation.",
+            "demoted_at": "2026-04-16T13:00:00Z",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "SMC",
+            "exchange": "binance",
+            "symbols": [
+                "SOLUSDT",
+                "BTCUSDT",
+                "ETHUSDT"
+            ],
+            "timeframes": [
+                "60",
+                "240"
+            ],
+            "operator": "harsh",
+            "approved_at": "2026-04-15T12:30:00Z",
+            "backtest_hash": "legacy_smc_luxalgo_signal_history_20260415",
+            "label": "RESEARCH",
+            "notes": "LuxAlgo SMC strategy. Was live Mar 2026 on SOLUSDT/BTCUSDT 1h with correct secret. Added as paper_only for signal observation. No OOS backtest on file.",
+            "approval_class": "paper_only",
+            "class_reason": "Legacy strategy reinstated as paper_only 2026-04-15. Correct secret confirmed in logs. Signals being observed before capital routing.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G100 HigherHigh Structure",
+            "exchange": "binance",
+            "symbols": [
+                "SUIUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-16T06:32:52Z",
+            "backtest_hash": "manual_approval_g100_higherhigh_structure_202604160632",
+            "label": "paper_only",
+            "notes": "PF=8.71, WR=84.5%, Sharpe=2.94, DSR>0",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G88 Vortex Donchian",
+            "exchange": "binance",
+            "symbols": [
+                "OPUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-16T06:33:23Z",
+            "backtest_hash": "manual_approval_g88_vortex_donchian_202604160633",
+            "label": "paper_only",
+            "notes": "PF=6.11, WR=80.7%, Sharpe=2.64, DSR>0",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G89 Coppock Donchian",
+            "exchange": "binance",
+            "symbols": [
+                "OPUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-16T06:33:35Z",
+            "backtest_hash": "manual_approval_g89_coppock_donchian_202604160633",
+            "label": "paper_only",
+            "notes": "PF=5.75, WR=80.1%, Sharpe=2.58, DSR>0",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G90 BB PercentB RSI",
+            "exchange": "binance",
+            "symbols": [
+                "OPUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-16T06:33:55Z",
+            "backtest_hash": "manual_approval_g90_bb_percentb_rsi_202604160633",
+            "label": "paper_only",
+            "notes": "PF=5.06, WR=80.0%, Sharpe=2.54, DSR>0",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G91 ATR Compression Breakout",
+            "exchange": "binance",
+            "symbols": [
+                "LDOUSDT",
+                "XRPUSDT",
+                "ETHUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-16T06:34:09Z",
+            "backtest_hash": "manual_approval_g91_atr_compression_breakout_202604160634",
+            "label": "paper_only",
+            "notes": "PF=10.88-13.49, WR=73-87%, Sharpe=2.73-3.24, DSR>0",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G92 RSI Divergence MACD",
+            "exchange": "binance",
+            "symbols": [
+                "LDOUSDT",
+                "ETHUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-16T06:35:36Z",
+            "backtest_hash": "manual_approval_g92_rsi_divergence_macd_202604160635",
+            "label": "paper_only",
+            "notes": "PF=9.61-10.54, WR=80-87%, Sharpe=2.61-2.75, DSR>0",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G94 Pivot Point Reclaim",
+            "exchange": "binance",
+            "symbols": [
+                "SUIUSDT",
+                "LDOUSDT",
+                "LINKUSDT",
+                "AVAXUSDT",
+                "XRPUSDT",
+                "ETHUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-16T06:35:57Z",
+            "backtest_hash": "manual_approval_g94_pivot_point_reclaim_202604160635",
+            "label": "paper_only",
+            "notes": "PF=10.01-19.84, WR=74-85%, Sharpe=2.65-3.50, DSR>0, PBO=0.00",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G95 Inside Bar Breakout",
+            "exchange": "binance",
+            "symbols": [
+                "SUIUSDT",
+                "ETHUSDT",
+                "XRPUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-16T06:36:19Z",
+            "backtest_hash": "manual_approval_g95_inside_bar_breakout_202604160636",
+            "label": "paper_only",
+            "notes": "PF=11.26-14.90, WR=73-85%, Sharpe=2.73-3.36, DSR>0",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "G99 Chande Momentum BB",
+            "exchange": "binance",
+            "symbols": [
+                "SUIUSDT",
+                "OPUSDT",
+                "XRPUSDT",
+                "ETHUSDT"
+            ],
+            "timeframes": [
+                "240"
+            ],
+            "operator": "garima",
+            "approved_at": "2026-04-16T06:36:34Z",
+            "backtest_hash": "manual_approval_g99_chande_momentum_bb_202604160636",
+            "label": "paper_only",
+            "notes": "PF=9.06-17.29, WR=72-87%, Sharpe=2.55-3.73, DSR>0, PBO=0.00",
+            "approval_class": "paper_only",
+            "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
+            "shortlist_priority": false
+        },
+        {
+            "strategy": "EMA Stack 15M",
+            "exchange": "binance",
+            "symbols": [
+                "BTCUSDT",
+                "ETHUSDT",
+                "SOLUSDT"
+            ],
+            "timeframes": [
+                "15"
+            ],
+            "operator": "harsh",
+            "approved_at": "2026-04-21",
+            "backtest_hash": "tv_backtest_ema_stack_15m_pf156",
+            "label": "PERSONAL_LIVE",
+            "notes": "Personal HF strategy. EMA 5/13/50 stack scalper 15M. PF=1.56, 461 trades/6yr, SL=0.8%, TP=1.6%. Separate from ETH 4H decision lane.",
+            "approval_class": "personal_live",
+            "class_reason": "Harsh personal trading -- not part of checkpoint decision lane",
+            "shortlist_priority": true
+        }
+    ]
 }

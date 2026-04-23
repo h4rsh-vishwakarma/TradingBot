@@ -102,14 +102,29 @@ def build_promotion_table(df: pd.DataFrame) -> pd.DataFrame:
     return df.sort_values("promotion_score", ascending=False)
 
 
-def apply_concentration_cap(df: pd.DataFrame) -> pd.DataFrame:
-    """Keep only top MAX_PER_SYMBOL rows per symbol and top MAX_PER_FAMILY per family."""
+def apply_concentration_cap(df, approved_path=None):
+    # shortlist_priority strategies fill slots first; non-shortlist evicted at cap
+    import json as _json, pathlib as _pl
     df = df.copy()
-    df["sym_rank"]    = df.groupby("symbol").cumcount() + 1
-    # family_rank already computed; use it as concentration guard
-    ok = (df["sym_rank"] <= MAX_PER_SYMBOL) & (df["family_rank"] <= MAX_PER_FAMILY)
-    df["promoted"] = ok
-    return df
+    if approved_path is None:
+        approved_path = str(_pl.Path(__file__).resolve().parents[1] / 'config' / 'approved_strategies.json')
+    priority_map = {}
+    try:
+        with open(approved_path) as _f:
+            _d = _json.load(_f)
+        for _a in _d.get('approvals', []):
+            priority_map[_a['strategy']] = bool(_a.get('shortlist_priority', False))
+    except Exception:
+        pass
+    df['is_shortlist'] = df['strategy'].map(lambda s: priority_map.get(s, False)).astype(int)
+    df = df.sort_values(['is_shortlist', 'promotion_score'], ascending=[False, False])
+    df['sym_rank'] = df.groupby('symbol').cumcount() + 1
+    ok = (df['sym_rank'] <= MAX_PER_SYMBOL) & (df['family_rank'] <= MAX_PER_FAMILY)
+    df['promoted'] = ok
+    for _, row in df[(~ok) & (df['sym_rank'] <= MAX_PER_SYMBOL + 2)].iterrows():
+        tag = 'shortlist' if row['is_shortlist'] else 'non-shortlist'
+        print('  [EVICTED] ' + str(row['strategy']) + ' from ' + str(row['symbol']) + ' (' + tag + ')')
+    return df.sort_values('promotion_score', ascending=False)
 
 
 def main():

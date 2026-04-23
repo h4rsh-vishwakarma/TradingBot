@@ -604,7 +604,10 @@ class WebhookServer:
                 }
 
                                 # Strategy alias map (empty — orphaned TV alerts deleted 2026-04-15)
-                _STRATEGY_ALIASES = {}
+                _STRATEGY_ALIASES = {
+                    "EMA_Stack_Scalper_15M": "EMA Stack 15M",
+                    "EMA_Stack_Scalper": "EMA Stack 15M",
+                }
                 strategy = _STRATEGY_ALIASES.get(strategy, strategy)
 
                 # --- Strategy allowlist check: skip unapproved/test strategies silently ---

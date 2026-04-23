@@ -438,7 +438,18 @@ class BinanceClient:
                         newClientOrderId=f"KILL_{int(time.time())}_{symbol}"
                     )
                     logger.critical(f"🚨 KILLED: {side} {qty} {symbol}")
-                    closed.append({"symbol": symbol, "side": side, "qty": qty})
+                    closed.append(dict(symbol=symbol, side=side, qty=qty))
+                    try:
+                        import json as _j, datetime as _dt
+                        _rec = dict(timestamp=_dt.datetime.utcnow().isoformat(),
+                                    action="position_closed", symbol=symbol,
+                                    side=side, qty=qty, strategy="KILL_SWITCH",
+                                    close_reason="flatten", pnl=None)
+                        _lp = pathlib.Path(__file__).resolve().parents[2] / "logs" / "trades.jsonl"
+                        with open(_lp, "a") as _lf:
+                            _lf.write(_j.dumps(_rec) + "\n")
+                    except Exception as _le:
+                        logger.warning("Ledger write failed after flatten: " + str(_le))
                 except Exception as e:
                     logger.error(f"❌ Failed to close {symbol}: {e}")
             # Cancel all open orders
