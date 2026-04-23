@@ -1,6 +1,6 @@
-# Runtime Log — 2026-04-22
+# Runtime Log — 2026-04-23
 
-> Auto-generated — last updated `2026-04-22T23:10:01Z`
+> Auto-generated — last updated `2026-04-23T00:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (1 of 27 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-22T23:10:01Z |
+| Last run | 2026-04-23T00:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -37,16 +37,16 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 12 |
-| Completed | 12 |
-| Last signal | 2026-04-22 20:01 UTC |
-| Last strategy | G94 Pivot Point Reclaim / LDOUSDT |
+| Signals received | 9 |
+| Completed | 9 |
+| Last signal | 2026-04-23 00:00 UTC |
+| Last strategy | ML Lorentzian Classification / LDOUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260422_2305 |
+| Last heartbeat file | heartbeat_20260423_0005 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -81,8 +81,9 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 | Dashboard | https://tradingbot.operatorbrief.xyz/ | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
-## Commits Today (2026-04-22)
+## Commits Today (2026-04-23)
 ```
+71061fc | 2026-04-22 23:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-22T23:10:01Z
 bfb4cb8 | 2026-04-22 22:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-22T22:10:02Z
 5f44730 | 2026-04-22 21:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-22T21:10:01Z
 ccb5bf1 | 2026-04-22 20:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-22T20:10:01Z
