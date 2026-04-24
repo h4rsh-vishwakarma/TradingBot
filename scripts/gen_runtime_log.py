@@ -265,6 +265,32 @@ All other strategies are testnet/research — not part of Apr 14 go-live decisio
 *Do not edit manually — changes will be overwritten.*
 """
 
+import re as _re
+_ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%Y-%m-%d %H:%M IST')
+_fail_lines = [l.strip() for l in gate_out.split(chr(10)) if '[FAIL]' in l]
+_warn_lines = [l.strip() for l in gate_out.split(chr(10)) if '[WARN]' in l]
+_verdict_line = next((l.strip() for l in gate_out.split(chr(10)) if 'VERDICT:' in l), verdict)
+_gate_block_lines = [_verdict_line] + _fail_lines + _warn_lines
+_new_gate_block = chr(10).join(_gate_block_lines)
+_dls_path = 'docs/DECISION_LANE_STATUS.md'
+if os.path.exists(_dls_path):
+    with open(_dls_path) as _df:
+        _dls = _df.read()
+    _dls = _re.sub(
+        r'## Gate Verdict \(live as of [^)]*\)',
+        '## Gate Verdict (live as of ' + _ist_now + ')',
+        _dls
+    )
+    _dls = _re.sub(
+        r'```\nVERDICT:.*?```',
+        chr(96)*3 + chr(10) + _new_gate_block + chr(10) + chr(96)*3,
+        _dls,
+        flags=_re.DOTALL
+    )
+    with open(_dls_path, 'w') as _df:
+        _df.write(_dls)
+    print('Updated: docs/DECISION_LANE_STATUS.md gate verdict')
+
 os.makedirs('docs', exist_ok=True)
 with open('docs/RUNTIME_LOG.md', 'w') as f:
     f.write(log)

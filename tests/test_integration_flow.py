@@ -664,6 +664,13 @@ class TestIdempotencyCleanup:
 class TestSafetyGatesBlock:
     """Prove that safety gates deterministically block signals at runtime."""
 
+    @pytest.fixture(autouse=True)
+    def _require_eth_account(self):
+        pytest.importorskip(
+            "eth_account",
+            reason="eth_account not installed in this Python env — run with venv/bin/python",
+        )
+
     def test_duplicate_signal_blocked(self):
         """Same strategy+symbol+side within dedup window is blocked."""
         from tradingview_webhook_bot.core.orchestrator import Orchestrator

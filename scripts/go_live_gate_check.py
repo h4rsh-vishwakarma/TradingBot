@@ -532,9 +532,8 @@ def min_closed_trades_gate(candidates: list[dict]) -> tuple[bool, str]:
     return passed, '; '.join(details) if details else 'No candidates to check'
 
 
-
-def decision_lane_recency_check(candidates, warn_after_hours: float = 96.0):
-    """WARN (not FAIL) if no ETHUSDT decision-lane signal received in last warn_after_hours."""
+def decision_lane_recency_check(candidates, warn_after_hours: float = 72.0):
+    """Fail if no ETHUSDT decision-lane signal received in last warn_after_hours."""
     import json as _json
     import time as _time
     metrics_path = PROJECT_ROOT / "storage" / "reports" / "paper_validation" / "execution_metrics.jsonl"
@@ -568,6 +567,7 @@ def decision_lane_recency_check(candidates, warn_after_hours: float = 96.0):
     last_dt = datetime.fromtimestamp(last_ts, tz=_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     detail = f"Last ETHUSDT signal: {last_strat} at {last_dt} ({age_h:.1f}h ago)"
     return age_h <= warn_after_hours, detail
+
 
 def main() -> int:
     load_env_file()
@@ -672,6 +672,9 @@ def main() -> int:
 
     min_trades_ok, min_trades_detail = min_closed_trades_gate(candidates)  # thresholds: 4H=5, 1H=10, 15m=20
     check("Candidates have min closed paper trades (4H=5,1H=10,15m=20)", min_trades_ok, min_trades_detail)
+
+    lane_recent_ok, lane_recent_detail = decision_lane_recency_check(candidates, warn_after_hours=72.0)
+    check("Decision-lane ETHUSDT signal active (<72h)", lane_recent_ok, lane_recent_detail)
 
     conc_ok, conc_detail = family_concentration_gate(candidates)
     check("Candidate family/symbol concentration within limits", conc_ok, conc_detail)
