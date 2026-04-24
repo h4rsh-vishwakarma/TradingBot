@@ -58,12 +58,31 @@ if sig_rows:
     last_sig_strat = str(p.get('strategy', '?')) + ' / ' + str(p.get('symbol') or p.get('ticker', '?'))
     last_sig_time = datetime.utcfromtimestamp(float(sig_rows[0][2])).strftime('%Y-%m-%d %H:%M UTC')
 
-# Positions
-with open('tradingview_webhook_bot/storage/ledger_state.json') as f:
-    ledger = json.load(f)
-open_pos = [(k, v) for k, v in ledger.get('positions', {}).items() if (v.get('quantity') or 0) != 0]
-pos_lines = '\n'.join(f'- `{k}` qty={v.get("quantity")} @ {v.get("avg_price")}' for k, v in open_pos) or '- None'
+# Positions -- split by lane (A-10)
+def _load_ledger(path):
+    try:
+        with open(path) as f:
+            return __import__("json").load(f)
+    except Exception:
+        return {}
 
+_dl_path = os.getenv("DECISION_LANE_LEDGER_PATH", "tradingview_webhook_bot/storage/ledger_decision.json")
+_rl_path = os.getenv("RESEARCH_LANE_LEDGER_PATH", "tradingview_webhook_bot/storage/ledger_research.json")
+ledger_decision = _load_ledger(_dl_path)
+ledger_research = _load_ledger(_rl_path)
+ledger = _load_ledger("tradingview_webhook_bot/storage/ledger_state.json")
+
+def _open_pos(ld): return [(k, v) for k, v in ld.get("positions", {}).items() if (v.get("quantity") or 0) != 0]
+def _lane_pnl(ld): return sum(v.get("realized_pnl", 0.0) for v in ld.get("positions", {}).values())
+
+dl_open = _open_pos(ledger_decision)
+rl_open = _open_pos(ledger_research)
+open_pos = dl_open or _open_pos(ledger)
+dl_pnl = _lane_pnl(ledger_decision)
+rl_pnl = _lane_pnl(ledger_research)
+dl_lines = chr(10).join(f'- `{k}` qty={v.get("quantity")} @ {v.get("avg_price")}' for k, v in dl_open) or "- None"
+rl_lines = chr(10).join(f'- `{k}` qty={v.get("quantity")} @ {v.get("avg_price")}' for k, v in rl_open) or "- None"
+pos_lines = dl_lines
 # Quarantine
 with open('storage/stale_position_quarantine.json') as f:
     qdata = json.load(f)
@@ -110,6 +129,41 @@ if hb_files:
     except Exception:
         pass
 
+
+# Decision-lane scoreboard (CCI Trend + Donchian Trend ETHUSDT closed trades)
+_decision_strats = ["CCI Trend", "Donchian Trend"]
+_dl_closed = {s: 0 for s in _decision_strats}
+_dl_last_signal = {s: "never" for s in _decision_strats}
+_dl_last_ts = {s: 0.0 for s in _decision_strats}
+_metrics_path = "storage/reports/paper_validation/execution_metrics.jsonl"
+if os.path.exists(_metrics_path):
+    with open(_metrics_path) as _mf:
+        for _line in _mf:
+            _line = _line.strip()
+            if not _line:
+                continue
+            try:
+                _rec = json.loads(_line)
+            except Exception:
+                continue
+            _strat = str(_rec.get("strategy", "")).strip()
+            _sym = str(_rec.get("symbol", "")).upper().strip()
+            if _strat in _decision_strats and _sym == "ETHUSDT":
+                _ts = float(_rec.get("timestamp_epoch", 0))
+                if _rec.get("is_exit"):
+                    _dl_closed[_strat] = _dl_closed.get(_strat, 0) + 1
+                if _ts > _dl_last_ts.get(_strat, 0):
+                    _dl_last_ts[_strat] = _ts
+                    _dl_last_signal[_strat] = str(_rec.get("recorded_at", "?"))[:19] + " UTC"
+_scoreboard_items = []
+for _s in _decision_strats:
+    _closed = _dl_closed.get(_s, 0)
+    _last = _dl_last_signal.get(_s, "never")
+    _icon = "OK" if _closed >= 5 else "NEED MORE"
+    row = "| " + str(_s) + " | " + str(_closed) + "/5 (" + _icon + ") | " + str(_last) + " |"
+    _scoreboard_items.append(row)
+_scoreboard_rows = chr(10).join(_scoreboard_items)
+
 log = f"""# Runtime Log — {today}
 
 > Auto-generated — last updated `{ts}`
@@ -143,6 +197,12 @@ log = f"""# Runtime Log — {today}
 ### RESEARCH (placeholder — not yet on TradingView)
 {chr(10).join(f'- {a["strategy"]}' for a in research)}
 
+## Decision-Lane Scoreboard (ETHUSDT 4H)
+| Strategy | Closed ETHUSDT Trades | Last ETHUSDT Signal |
+|---|---|---|
+{_scoreboard_rows}
+> Gate requires 5 closed ETHUSDT trades per strategy. OK = threshold met.
+
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
@@ -159,8 +219,13 @@ log = f"""# Runtime Log — {today}
 | Verdict | {last_hb_verdict} |
 | Cron schedule | every hour at :05 UTC |
 
-## Open Positions
-{pos_lines}
+## Open Positions -- Decision Lane (Harsh / live-approved)
+{dl_lines}
+Realized P&L: ${dl_pnl:.2f}
+
+## Open Positions -- Research Lane (Garima / paper_only)
+{rl_lines}
+Realized P&L: ${rl_pnl:.2f}
 
 ## Stale Position Quarantine
 | Item | Value |

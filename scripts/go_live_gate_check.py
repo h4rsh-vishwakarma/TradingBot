@@ -532,6 +532,43 @@ def min_closed_trades_gate(candidates: list[dict]) -> tuple[bool, str]:
     return passed, '; '.join(details) if details else 'No candidates to check'
 
 
+
+def decision_lane_recency_check(candidates, warn_after_hours: float = 96.0):
+    """WARN (not FAIL) if no ETHUSDT decision-lane signal received in last warn_after_hours."""
+    import json as _json
+    import time as _time
+    metrics_path = PROJECT_ROOT / "storage" / "reports" / "paper_validation" / "execution_metrics.jsonl"
+    if not metrics_path.exists():
+        return True, "metrics file not found — cannot check"
+    now_ts = _time.time()
+    candidate_names = {str(c.get("strategy", "")).strip() for c in candidates}
+    last_ts, last_strat = 0.0, None
+    try:
+        with open(metrics_path) as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = _json.loads(line)
+                except Exception:
+                    continue
+                strat = str(rec.get("strategy", "")).strip()
+                sym = str(rec.get("symbol", "")).upper().strip()
+                if strat in candidate_names and sym == "ETHUSDT":
+                    ts = float(rec.get("timestamp_epoch", 0))
+                    if ts > last_ts:
+                        last_ts, last_strat = ts, strat
+    except Exception as exc:
+        return True, f"cannot check: {exc}"
+    if last_ts == 0:
+        return False, "No ETHUSDT decision-lane signal ever recorded in execution_metrics"
+    age_h = (now_ts - last_ts) / 3600
+    from datetime import timezone as _tz
+    last_dt = datetime.fromtimestamp(last_ts, tz=_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    detail = f"Last ETHUSDT signal: {last_strat} at {last_dt} ({age_h:.1f}h ago)"
+    return age_h <= warn_after_hours, detail
+
 def main() -> int:
     load_env_file()
 
@@ -638,6 +675,13 @@ def main() -> int:
 
     conc_ok, conc_detail = family_concentration_gate(candidates)
     check("Candidate family/symbol concentration within limits", conc_ok, conc_detail)
+
+    # Decision-lane signal recency WARN (not a hard gate — does not affect fail count)
+    _lane_recent, _lane_recency_detail = decision_lane_recency_check(candidates)
+    if not _lane_recent:
+        print(f"  [WARN] Decision-lane signal starvation (>96h) -- {_lane_recency_detail}")
+    else:
+        print(f"  [INFO] Decision-lane recency OK -- {_lane_recency_detail}")
 
     print()
     print("=" * 60)
