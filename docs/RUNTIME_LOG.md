@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-24
 
-> Auto-generated — last updated `2026-04-24T11:54:59Z`
+> Auto-generated — last updated `2026-04-24T12:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,9 +8,9 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (1 of 27 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (2 of 28 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-24T11:54:59Z |
+| Last run | 2026-04-24T12:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -44,16 +44,16 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 9 |
-| Completed | 9 |
-| Last signal | 2026-04-24 04:00 UTC |
-| Last strategy | G94 Pivot Point Reclaim / LDOUSDT |
+| Signals received | 11 |
+| Completed | 11 |
+| Last signal | 2026-04-24 12:01 UTC |
+| Last strategy | G27 CCI Donchian Wide / MAGICUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260424_1105 |
+| Last heartbeat file | heartbeat_20260424_1205 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -90,6 +90,9 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 
 ## Commits Today (2026-04-24)
 ```
+0e26b97 | 2026-04-24 12:01:20 +0000 | fix(tests): extend Orchestrator import guard to test_lighter_client + test_strategy_decision_alerts
+5fdeaf5 | 2026-04-24 11:55:21 +0000 | fix(audit): resolve H-02 H-03 H-04 H-05 from CEO Apr 24 audit
+a4f73a6 | 2026-04-24 11:55:00 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T11:54:59Z
 1c9075d | 2026-04-24 11:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T11:10:01Z
 28212fd | 2026-04-24 10:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T10:10:02Z
 3a3a00f | 2026-04-24 09:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T09:10:01Z
