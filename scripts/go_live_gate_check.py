@@ -679,13 +679,6 @@ def main() -> int:
     conc_ok, conc_detail = family_concentration_gate(candidates)
     check("Candidate family/symbol concentration within limits", conc_ok, conc_detail)
 
-    # Decision-lane signal recency WARN (not a hard gate — does not affect fail count)
-    _lane_recent, _lane_recency_detail = decision_lane_recency_check(candidates)
-    if not _lane_recent:
-        print(f"  [WARN] Decision-lane signal starvation (>96h) -- {_lane_recency_detail}")
-    else:
-        print(f"  [INFO] Decision-lane recency OK -- {_lane_recency_detail}")
-
     print()
     print("=" * 60)
     passed = sum(1 for result in RESULTS if result["passed"])
