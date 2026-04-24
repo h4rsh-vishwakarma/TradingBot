@@ -30,10 +30,11 @@ VERDICT: NO-GO  (1 of 27 gates FAILED)
 - Before Apr 22 session: NO-GO (3/27 FAIL)
 - After FIX-1/FIX-2 (morning): NO-GO (1/27 FAIL)
 - After FIX-3 through FIX-11 + TV cleanup (afternoon): NO-GO (1/27 FAIL)
-- After Apr 24 AM fixes (gate_check NameError + freeze baseline reset): NO-GO **(1/27 FAIL)** ← current
-- **Remaining blocker:** CCI Trend needs 5 closed paper trades (has 1); Donchian Trend needs 5 (has 0)
-- **ETA to gate clear:** Unknown — CCI Trend / Donchian Trend TV alerts have not fired since 2026-04-20 05:51 UTC. Verify TradingView alert is active with exact strategy name match before estimating ETA.
-- **H-03 ALERT (2026-04-24):** No decision-lane signals received since 2026-04-20 05:51 UTC (4+ days). TradingView alerts for "CCI Trend" and "Donchian Trend" (exact name match required) appear inactive. Research-lane variants (CCI_Donchian, Donchian_Trend underscore names) are firing on ETHUSDT but are not in the manifest. Action: verify and repair TV alert names immediately.
+- After Apr 24 AM fixes (gate_check NameError + freeze baseline reset): NO-GO (1/27 FAIL)
+- After Apr 24 PM fixes (H-06..H-09: recency hard gate 72h, TV fill 200, eth_account skip, DECISION_LANE auto-update): NO-GO **(2/28 FAIL)** ← current
+- **H-01 RESOLVED (2026-04-24 ~18:00 IST):** Harsh confirmed TradingView alerts for "CCI Trend" and "Donchian Trend" exist with correct name, correct JSON/order-fill format, and correct webhook URL. No setup issue — gate failure is market-driven (ETHUSDT 4H has not triggered strategy conditions since 2026-04-20 05:51 UTC).
+- **Remaining blockers (market-driven, not config):** CCI Trend needs 5 closed paper trades (has 1); Donchian Trend needs 5 (has 0). Both gates clear automatically when signals arrive and trades close.
+- **ETA to gate clear:** When ETHUSDT 4H next crosses CCI/Donchian threshold. No manual action required.
 
 ---
 
