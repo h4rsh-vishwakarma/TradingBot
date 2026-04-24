@@ -1,5 +1,5 @@
 # Decision Lane Status Report
-> Auto-regenerated 2026-04-24 10:30 IST
+> Auto-regenerated 2026-04-24 13:40 IST
 > **Scope: CCI Trend + Donchian Trend on ETHUSDT 4h ONLY**
 > All other strategies are paper-only research — not part of go-live decision
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
@@ -22,7 +22,7 @@
 ## Gate Verdict (live as of 2026-04-24 10:30 IST)
 
 ```
-VERDICT: NO-GO  (2 of 27 gates FAILED)
+VERDICT: NO-GO  (1 of 27 gates FAILED)
 [FAIL] Candidates have min closed paper trades (4H=5,1H=10,15m=20) -- CCI Trend:1(NEED 5); Donchian Trend:0(NEED 5)
 ```
 
@@ -30,6 +30,7 @@ VERDICT: NO-GO  (2 of 27 gates FAILED)
 - Before Apr 22 session: NO-GO (3/27 FAIL)
 - After FIX-1/FIX-2 (morning): NO-GO (1/27 FAIL)
 - After FIX-3 through FIX-11 + TV cleanup (afternoon): NO-GO (1/27 FAIL)
+- After Apr 24 AM fixes (gate_check NameError + freeze baseline reset): NO-GO **(1/27 FAIL)** ← current
 - **Remaining blocker:** CCI Trend needs 5 closed paper trades (has 1); Donchian Trend needs 5 (has 0)
 - **ETA to gate clear:** Unknown — CCI Trend / Donchian Trend TV alerts have not fired since 2026-04-20 05:51 UTC. Verify TradingView alert is active with exact strategy name match before estimating ETA.
 - **H-03 ALERT (2026-04-24):** No decision-lane signals received since 2026-04-20 05:51 UTC (4+ days). TradingView alerts for "CCI Trend" and "Donchian Trend" (exact name match required) appear inactive. Research-lane variants (CCI_Donchian, Donchian_Trend underscore names) are firing on ETHUSDT but are not in the manifest. Action: verify and repair TV alert names immediately.
@@ -101,7 +102,7 @@ Key findings from CEO review:
 - GitHub now validates narrow ETH-only decision lane ✅
 - Manifest v14 explicit (2 candidates, both ETHUSDT 4H) ✅
 - TRACKER_SOURCE_OF_TRUTH.md separates lane evidence from research ✅
-- RUNTIME_LOG.md reflects v14, 2 candidates, NO-GO (2/27 as of Apr 24) ✅
+- RUNTIME_LOG.md reflects v14, 2 candidates, NO-GO (1/27 as of Apr 24) ✅
 - **Remaining gap:** Too few closed decision-lane paper trades (need 5, have 1 each) ❌
 
 **What must not be widened yet:** candidate_for_tiny_capital, G94, ML Lorentzian, combos, broader asset scope.
