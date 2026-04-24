@@ -115,6 +115,7 @@ class TestWebhookToQueue:
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
             config = {"webhook": {"secret": "test_secret_123"}}
             server = WebhookServer(config=config, signals_queue_file=tf.name)
+            server.app.config["TESTING"] = True
             client = server.app.test_client()
 
             payload = {
@@ -142,6 +143,7 @@ class TestWebhookToQueue:
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
             config = {"webhook": {"secret": "test_secret_123"}}
             server = WebhookServer(config=config, signals_queue_file=tf.name)
+            server.app.config["TESTING"] = True
             client = server.app.test_client()
 
             text = "TestStrategy | SOLUSDT - Webhook (test_secret_123): order buy @ 10 filled on SOLUSDT. New strategy position is 10"
@@ -159,6 +161,7 @@ class TestWebhookToQueue:
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
             config = {"webhook": {"secret": "test_secret_123"}}
             server = WebhookServer(config=config, signals_queue_file=tf.name)
+            server.app.config["TESTING"] = True
             client = server.app.test_client()
 
             payload = {
@@ -181,6 +184,7 @@ class TestWebhookToQueue:
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
             config = {"webhook": {"secret": "test_secret_123"}}
             server = WebhookServer(config=config, signals_queue_file=tf.name)
+            server.app.config["TESTING"] = True
             client = server.app.test_client()
 
             payload = {
@@ -202,6 +206,7 @@ class TestWebhookToQueue:
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
             config = {"webhook": {"secret": "test_secret_123"}}
             server = WebhookServer(config=config, signals_queue_file=tf.name)
+            server.app.config["TESTING"] = True
             client = server.app.test_client()
 
             text = "TestStrategy: order buy @ 10 filled on SOLUSDT. New strategy position is 10"
@@ -220,6 +225,7 @@ class TestWebhookToQueue:
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
             config = {"webhook": {"secret": "test_secret_123"}}
             server = WebhookServer(config=config, signals_queue_file=tf.name)
+            server.app.config["TESTING"] = True
             client = server.app.test_client()
 
             payload = {
@@ -242,6 +248,7 @@ class TestWebhookToQueue:
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
             config = {"webhook": {"secret": "test_secret_123"}}
             server = WebhookServer(config=config, signals_queue_file=tf.name)
+            server.app.config["TESTING"] = True
             client = server.app.test_client()
 
             payload = {
@@ -263,6 +270,7 @@ class TestWebhookToQueue:
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
             config = {"webhook": {"secret": "test_secret_123"}}
             server = WebhookServer(config=config, signals_queue_file=tf.name)
+            server.app.config["TESTING"] = True
             client = server.app.test_client()
 
             text = "TestStrategy: order buy @ 10 filled on SOLUSDT. New strategy position is 10"
@@ -281,6 +289,7 @@ class TestWebhookToQueue:
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
             config = {"webhook": {"secret": "test_secret_123"}}
             server = WebhookServer(config=config, signals_queue_file=tf.name)
+            server.app.config["TESTING"] = True
             client = server.app.test_client()
 
             payload = {
@@ -303,6 +312,7 @@ class TestWebhookToQueue:
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
             config = {"webhook": {"secret": "test_secret_123"}}
             server = WebhookServer(config=config, signals_queue_file=tf.name)
+            server.app.config["TESTING"] = True
             client = server.app.test_client()
             resp = client.get("/health")
             assert resp.status_code == 200
@@ -315,6 +325,7 @@ class TestWebhookToQueue:
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
             config = {"webhook": {"secret": "test_secret_123"}}
             server = WebhookServer(config=config, signals_queue_file=tf.name)
+            server.app.config["TESTING"] = True
             client = server.app.test_client()
             resp = client.get("/metrics")
             assert resp.status_code == 200
@@ -743,7 +754,7 @@ class TestSafetyGatesBlock:
 
             # Lock BUY direction
             orch._set_candle_lock("BTCUSDT", "BUY", "TestStrat")
-            # Opposite direction (SELL) should be blocked
-            assert orch._is_candle_locked("BTCUSDT", "SELL")
+            # Opposite direction (SELL) should be blocked for same strategy
+            assert orch._is_candle_locked("BTCUSDT", "SELL", "TestStrat")
             # Same direction (BUY) should NOT be blocked
-            assert not orch._is_candle_locked("BTCUSDT", "BUY")
+            assert not orch._is_candle_locked("BTCUSDT", "BUY", "TestStrat")

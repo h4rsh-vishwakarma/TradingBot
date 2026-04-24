@@ -500,8 +500,8 @@ def min_closed_trades_gate(candidates: list[dict]) -> tuple[bool, str]:
                     continue
                 if not rec.get("is_exit"):
                     continue
-                strat = str(rec.get(strategy, )).strip()
-                rec_sym = str(rec.get(symbol, )).upper().strip()
+                strat = str(rec.get("strategy", "")).strip()
+                rec_sym = str(rec.get("symbol", "")).upper().strip()
                 if strat:
                     strategy_exits.setdefault(strat, {})
                     strategy_exits[strat][rec_sym] = strategy_exits[strat].get(rec_sym, 0) + 1

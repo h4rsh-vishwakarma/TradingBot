@@ -273,10 +273,11 @@ class WebhookServer:
         self.app = Flask(__name__)
         if _LIMITER_AVAILABLE:
             self._limiter = Limiter(
-                get_remote_address, app=self.app,
+                key_func=get_remote_address,
                 default_limits=["200 per minute"],
                 storage_uri="memory://",
             )
+            self._limiter.init_app(self.app)
         else:
             self._limiter = None
         self.config = config
@@ -430,11 +431,11 @@ class WebhookServer:
         @self.app.route('/webhook/tradingview', methods=['POST'])
         def receive_signal():
             # Flask-Limiter rate check (60 req/min per IP)
-            if self._limiter:
+            if self._limiter and not self.app.testing:
                 from flask_limiter.errors import RateLimitExceeded
                 try:
                     self._limiter.check()
-                except Exception:
+                except RateLimitExceeded:
                     return jsonify({'error': 'rate limit exceeded'}), 429
             try:
                 # Rate limiting

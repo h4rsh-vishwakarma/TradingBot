@@ -44,7 +44,7 @@
 
 ## File-by-File Summary
 
-### `config/approved_strategies.json` (v10)
+### `config/approved_strategies.json` (v14)
 - Manifest of all strategies: label, symbols, timeframes, backtest hash
 - `approval_class=candidate_for_tiny_capital` → decision lane (currently 2: CCI Trend + Donchian Trend, ETHUSDT)
 - `approval_class=paper_only` → research monitored, not capital-eligible (29 strategies)
