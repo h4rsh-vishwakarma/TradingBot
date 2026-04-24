@@ -265,6 +265,34 @@ All other strategies are testnet/research — not part of Apr 14 go-live decisio
 *Do not edit manually — changes will be overwritten.*
 """
 
+# P-04: Signal drought alert — Telegram notification at 48h / 72h / 96h / 120h thresholds
+_drought_hours = float('inf')
+_most_recent_dl_ts = max(_dl_last_ts.values()) if any(v > 0 for v in _dl_last_ts.values()) else 0.0
+if _most_recent_dl_ts > 0:
+    _drought_hours = (now.timestamp() - _most_recent_dl_ts) / 3600
+_recency_failing = any('Decision-lane ETHUSDT signal' in l for l in gate_out.split(chr(10)) if '[FAIL]' in l)
+_drought_alert_thresholds = [48, 72, 96, 120]
+if _recency_failing and any(t <= _drought_hours < t + 1.5 for t in _drought_alert_thresholds):
+    try:
+        from tradingview_webhook_bot.alerts.telegram_alerts import TelegramAlert, AlertSeverity
+        _tg = TelegramAlert()
+        _cci_last = _dl_last_signal.get('CCI Trend', 'never')
+        _don_last = _dl_last_signal.get('Donchian Trend', 'never')
+        _tg.send(
+            severity=AlertSeverity.WARNING,
+            title=chr(9888) + " Decision-Lane Signal Drought",
+            message=(
+                f"No ETHUSDT decision-lane signal in {_drought_hours:.0f}h "
+                f"(gate FAIL threshold: 72h).\n\n"
+                f"CCI Trend last: {_cci_last}\n"
+                f"Donchian Trend last: {_don_last}\n\n"
+                "Verify TradingView alerts are active on ETHUSDT 4H chart."
+            ),
+        )
+        print(f"Telegram drought alert sent ({_drought_hours:.0f}h stale)")
+    except Exception as _tg_exc:
+        print(f"Telegram drought alert skipped: {_tg_exc}")
+
 import re as _re
 _ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30))).strftime('%Y-%m-%d %H:%M IST')
 _fail_lines = [l.strip() for l in gate_out.split(chr(10)) if '[FAIL]' in l]

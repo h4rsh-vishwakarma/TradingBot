@@ -242,11 +242,17 @@ class TestWebhookServer:
         resp = app_client.post("/webhook/tradingview", json=payload)
         assert resp.status_code == 401
 
-    def test_secretless_order_fill_accepted(self, client):
-        # TV order-fill format alerts are intentionally accepted without a secret.
-        # Format-trusted but still manifest-checked before any execution.
+    def test_secretless_order_fill_unknown_strategy_rejected(self, client):
+        # P-06: secretless TV order-fill for a strategy not in manifest returns 403.
         app_client, _ = client
         payload = "BTC Breakout: order buy @ 50000 filled on BTCUSDT. New strategy position is 1"
+        resp = app_client.post("/webhook/tradingview", data=payload, content_type="text/plain")
+        assert resp.status_code == 403
+
+    def test_secretless_order_fill_manifest_strategy_accepted(self, client):
+        # P-06: secretless TV order-fill for a manifest-approved strategy returns 200.
+        app_client, _ = client
+        payload = "CCI Trend: order buy @ 2000 filled on ETHUSDT. New strategy position is 1"
         resp = app_client.post("/webhook/tradingview", data=payload, content_type="text/plain")
         assert resp.status_code == 200
 

@@ -558,8 +558,28 @@ class WebhookServer:
                     # format specificity and do not carry a secret in the message body.
                     parsed_secret = parsed.get('secret')
                     if _is_tv_order_fill:
-                        # Secretless TV order-fill — accept, log for audit
-                        logger.info("✅ Accepted secretless TV order-fill alert (format-trusted)")
+                        # P-06: Manifest pre-check before accepting secretless order-fill.
+                        # Rejects spoofed order-fill payloads for unknown strategy names.
+                        _tv_strat = parsed.get('strategy', '')
+                        _mf_path_tv = Path(__file__).resolve().parents[2] / 'config' / 'approved_strategies.json'
+                        _tv_approved: set = set()
+                        try:
+                            with open(_mf_path_tv) as _mf_tv:
+                                _mf_tv_data = json.load(_mf_tv)
+                            _tv_approved = (
+                                {a['strategy'].replace(' ', '_') for a in _mf_tv_data.get('approvals', [])}
+                                | {a['strategy'] for a in _mf_tv_data.get('approvals', [])}
+                            )
+                        except Exception:
+                            pass
+                        if _tv_approved and _tv_strat not in _tv_approved:
+                            logger.warning(
+                                f"🚫 Secretless TV order-fill rejected — strategy not in manifest: {_tv_strat}"
+                            )
+                            return jsonify({'status': 'error', 'message': 'Strategy not authorized'}), 403
+                        logger.info(
+                            f"✅ Accepted secretless TV order-fill alert (format-trusted, manifest-verified): {_tv_strat}"
+                        )
                     elif not parsed_secret or parsed_secret != self.webhook_secret:
                         logger.warning("❌ Unauthorized plain text attempt — secret missing or mismatch")
                         return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
