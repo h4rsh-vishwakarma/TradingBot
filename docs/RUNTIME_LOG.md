@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-24
 
-> Auto-generated — last updated `2026-04-24T11:10:01Z`
+> Auto-generated — last updated `2026-04-24T11:54:59Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (1 of 27 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-24T11:10:01Z |
+| Last run | 2026-04-24T11:54:59Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -33,6 +33,13 @@
 
 ### RESEARCH (placeholder — not yet on TradingView)
 
+
+## Decision-Lane Scoreboard (ETHUSDT 4H)
+| Strategy | Closed ETHUSDT Trades | Last ETHUSDT Signal |
+|---|---|---|
+| CCI Trend | 1/5 (NEED MORE) | 2026-04-20T05:51:09 UTC |
+| Donchian Trend | 0/5 (NEED MORE) | never |
+> Gate requires 5 closed ETHUSDT trades per strategy. OK = threshold met.
 
 ## Signal Pipeline — Last 24h
 | Item | Value |
@@ -83,6 +90,7 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 
 ## Commits Today (2026-04-24)
 ```
+1c9075d | 2026-04-24 11:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T11:10:01Z
 28212fd | 2026-04-24 10:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T10:10:02Z
 3a3a00f | 2026-04-24 09:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T09:10:01Z
 a97b248 | 2026-04-24 08:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T08:10:01Z
