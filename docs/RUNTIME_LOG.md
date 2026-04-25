@@ -1,6 +1,6 @@
-# Runtime Log — 2026-04-24
+# Runtime Log — 2026-04-25
 
-> Auto-generated — last updated `2026-04-24T12:10:01Z`
+> Auto-generated — last updated `2026-04-25T04:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,9 +8,9 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (2 of 28 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (3 of 28 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-24T12:10:01Z |
+| Last run | 2026-04-25T04:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -44,16 +44,16 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 11 |
-| Completed | 11 |
-| Last signal | 2026-04-24 12:01 UTC |
-| Last strategy | G27 CCI Donchian Wide / MAGICUSDT |
+| Signals received | 16 |
+| Completed | 16 |
+| Last signal | 2026-04-25 04:00 UTC |
+| Last strategy | G68 OBV CCI Cross / MAGICUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260424_1205 |
+| Last heartbeat file | heartbeat_20260425_0405 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -88,8 +88,24 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 | Dashboard | https://tradingbot.operatorbrief.xyz/ | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
-## Commits Today (2026-04-24)
+## Commits Today (2026-04-25)
 ```
+a63f8b9 | 2026-04-25 03:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T03:10:01Z
+65b8525 | 2026-04-25 02:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T02:10:01Z
+e6a9e6c | 2026-04-25 01:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T01:10:02Z
+dfa53f8 | 2026-04-25 00:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T00:10:01Z
+bc2fdf1 | 2026-04-24 23:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T23:10:02Z
+8157fa2 | 2026-04-24 22:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T22:10:01Z
+e0db2bc | 2026-04-24 21:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T21:10:01Z
+9d0a4e9 | 2026-04-24 20:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T20:10:01Z
+c5f55cc | 2026-04-24 19:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T19:10:01Z
+cb97051 | 2026-04-24 18:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T18:10:02Z
+dcf3c97 | 2026-04-24 17:10:02 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T17:10:01Z
+2c6b185 | 2026-04-24 16:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T16:10:01Z
+6fe97af | 2026-04-24 15:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T15:10:01Z
+2fef574 | 2026-04-24 14:10:02 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T14:10:01Z
+d8d311a | 2026-04-24 13:10:02 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T13:10:01Z
+1b8174a | 2026-04-24 12:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T12:10:01Z
 0e26b97 | 2026-04-24 12:01:20 +0000 | fix(tests): extend Orchestrator import guard to test_lighter_client + test_strategy_decision_alerts
 5fdeaf5 | 2026-04-24 11:55:21 +0000 | fix(audit): resolve H-02 H-03 H-04 H-05 from CEO Apr 24 audit
 a4f73a6 | 2026-04-24 11:55:00 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T11:54:59Z

@@ -662,6 +662,12 @@ class TestIdempotencyCleanup:
 
 
 class TestSafetyGatesBlock:
+    @pytest.fixture(autouse=True)
+    def _require_eth_account(self):
+        pytest.importorskip(
+            "eth_account",
+            reason="eth_account not installed in this Python env — run with venv/bin/python",
+        )
     """Prove that safety gates deterministically block signals at runtime."""
 
     @pytest.fixture(autouse=True)
