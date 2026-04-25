@@ -229,7 +229,7 @@ This class is reserved for Harsh's personal trading strategies. It is **not part
 
 | Strategy | Symbol | TF | TV Status | Notes |
 |----------|--------|----|-----------|-------|
-| EMA Stack 15M | BTCUSDT / ETHUSDT / SOLUSDT | 15m | MISSING — alert not yet deployed | Must deploy before personal capital use |
+| EMA Stack 15M | BTCUSDT / ETHUSDT / SOLUSDT | 15m | UNVERIFIED — real BTCUSDT fill recorded 2026-04-21 but TV inventory has no LIVE_VERIFIED entry | Position closed (ledger confirmed). Alert appears to have fired at least once. Must achieve formal LIVE_VERIFIED status in `tv_inventory_report.csv` before next personal capital deployment. |
 
 
 ## Paper Window Hard-Stop Conditions (NO_GO Triggers)

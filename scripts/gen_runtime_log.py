@@ -130,12 +130,29 @@ if hb_files:
         pass
 
 
+# STOP_DISPATCH detection
+_stop_dispatch_path = "tradingview_webhook_bot/storage/STOP_DISPATCH"
+_stop_dispatch_active = os.path.exists(_stop_dispatch_path)
+_stop_dispatch_note = ""
+if _stop_dispatch_active:
+    import time as _time
+    _sd_mtime = os.path.getmtime(_stop_dispatch_path)
+    _sd_age_h = (_time.time() - _sd_mtime) / 3600
+    _sd_since = datetime.fromtimestamp(_sd_mtime, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    _stop_dispatch_note = f"⚠️ STOP_DISPATCH active since {_sd_since} ({_sd_age_h:.1f}h ago) — no signals are being dispatched to the exchange"
+
 # Decision-lane scoreboard (CCI Trend + Donchian Trend ETHUSDT closed trades)
+# Closed-trade count: reads execution_metrics.jsonl (only populated on actual fills)
+# Last signal: reads signal_queue.db (populated on every received signal, including test signals)
 _decision_strats = ["CCI Trend", "Donchian Trend"]
 _dl_closed = {s: 0 for s in _decision_strats}
 _dl_last_signal = {s: "never" for s in _decision_strats}
 _dl_last_ts = {s: 0.0 for s in _decision_strats}
+
+# Closed trade count from execution_metrics
 _metrics_path = "storage/reports/paper_validation/execution_metrics.jsonl"
+_paper_start = os.getenv("PAPER_WINDOW_START", "2026-04-07")
+_paper_start_ts = datetime.strptime(_paper_start, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()
 if os.path.exists(_metrics_path):
     with open(_metrics_path) as _mf:
         for _line in _mf:
@@ -148,13 +165,38 @@ if os.path.exists(_metrics_path):
                 continue
             _strat = str(_rec.get("strategy", "")).strip()
             _sym = str(_rec.get("symbol", "")).upper().strip()
-            if _strat in _decision_strats and _sym == "ETHUSDT":
-                _ts = float(_rec.get("timestamp_epoch", 0))
+            _ts = float(_rec.get("timestamp_epoch", 0))
+            if _strat in _decision_strats and _sym == "ETHUSDT" and _ts >= _paper_start_ts:
                 if _rec.get("is_exit"):
                     _dl_closed[_strat] = _dl_closed.get(_strat, 0) + 1
-                if _ts > _dl_last_ts.get(_strat, 0):
-                    _dl_last_ts[_strat] = _ts
-                    _dl_last_signal[_strat] = str(_rec.get("recorded_at", "?"))[:19] + " UTC"
+
+# Last signal received: from signal_queue.db (more current than execution_metrics)
+import re as _re_norm
+_candidate_norm = {_re_norm.sub(r"[^a-z0-9]+", " ", s.lower()).strip(): s for s in _decision_strats}
+try:
+    _sq_conn = sqlite3.connect("tradingview_webhook_bot/storage/signal_queue.db")
+    _sq_rows = _sq_conn.execute(
+        "SELECT payload, created_at FROM signals WHERE created_at >= ? ORDER BY created_at DESC LIMIT 2000",
+        (_paper_start_ts,)
+    ).fetchall()
+    for _raw, _ts_sq in _sq_rows:
+        try:
+            _d = json.loads(_raw)
+            _p = _d.get("payload", _d) if isinstance(_d, dict) else {}
+            _strat_raw = str(_p.get("strategy", ""))
+            _sym_sq = str(_p.get("symbol", "")).upper().strip()
+            _strat_n = _re_norm.sub(r"[^a-z0-9]+", " ", _strat_raw.lower()).strip()
+            if _strat_n in _candidate_norm and _sym_sq == "ETHUSDT":
+                _canonical = _candidate_norm[_strat_n]
+                _ts_f = float(_ts_sq)
+                if _ts_f > _dl_last_ts.get(_canonical, 0):
+                    _dl_last_ts[_canonical] = _ts_f
+                    _dl_last_signal[_canonical] = datetime.fromtimestamp(_ts_f, timezone.utc).strftime("%Y-%m-%dT%H:%M") + " UTC"
+        except Exception:
+            pass
+    _sq_conn.close()
+except Exception:
+    pass
 _scoreboard_items = []
 for _s in _decision_strats:
     _closed = _dl_closed.get(_s, 0)
@@ -235,13 +277,7 @@ Realized P&L: ${rl_pnl:.2f}
 | File | `storage/stale_position_quarantine.json` |
 
 ## Known Issues — Requires Manual Action
-_None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JSON format + auth bypass + SKIP_PYTEST cron noise)._
-
-**Resolved today (2026-04-16):**
-- G-series alerts: now sending JSON format with correct strategy names (Harsh Pine Script update)
-- CCI Trend / LDOUSDT old plain-text format: superseded by server-side TV order-fill bypass
-- Garima test signals (`test_secret_123`): no hits since 2026-04-13; stale note removed
-- TestStrategy: pytest-only infrastructure (operator=harsh), no manifest entry, no live alerts
+{_stop_dispatch_note if _stop_dispatch_active else "_No outstanding operational issues._"}
 
 ## Services
 | Service | URL | Status |

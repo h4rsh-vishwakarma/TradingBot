@@ -730,6 +730,7 @@ def main() -> int:
     if failed == 0:
         print(f"  VERDICT: GO  ({passed}/{total} gates passed)")
         print("=" * 60)
+        _write_gate_verdict_cache(True, 0, total)
         return 0
 
     print(f"  VERDICT: NO-GO  ({failed} of {total} gates FAILED)")
@@ -738,7 +739,24 @@ def main() -> int:
         if not result["passed"]:
             print(f"    FAIL: {result['name']} -- {result['detail']}")
     print("=" * 60)
+    _write_gate_verdict_cache(failed == 0, failed, total)
     return 1
+
+
+def _write_gate_verdict_cache(passed: bool, failed_count: int, total: int) -> None:
+    """Write a lightweight verdict cache so the orchestrator can read gate status without re-running."""
+    cache_path = PROJECT_ROOT / "storage" / "reports" / "gate_verdict_cache.json"
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps({
+            "verdict": "GO" if passed else "NO-GO",
+            "passed": passed,
+            "failed_count": failed_count,
+            "total": total,
+            "checked_at": datetime.now(UTC).isoformat(),
+        }, indent=2))
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

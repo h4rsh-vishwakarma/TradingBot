@@ -397,6 +397,29 @@ class Orchestrator:
             pass
         return ""
 
+    def _check_gate_verdict_cache(self, max_age_hours: float = 2.0) -> tuple[bool, str]:
+        """Read the cached gate verdict from go_live_gate_check.py output.
+
+        Returns (ok, reason). If the cache is missing or stale (>max_age_hours),
+        returns (False, reason) to fail safe.
+        """
+        cache_path = PROJECT_ROOT / "storage" / "reports" / "gate_verdict_cache.json"
+        if not cache_path.exists():
+            return False, "gate_verdict_cache.json missing — run go_live_gate_check.py first"
+        try:
+            data = json.loads(cache_path.read_text())
+            checked_at_str = data.get("checked_at", "")
+            from datetime import datetime as _dt, timezone as _tz
+            checked_at = _dt.fromisoformat(checked_at_str)
+            age_h = (time.time() - checked_at.timestamp()) / 3600
+            if age_h > max_age_hours:
+                return False, f"gate_verdict_cache.json is stale ({age_h:.1f}h old, max {max_age_hours}h)"
+            if data.get("passed"):
+                return True, f"GO ({data.get('total', '?')} gates passed)"
+            return False, f"NO-GO ({data.get('failed_count', '?')} of {data.get('total', '?')} gates FAILED)"
+        except Exception as exc:
+            return False, f"could not read gate verdict cache: {exc}"
+
     def _binance_client_for(self, approval_class: str):
         """Return the correct Binance client based on approval class (lane isolation Q-04)."""
         if approval_class.lower() == "paper_only":
@@ -772,6 +795,29 @@ class Orchestrator:
                 _approval_class = self._get_approval_class(strat_name, symbol, target_exchange)
             _active_binance = self._binance_client_for(_approval_class)
             _active_ledger = self._ledger_for(_approval_class)
+
+            # --- 1.4b. GATE BLOCK CHECK ---
+            # If GATE_BLOCK_EXECUTION=true, block entry signals for candidate_for_tiny_capital
+            # strategies unless the go-live gate verdict cache says GO.
+            # Exits always pass (closing an open position is always allowed).
+            if (
+                not is_exit_hint
+                and os.getenv("GATE_BLOCK_EXECUTION", "").lower() == "true"
+                and _approval_class == "candidate_for_tiny_capital"
+            ):
+                _gate_ok, _gate_reason = self._check_gate_verdict_cache()
+                if not _gate_ok:
+                    logger.warning(f"Gate block: GATE_BLOCK_EXECUTION=true and gate is NO-GO | strat={strat_name} reason={_gate_reason}")
+                    self._notify_signal_decision(
+                        title="Signal Blocked — Gate NO-GO",
+                        reason=f"GATE_BLOCK_EXECUTION is set. Gate verdict: {_gate_reason}. Signal will not execute until all 28 gates pass.",
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        strategy=strat_name,
+                        action=side_hint,
+                        severity=AlertSeverity.WARNING,
+                    )
+                    return True
 
             # --- 1.5. SIGNAL DEDUP CHECK ---
             if self._is_duplicate_signal(strat_name, symbol, side_hint):

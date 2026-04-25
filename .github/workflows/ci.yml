@@ -20,4 +20,4 @@ jobs:
           pip install pytest-cov flake8
       - name: Run tests
         run: |
-          python -m pytest -v --tb=short tests/test_integration_flow.py tests/test_orchestrator_flow.py tests/test_strategy_decision_alerts.py tests/test_lighter_client.py tests/test_exit_fallback.py tests/test_alpha_engine.py tests/test_batch_backtest_realism.py tests/test_verify_tv_inventory.py tradingview_webhook_bot/recon/test_recon.py --cov=tradingview_webhook_bot --cov-report=term-missing
+          python -m pytest -v --tb=short tests/test_integration_flow.py tests/test_tradingview_webhook_bot.py tests/test_hardened_logic.py tests/test_hardened_ledger.py tests/test_orchestrator_flow.py tests/test_strategy_decision_alerts.py tests/test_lighter_client.py tests/test_exit_fallback.py tests/test_alpha_engine.py tests/test_batch_backtest_realism.py tests/test_verify_tv_inventory.py tests/test_concurrency.py tradingview_webhook_bot/recon/test_recon.py --cov=tradingview_webhook_bot --cov-report=term-missing
