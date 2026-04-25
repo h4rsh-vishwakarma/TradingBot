@@ -58,13 +58,19 @@ def parse_tv_csv(file_path):
     raw_name = os.path.basename(file_path)
     clean_name = raw_name.split('_BITSTAMP')[0].replace('_', ' ')
 
+    wr = round(float(win_rate), 2)
+    pf = round(float(profit_factor), 2)
+    suspect = "YES" if wr > 65.0 or pf > 5.0 else "NO"
+
     return {
         "strategy_name": clean_name,
         "net_profit": round(float(net_profit), 2),
-        "profit_factor": round(float(profit_factor), 2),
-        "win_rate": round(float(win_rate), 2),
+        "profit_factor": pf,
+        "win_rate": wr,
         "max_dd": round(float(max_dd), 2),
-        "sharpe": round(float(sharpe), 2)
+        "sharpe": round(float(sharpe), 2),
+        "source": "tv_backtester",
+        "suspect": suspect,
     }
     # Try multiple encodings because TradingView is inconsistent
     for enc in ['utf-8', 'utf-16', 'cp1252']:
@@ -98,14 +104,16 @@ def save_to_db(data):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO metrics (strategy_name, net_profit, profit_factor, win_rate, max_dd, sharpe)
-        VALUES (:strategy_name, :net_profit, :profit_factor, :win_rate, :max_dd, :sharpe)
+        INSERT INTO metrics (strategy_name, net_profit, profit_factor, win_rate, max_dd, sharpe, source, suspect)
+        VALUES (:strategy_name, :net_profit, :profit_factor, :win_rate, :max_dd, :sharpe, :source, :suspect)
         ON CONFLICT(strategy_name) DO UPDATE SET
             net_profit=excluded.net_profit,
             profit_factor=excluded.profit_factor,
             win_rate=excluded.win_rate,
             max_dd=excluded.max_dd,
-            sharpe=excluded.sharpe
+            sharpe=excluded.sharpe,
+            source=excluded.source,
+            suspect=excluded.suspect
     ''', data)
     conn.commit()
     conn.close()
