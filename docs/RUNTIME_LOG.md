@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-25
 
-> Auto-generated — last updated `2026-04-25T05:10:01Z`
+> Auto-generated — last updated `2026-04-25T05:59:24Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,9 +8,9 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (3 of 28 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (1 of 28 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-25T05:10:01Z |
+| Last run | 2026-04-25T05:59:24Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -37,17 +37,17 @@
 ## Decision-Lane Scoreboard (ETHUSDT 4H)
 | Strategy | Closed ETHUSDT Trades | Last ETHUSDT Signal |
 |---|---|---|
-| CCI Trend | 1/5 (NEED MORE) | 2026-04-20T05:51:09 UTC |
-| Donchian Trend | 0/5 (NEED MORE) | never |
+| CCI Trend | 1/5 (NEED MORE) | 2026-04-25T05:17 UTC |
+| Donchian Trend | 0/5 (NEED MORE) | 2026-04-25T05:17 UTC |
 > Gate requires 5 closed ETHUSDT trades per strategy. OK = threshold met.
 
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 16 |
-| Completed | 16 |
-| Last signal | 2026-04-25 04:00 UTC |
-| Last strategy | G68 OBV CCI Cross / MAGICUSDT |
+| Signals received | 18 |
+| Completed | 18 |
+| Last signal | 2026-04-25 05:17 UTC |
+| Last strategy | Donchian Trend / ETHUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
@@ -73,13 +73,7 @@ Realized P&L: $0.00
 | File | `storage/stale_position_quarantine.json` |
 
 ## Known Issues — Requires Manual Action
-_None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JSON format + auth bypass + SKIP_PYTEST cron noise)._
-
-**Resolved today (2026-04-16):**
-- G-series alerts: now sending JSON format with correct strategy names (Harsh Pine Script update)
-- CCI Trend / LDOUSDT old plain-text format: superseded by server-side TV order-fill bypass
-- Garima test signals (`test_secret_123`): no hits since 2026-04-13; stale note removed
-- TestStrategy: pytest-only infrastructure (operator=harsh), no manifest entry, no live alerts
+⚠️ STOP_DISPATCH active since 2026-04-23 11:45 UTC (42.2h ago) — no signals are being dispatched to the exchange
 
 ## Services
 | Service | URL | Status |
@@ -90,6 +84,11 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 
 ## Commits Today (2026-04-25)
 ```
+4955957 | 2026-04-25 11:28:37 +0530 | fix(H-11..H-14): CI coverage, gate enforcement, STOP_DISPATCH observability, EMA doc
+2ec8a68 | 2026-04-25 10:57:00 +0530 | docs: refresh DECISION_LANE_STATUS — 1/28 FAIL (Apr 25 21:00 IST)
+faf71da | 2026-04-25 10:55:17 +0530 | Merge remote-tracking branch 'origin/main'
+966dba4 | 2026-04-25 10:54:40 +0530 | fix(gate): recency check reads signal_queue.db instead of execution_metrics.jsonl
+443aff8 | 2026-04-25 05:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T05:10:01Z
 3bcddfa | 2026-04-25 10:10:56 +0530 | fix(tests): remove duplicate secretless order-fill test + update to P-06 behavior
 5cf5504 | 2026-04-25 10:08:10 +0530 | Merge remote-tracking branch 'origin/main'
 db6bd80 | 2026-04-25 10:05:38 +0530 | docs: refresh DECISION_LANE_STATUS — 3/28 FAIL, Apr 25 live gate state
