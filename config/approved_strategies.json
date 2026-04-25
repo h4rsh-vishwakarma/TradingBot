@@ -1,6 +1,6 @@
 {
-  "version": 14,
-  "updated_at": "2026-04-23T13:47:09.093889+00:00",
+  "version": 15,
+  "updated_at": "2026-04-25T10:00:00.000000+00:00",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -386,28 +386,7 @@
       "approved_at": "2026-04-15T12:00:00Z",
       "backtest_hash": "backtest_ml_lorentzian_LDOUSDT_4h_20260415",
       "label": "RESEARCH",
-      "notes": "ML Lorentzian Classification (JdeP). LDOUSDT 4h. Sharpe=7.28, PF=high, DD low. Kernel regression + k-NN feature space. Approved for testnet live execution. | symbols widened to wildcard 2026-04-15: existing TV alert sends SOLUSDT; primary target LDOUSDT 4h.",
-      "approval_class": "paper_only",
-      "class_reason": "Demoted from candidate_for_tiny_capital to paper_only 2026-04-16 per A-03 governance freeze. Backtest-only evidence (Sharpe=7.28 on LDOUSDT 4h). No live paper signals confirmed yet. Reinstate to candidate_for_tiny_capital only after 7-day paper window with >=5 closed trades and DSR validation.",
-      "demoted_at": "2026-04-16T13:00:00Z",
-      "shortlist_priority": false
-    },
-    {
-      "strategy": "Machine Learning Lorentzian Classification",
-      "exchange": "binance",
-      "symbols": [
-        "ETHUSDT",
-        "BTCUSDT",
-        "SOLUSDT"
-      ],
-      "timeframes": [
-        "240"
-      ],
-      "operator": "harsh",
-      "approved_at": "2026-04-15T12:00:00Z",
-      "backtest_hash": "backtest_ml_lorentzian_v2_LDOUSDT_4h_20260415",
-      "label": "RESEARCH",
-      "notes": "ML Lorentzian Classification v2 variant. LDOUSDT 4h. Sharpe=6.93. Kernel regression + k-NN feature space. Approved for testnet live execution. | symbols widened to wildcard 2026-04-15: existing TV alert sends SOLUSDT; primary target LDOUSDT 4h.",
+      "notes": "ML Lorentzian Classification (JdeP). LDOUSDT 4h. Sharpe=7.28, PF=high, DD low. Kernel regression + k-NN feature space. Approved for testnet live execution. | symbols widened to wildcard 2026-04-15: existing TV alert sends SOLUSDT; primary target LDOUSDT 4h. | v2 variant (Sharpe=6.93) merged into this entry 2026-04-25 — duplicate entry removed.",
       "approval_class": "paper_only",
       "class_reason": "Demoted from candidate_for_tiny_capital to paper_only 2026-04-16 per A-03 governance freeze. Backtest-only evidence (Sharpe=7.28 on LDOUSDT 4h). No live paper signals confirmed yet. Reinstate to candidate_for_tiny_capital only after 7-day paper window with >=5 closed trades and DSR validation.",
       "demoted_at": "2026-04-16T13:00:00Z",
