@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-25
 
-> Auto-generated — last updated `2026-04-25T05:59:24Z`
+> Auto-generated — last updated `2026-04-25T06:04:04Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (1 of 28 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-25T05:59:24Z |
+| Last run | 2026-04-25T06:04:04Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -73,7 +73,7 @@ Realized P&L: $0.00
 | File | `storage/stale_position_quarantine.json` |
 
 ## Known Issues — Requires Manual Action
-⚠️ STOP_DISPATCH active since 2026-04-23 11:45 UTC (42.2h ago) — no signals are being dispatched to the exchange
+_No outstanding operational issues._
 
 ## Services
 | Service | URL | Status |
@@ -84,6 +84,7 @@ Realized P&L: $0.00
 
 ## Commits Today (2026-04-25)
 ```
+a65263d | 2026-04-25 05:59:24 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T05:59:24Z
 4955957 | 2026-04-25 11:28:37 +0530 | fix(H-11..H-14): CI coverage, gate enforcement, STOP_DISPATCH observability, EMA doc
 2ec8a68 | 2026-04-25 10:57:00 +0530 | docs: refresh DECISION_LANE_STATUS — 1/28 FAIL (Apr 25 21:00 IST)
 faf71da | 2026-04-25 10:55:17 +0530 | Merge remote-tracking branch 'origin/main'
