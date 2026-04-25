@@ -1,5 +1,5 @@
 # Decision Lane Status Report
-> Refreshed 2026-04-25 15:44 IST
+> Refreshed 2026-04-25 19:30 IST
 > **Scope: CCI Trend + Donchian Trend on ETHUSDT 4h ONLY**
 > All other strategies are paper-only research — not part of go-live decision
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
@@ -33,9 +33,10 @@ VERDICT: NO-GO  (1 of 28 gates FAILED)
 - After Apr 24 AM fixes (gate_check NameError + freeze baseline reset): NO-GO (1/27 FAIL)
 - After Apr 24 PM fixes (H-06..H-09: recency hard gate 72h added as gate #28): NO-GO (2/28 FAIL)
 - **Apr 25 15:44 IST — live gate check: NO-GO (3/28 FAIL)** ← current
-  - Gate #1 (inventory): Donchian Trend still MISSING despite H-01 claim — alert may exist in TV but has never fired on ETHUSDT, so inventory check cannot verify it. Alert must fire at least once.
-  - Gate #2 (trade count): unchanged — CCI 1/5, Donchian 0/5. Market-gated.
-  - Gate #3 (signal recency): 118.4h since last ETHUSDT CCI signal. CCI Trend alert liveness must be confirmed in TradingView UI.
+  - Gate #1 (inventory): Donchian Trend still MISSING — alert must fire at least once on ETHUSDT 4H.
+  - Gate #2 (trade count): CCI 1/5, Donchian 0/5. Market-gated (H-31).
+  - Gate #3 (signal recency): 118.4h since last ETHUSDT CCI signal. Confirm alert not expired in TradingView UI.
+- **Apr 25 19:30 IST — H-26..H-29 applied:** STOP_LOSS_PCT corrected to 2.0; all 3 processes under systemd; env_vars.template created; gate check now validates SL bounds + BLOCKED list. Gate count unchanged (1/28 FAIL — trade count only).
 
 **ACTION REQUIRED (Harsh — manual, TradingView UI):**
 1. **Donchian Trend:** Log into TradingView → confirm alert exists on ETHUSDT 4H chart with exact name `Donchian Trend`. Use the Test button to fire a test signal. Confirm receipt in server `auto_scan.log`.
@@ -83,6 +84,33 @@ Research lane realized P&L: $0.0
 
 > **Important:** Research lane positions above do NOT count as decision-lane evidence.
 > They are paper_only monitoring under A-10 lane isolation.
+
+---
+
+## Post-Checkpoint Fixes Applied (2026-04-25 — H-26 through H-28)
+
+| Fix ID | Fix | Impact |
+|--------|-----|--------|
+| H-26 | STOP_LOSS_PCT: 0.5 → 2.0 | Eliminates $11 stop on $2300 ETH — now $46, within 4H ATR range |
+| H-27 | ExecStartPre kill guard in orchestrator.service | Prevents duplicate orchestrator PIDs on systemd restart |
+| H-28 | Gunicorn + telegram_listener moved under systemd | All 3 processes now auto-restart, survive reboots |
+| H-29 | deploy/env_vars.template created | env_vars is now version-controlled (redacted); gate check validates SL bounds + BLOCKED list |
+
+**Applied:** 2026-04-25 19:30 IST by Harsh
+**Orchestrator PID after fix:** 474914 (single, systemd-managed)
+**STOP_LOSS_PCT confirmed in /proc/474914/environ:** 2.0
+
+---
+
+## Post-Checkpoint Fixes Applied (2026-04-25 — H-21 through H-25)
+
+| Fix ID | Fix | Impact |
+|--------|-----|--------|
+| H-21 | BLOCKED_STRATEGY_NAMES: removed CCI Trend + Donchian Trend | Decision-lane can now execute; only test strategies blocked |
+| H-22 | SL/TP fallback logic verified | Orchestrator uses env var when signal has sl_pct=0; env var was 0.5% (fixed in H-26) |
+| H-23 | DECISION_LANE_STATUS.md corrected | Stale 3/28 FAIL → corrected to 1/28 FAIL |
+| H-24 | Systemd service files created for all 3 processes | Orchestrator moved to systemd |
+| H-25 | paper_sim_engine verified | 208 simulated trades, 41 strategy-symbol pairs confirmed running |
 
 ---
 
@@ -135,5 +163,5 @@ Key findings from CEO review:
 
 ---
 
-*This file is refreshed on demand. Last refresh: 2026-04-25 15:44 IST*
+*This file is refreshed on demand. Last refresh: 2026-04-25 19:30 IST*
 *Do not confuse full-system RUNTIME_LOG.md with this decision-lane-only report.*

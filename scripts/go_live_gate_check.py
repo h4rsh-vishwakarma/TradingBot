@@ -634,6 +634,11 @@ def main() -> int:
 
     sl = os.getenv("STOP_LOSS_PCT", "")
     check("STOP_LOSS_PCT is set", bool(sl), f"value={sl or 'NOT SET'}")
+    try:
+        sl_val = float(sl) if sl else 0.0
+        check("STOP_LOSS_PCT is safe (0.5–5.0%)", 0.5 <= sl_val <= 5.0, f"value={sl_val} — must be between 0.5 and 5.0")
+    except ValueError:
+        check("STOP_LOSS_PCT is safe (0.5–5.0%)", False, f"non-numeric value: {sl!r}")
 
     tp = os.getenv("TAKE_PROFIT_PCT", "")
     check("TAKE_PROFIT_PCT is set", bool(tp), f"value={tp or 'NOT SET'}")
@@ -720,6 +725,16 @@ def main() -> int:
 
     conc_ok, conc_detail = family_concentration_gate(candidates)
     check("Candidate family/symbol concentration within limits", conc_ok, conc_detail)
+
+    _decision_lane_names = {"CCI Trend", "Donchian Trend", "CCI_Trend", "Donchian_Trend"}
+    blocked_raw = os.getenv("BLOCKED_STRATEGY_NAMES", "")
+    blocked_set = {s.strip() for s in blocked_raw.split(",") if s.strip()}
+    _wrongly_blocked = _decision_lane_names & blocked_set
+    check(
+        "Decision-lane candidates not in BLOCKED_STRATEGY_NAMES",
+        not _wrongly_blocked,
+        f"Wrongly blocked: {', '.join(sorted(_wrongly_blocked))}" if _wrongly_blocked else f"BLOCKED_STRATEGY_NAMES={blocked_raw!r}",
+    )
 
     print()
     print("=" * 60)

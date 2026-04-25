@@ -1,0 +1,128 @@
+# env_vars.template — copy to /etc/tradingbot/env_vars and fill in <REDACTED> values
+# DO NOT commit the populated file (it contains secrets).
+# This template is version-controlled; the live file lives only on the server.
+
+# --- 1. CORE SERVER CONFIG ---
+WEBHOOK_SECRET="<REDACTED>"
+PORT=5000
+RUN_MODE="production"
+
+# --- 2. MODULAR PATHS ---
+QUEUE_PATH="/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/storage/signals.jsonl"
+OFFSET_PATH="/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/storage/signals.offset"
+LEDGER_PATH="/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/storage/ledger_state.json"
+ALERTS_LOG="/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/storage/alerts.jsonl"
+IDEMPOTENCY_DB_PATH="/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/storage/idempotency.db"
+LOG_FILE="/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/logs/bot.log"
+
+# --- 3. TELEGRAM CHANNELS ---
+TELEGRAM_BOT_TOKEN=<REDACTED>
+TELEGRAM_CHAT_ID=<REDACTED>
+TELEGRAM_CHAT_ID_SYSTEM=<REDACTED>
+TELEGRAM_CHAT_ID_TRADES=<REDACTED>
+
+# --- 4. GOOGLE SHEETS ---
+GOOGLE_SERVICE_ACCOUNT_FILE="/etc/tradingbot/service_account.json"
+GOOGLE_SHEET_NAME="Trading_Bot_Ledger"
+
+# --- 5. EMAIL NOTIFICATIONS ---
+SMTP_SERVER="smtp.gmail.com"
+SMTP_PORT=587
+EMAIL_SENDER="<REDACTED>"
+EMAIL_PASSWORD="<REDACTED>"
+EMAIL_RECEIVER="<REDACTED>"
+
+# --- 6. BINANCE FUTURES CONFIG ---
+BINANCE_API_KEY="<REDACTED>"
+BINANCE_API_SECRET="<REDACTED>"
+BINANCE_TESTNET=true
+ALLOW_REAL_TRADES=true
+ALLOWED_SYMBOLS=
+
+# --- 7. SYSTEM LIMITS ---
+DLQ_THRESHOLD=5
+DLQ_WINDOW_SECONDS=60
+
+# --- 8. P&L ENV ---
+MAX_NOTIONAL_PER_TRADE=2000.0
+DAILY_LOSS_LIMIT="-50.0"
+
+# --- 9. Hyper Liquid Config ---
+HL_WALLET_ADDRESS="<REDACTED>"
+HL_PRIVATE_KEY="<REDACTED>"
+HL_IS_TESTNET="True"
+TRADER_ADDRESSES="<REDACTED>"
+POLL_INTERVAL_SECONDS="5"
+
+# ===== SAFETY PLACEHOLDERS =====
+# Stop-Loss: must be 0.5–5.0 (gate check enforces this). Default 2.0 for 4H ETHUSDT.
+STOP_LOSS_PCT=2.0
+TAKE_PROFIT_PCT=12.0
+
+# Circuit Breaker
+CB_DAILY_LOSS_PCT=8.0
+CB_MAX_CONSECUTIVE_LOSSES=8
+CB_COOLDOWN_MINUTES=60
+
+# Position Sizing
+POSITION_SIZE_MODE=equity_pct
+MAX_QTY_CAPS='{"SUIUSDT":900.0,"INJUSDT":280.0,"LDOUSDT":1000.0,"NEARUSDT":700.0,"APTUSDT":900.0,"SOLUSDT":30.0,"BTCUSDT":0.05,"DOTUSDT":500.0,"AAVEUSDT":20.0,"AVAXUSDT":200.0,"FILUSDT":2000.0,"OPUSDT":2000.0,"LINKUSDT":35.0,"XRPUSDT":250.0,"MAGICUSDT":5000.0,"ETHUSDT":0.15}'
+
+# Anti Flip-Flop
+SYMBOL_COOLDOWN_SECONDS=60
+DEDUP_WINDOW_SECONDS=120
+CANDLE_LOCK_SECONDS=60
+
+# Queue
+USE_DURABLE_QUEUE=true
+
+# Limits
+LEVERAGE=2
+MAX_DRAWDOWN_PCT=55.0
+
+# Lighter config
+LIGHTER_API_URL=https://testnet.zklighter.elliot.ai
+LIGHTER_ACCOUNT_INDEX=210
+LIGHTER_API_KEY_INDEX=4
+LIGHTER_PRIVATE_KEY=<REDACTED>
+LIGHTER_ALLOW_REAL_TRADES=false
+
+# --- LIVE TRADING PARAMS ---
+TRADE_LEVERAGE=2
+MAX_STRATEGIES_PER_SYMBOL=2
+STARTING_CAPITAL=5000
+
+# --- LIMIT ORDERS + SIZING ---
+USE_LIMIT_ORDERS=true
+EQUITY_PCT_PER_TRADE=10
+FIXED_TRADE_USD=300
+MAX_OPEN_POSITIONS=16
+RECONCILE_INTERVAL_SECONDS=300
+
+# Tournament Report Path
+TOURNAMENT_REPORT_PATH=/home/ubuntu/tradingview_webhook_bot/storage/reports/tournament_winners_4h.csv
+
+TRADINGVIEW_AUTH_MODE=secret
+REQUIRE_APPROVAL_MANIFEST=true
+ALLOWED_EXCHANGES=binance
+# LIVE_APPROVAL_CLASSES: must include candidate_for_tiny_capital for decision-lane to execute
+LIVE_APPROVAL_CLASSES=candidate_for_tiny_capital,live_approved,approved,personal_live
+WEBHOOK_URL=https://tradingbot.operatorbrief.xyz/webhook/tradingview
+
+# Decision Lane vs Research Lane separation
+DECISION_LANE_OPERATOR=harsh
+DECISION_LANE_SYMBOLS=ETHUSDT
+
+# Garima research lane credentials
+BINANCE_RESEARCH_API_KEY=<REDACTED>
+BINANCE_RESEARCH_API_SECRET=<REDACTED>
+RESEARCH_LANE_ENABLED=true
+AUTO_PROMOTE_FREEZE=true
+
+# Lane-split ledger paths
+DECISION_LANE_LEDGER_PATH=/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/storage/ledger_decision.json
+RESEARCH_LANE_LEDGER_PATH=/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/storage/ledger_research.json
+
+# BLOCKED_STRATEGY_NAMES: DO NOT add CCI Trend or Donchian Trend here — they are the decision lane.
+# Only block genuinely unsafe/test strategies.
+BLOCKED_STRATEGY_NAMES=TestStrategy,44_PSAR_Volume_Surge,44 PSAR Volume Surge
