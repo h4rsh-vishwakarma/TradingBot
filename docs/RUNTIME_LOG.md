@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-25
 
-> Auto-generated — last updated `2026-04-25T11:10:01Z`
+> Auto-generated — last updated `2026-04-25T12:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (1 of 28 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-25T11:10:01Z |
+| Last run | 2026-04-25T12:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -44,8 +44,8 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 20 |
-| Completed | 20 |
+| Signals received | 18 |
+| Completed | 18 |
 | Last signal | 2026-04-25 08:02 UTC |
 | Last strategy | G94 Pivot Point Reclaim / LDOUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
@@ -53,7 +53,7 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260425_1105 |
+| Last heartbeat file | heartbeat_20260425_1205 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -84,6 +84,9 @@ _No outstanding operational issues._
 
 ## Commits Today (2026-04-25)
 ```
+bb718db | 2026-04-25 16:46:10 +0530 | Merge branch 'main' of https://github.com/anythingai-labs/tradingview_webhook_bot
+1cc7d8a | 2026-04-25 16:42:58 +0530 | feat: add daily P&L breakdown to paper sim heartbeat section
+3f6c179 | 2026-04-25 11:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T11:10:01Z
 94fac21 | 2026-04-25 10:18:42 +0000 | Merge branch 'main' of https://github.com/anythingai-labs/tradingview_webhook_bot
 48b9b6b | 2026-04-25 15:43:32 +0530 | chore: add paper_sim_engine daily cron at 02:00 UTC (7:30 AM IST)
 4cfa06f | 2026-04-25 15:41:22 +0530 | feat: add paper lane simulation section to hourly heartbeat report
