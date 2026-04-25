@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-25
 
-> Auto-generated — last updated `2026-04-25T05:59:24Z`
+> Auto-generated — last updated `2026-04-25T11:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (1 of 28 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-25T05:59:24Z |
+| Last run | 2026-04-25T11:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -44,16 +44,16 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 18 |
-| Completed | 18 |
-| Last signal | 2026-04-25 05:17 UTC |
-| Last strategy | Donchian Trend / ETHUSDT |
+| Signals received | 20 |
+| Completed | 20 |
+| Last signal | 2026-04-25 08:02 UTC |
+| Last strategy | G94 Pivot Point Reclaim / LDOUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260425_0505 |
+| Last heartbeat file | heartbeat_20260425_1105 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -73,7 +73,7 @@ Realized P&L: $0.00
 | File | `storage/stale_position_quarantine.json` |
 
 ## Known Issues — Requires Manual Action
-⚠️ STOP_DISPATCH active since 2026-04-23 11:45 UTC (42.2h ago) — no signals are being dispatched to the exchange
+_No outstanding operational issues._
 
 ## Services
 | Service | URL | Status |
@@ -84,6 +84,21 @@ Realized P&L: $0.00
 
 ## Commits Today (2026-04-25)
 ```
+94fac21 | 2026-04-25 10:18:42 +0000 | Merge branch 'main' of https://github.com/anythingai-labs/tradingview_webhook_bot
+48b9b6b | 2026-04-25 15:43:32 +0530 | chore: add paper_sim_engine daily cron at 02:00 UTC (7:30 AM IST)
+4cfa06f | 2026-04-25 15:41:22 +0530 | feat: add paper lane simulation section to hourly heartbeat report
+acd29c7 | 2026-04-25 10:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T10:10:01Z
+6f13ef7 | 2026-04-25 15:36:33 +0530 | feat: paper_sim_engine.py — simulated P&L for paper_only strategies
+a4a7b5f | 2026-04-25 15:14:01 +0530 | fix: H-19/H-20 — source tagging + suspect flag for TV-sourced leaderboard entries
+8d71ba0 | 2026-04-25 15:06:34 +0530 | fix: H-16/H-18/Gap3 — raise slippage to 15 bps, TV win-rate guard, realism tests
+a51a600 | 2026-04-25 09:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T09:10:01Z
+56aa381 | 2026-04-25 08:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T08:10:01Z
+45ead96 | 2026-04-25 07:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T07:10:01Z
+64281d3 | 2026-04-25 06:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T06:10:01Z
+f483c42 | 2026-04-25 06:04:05 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T06:04:04Z
+c065ad0 | 2026-04-25 11:33:54 +0530 | merge: keep current DECISION_LANE_STATUS over stale server cron version
+e7c1622 | 2026-04-25 11:33:31 +0530 | fix(H-10): remove STOP_DISPATCH — dispatch resumed 2026-04-25
+a65263d | 2026-04-25 05:59:24 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T05:59:24Z
 4955957 | 2026-04-25 11:28:37 +0530 | fix(H-11..H-14): CI coverage, gate enforcement, STOP_DISPATCH observability, EMA doc
 2ec8a68 | 2026-04-25 10:57:00 +0530 | docs: refresh DECISION_LANE_STATUS — 1/28 FAIL (Apr 25 21:00 IST)
 faf71da | 2026-04-25 10:55:17 +0530 | Merge remote-tracking branch 'origin/main'

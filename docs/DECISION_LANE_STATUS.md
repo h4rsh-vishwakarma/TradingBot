@@ -1,5 +1,5 @@
 # Decision Lane Status Report
-> Refreshed 2026-04-25 21:00 IST
+> Refreshed 2026-04-25 15:44 IST
 > **Scope: CCI Trend + Donchian Trend on ETHUSDT 4h ONLY**
 > All other strategies are paper-only research — not part of go-live decision
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
@@ -19,14 +19,11 @@
 
 ---
 
-## Gate Verdict (live as of 2026-04-25 21:00 IST — from `go_live_gate_check.py`)
+## Gate Verdict (live as of 2026-04-25 15:40 IST)
 
 ```
 VERDICT: NO-GO  (1 of 28 gates FAILED)
-
-[FAIL] Candidates have min closed paper trades (4H=5,1H=10,15m=20)
-       CCI Trend:1(NEED 5); Donchian Trend:0(NEED 5)
-       → Time-gated. Cannot be resolved without real market signals executing and closing.
+[FAIL] Candidates have min closed paper trades (4H=5,1H=10,15m=20) -- CCI Trend:1(NEED 5); Donchian Trend:0(NEED 5)
 ```
 
 **Gate history:**
@@ -35,15 +32,16 @@ VERDICT: NO-GO  (1 of 28 gates FAILED)
 - After FIX-3 through FIX-11 + TV cleanup (afternoon): NO-GO (1/27 FAIL)
 - After Apr 24 AM fixes (gate_check NameError + freeze baseline reset): NO-GO (1/27 FAIL)
 - After Apr 24 PM fixes (H-06..H-09: recency hard gate 72h added as gate #28): NO-GO (2/28 FAIL)
-- Apr 25 15:44 IST — live gate check: NO-GO (3/28 FAIL) — inventory + recency + trade count
-- **Apr 25 21:00 IST — live gate check: NO-GO (1/28 FAIL)** ← current
-  - Gate #1 (inventory): CLEARED — both CCI Trend and Donchian Trend LIVE_VERIFIED via test signals
-  - Gate #2 (trade count): STILL FAILING — CCI 1/5, Donchian 0/5. Market-gated; needs real fills.
-  - Gate #3 (signal recency): CLEARED — fix: recency now reads signal_queue.db (receipt) not execution_metrics.jsonl (fills). Last ETHUSDT signal: Donchian Trend at 2026-04-25T05:17:41Z (0.1h ago)
+- **Apr 25 15:44 IST — live gate check: NO-GO (3/28 FAIL)** ← current
+  - Gate #1 (inventory): Donchian Trend still MISSING despite H-01 claim — alert may exist in TV but has never fired on ETHUSDT, so inventory check cannot verify it. Alert must fire at least once.
+  - Gate #2 (trade count): unchanged — CCI 1/5, Donchian 0/5. Market-gated.
+  - Gate #3 (signal recency): 118.4h since last ETHUSDT CCI signal. CCI Trend alert liveness must be confirmed in TradingView UI.
 
-**Only remaining blocker:** Gate #2 — trade count. Needs 4 more CCI closed trades + 5 Donchian closed trades on ETHUSDT 4H. No manual workaround — wait for live market signals to trigger and close.
-
-> ✅ **STOP_DISPATCH removed 2026-04-25** — File was active since 2026-04-23 11:45 UTC (42h). Removed by Harsh. Dispatch resumed. Decision-lane signals will now execute and closed trades will accumulate toward gate #2.
+**ACTION REQUIRED (Harsh — manual, TradingView UI):**
+1. **Donchian Trend:** Log into TradingView → confirm alert exists on ETHUSDT 4H chart with exact name `Donchian Trend`. Use the Test button to fire a test signal. Confirm receipt in server `auto_scan.log`.
+2. **CCI Trend:** Confirm alert is Active (not Expired/Paused). If expired, re-enable and test-fire.
+3. Both gates (#1 and #3) will clear once a real or test signal arrives from each strategy on ETHUSDT.
+4. Gate #2 (trade count) clears only when live market signals execute and close — no manual workaround.
 
 ---
 
@@ -55,8 +53,8 @@ VERDICT: NO-GO  (1 of 28 gates FAILED)
 | Research/other signals (excluded from decision) | 16 |
 | Decision-lane closed trades (all-time) | 1 (CCI Trend, -$1.86) |
 | Decision-lane realized P&L | -$1.86 |
-| Last CCI Trend ETHUSDT signal | 2026-04-25 05:17 UTC (test signal, <1h ago) |
-| Last Donchian Trend ETHUSDT signal | 2026-04-25 05:17 UTC (test signal, <1h ago) |
+| Last CCI Trend ETHUSDT signal | 2026-04-20 05:51 UTC (118.4h ago) |
+| Last Donchian Trend ETHUSDT signal | Never |
 
 *No decision-lane (ETH CCI+Donchian) signals in last 24h. Research-lane signals continue on MAGIC/LDO/SUI.*
 
@@ -114,8 +112,8 @@ Key findings from CEO review:
 - GitHub now validates narrow ETH-only decision lane ✅
 - Manifest v15 explicit (2 candidates, both ETHUSDT 4H; duplicate ML Lorentzian removed) ✅
 - TRACKER_SOURCE_OF_TRUTH.md separates lane evidence from research ✅
-- RUNTIME_LOG.md reflects v15, 2 candidates, NO-GO (1/28 as of Apr 25) ✅
-- **Remaining gap:** Trade count only — CCI 1/5, Donchian 0/5. Both TV alerts confirmed LIVE_VERIFIED. ❌
+- RUNTIME_LOG.md reflects v15, 2 candidates, NO-GO (3/28 as of Apr 25) ✅
+- **Remaining gaps:** Donchian Trend TV alert unconfirmed (MISSING); CCI Trend silent 118h; both need 5 closed trades ❌
 
 **What must not be widened yet:** candidate_for_tiny_capital, G94, ML Lorentzian, combos, broader asset scope.
 
@@ -137,5 +135,5 @@ Key findings from CEO review:
 
 ---
 
-*This file is refreshed on demand. Last refresh: 2026-04-25 21:00 IST*
+*This file is refreshed on demand. Last refresh: 2026-04-25 15:44 IST*
 *Do not confuse full-system RUNTIME_LOG.md with this decision-lane-only report.*
