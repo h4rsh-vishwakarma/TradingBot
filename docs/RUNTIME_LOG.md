@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-25
 
-> Auto-generated — last updated `2026-04-25T13:10:01Z`
+> Auto-generated — last updated `2026-04-25T14:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,9 +8,9 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (1 of 28 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (1 of 30 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-25T13:10:01Z |
+| Last run | 2026-04-25T14:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -53,7 +53,7 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260425_1305 |
+| Last heartbeat file | heartbeat_20260425_1405 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -84,6 +84,10 @@ _No outstanding operational issues._
 
 ## Commits Today (2026-04-25)
 ```
+d3d1276 | 2026-04-25 19:35:37 +0530 | merge: resolve DECISION_LANE_STATUS.md conflict, keep H-26..H-29 entries
+039ccfe | 2026-04-25 19:32:50 +0530 | fix(H-26..H-29): correct STOP_LOSS_PCT, systemd kill guards, env template, gate validations
+6b28129 | 2026-04-25 13:42:46 +0000 | fix(H-21/H-22/H-23/H-24/H-25): unblock decision-lane + systemd + doc correction
+fce5001 | 2026-04-25 13:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T13:10:01Z
 70dc02a | 2026-04-25 12:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T12:10:02Z
 bb718db | 2026-04-25 16:46:10 +0530 | Merge branch 'main' of https://github.com/anythingai-labs/tradingview_webhook_bot
 1cc7d8a | 2026-04-25 16:42:58 +0530 | feat: add daily P&L breakdown to paper sim heartbeat section
