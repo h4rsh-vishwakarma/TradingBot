@@ -46,9 +46,21 @@ SIM_RESULTS_FILE = SIM_DIR / "paper_sim_results.json"
 
 BINANCE_BASE = "https://fapi.binance.com"
 
-# Default risk parameters (used when strategy config doesn't specify)
-DEFAULT_SL_PCT = 3.0
-DEFAULT_TP_PCT = 5.0
+# Default risk parameters — read from live env_vars so sim matches orchestrator
+def _read_env(key: str, fallback: str) -> str:
+    env_file = Path("/etc/tradingbot/env_vars")
+    if env_file.exists():
+        for line in env_file.read_text(errors="ignore").splitlines():
+            line = line.strip()
+            if line.startswith("#") or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            if k.strip() == key:
+                return v.strip().strip('"').strip("'")
+    return os.getenv(key, fallback)
+
+DEFAULT_SL_PCT = float(_read_env("STOP_LOSS_PCT", "2.0"))
+DEFAULT_TP_PCT = float(_read_env("TAKE_PROFIT_PCT", "12.0"))
 DEFAULT_FIXED_NOTIONAL = 100.0   # $100 per simulated trade (paper only)
 
 _TF_TO_BINANCE_INTERVAL = {
