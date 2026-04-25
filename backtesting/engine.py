@@ -5,6 +5,10 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+_TV_WIN_RATE_SUSPECT_THRESHOLD = 0.65  # TV backtester results above this are likely inflated by lookahead/compounding
+_TV_SUSPECT_CONFIDENCE_CAP = 0.55     # Cap confidence for unvalidated TV-sourced results
+
+
 class BacktestEngine:
     def __init__(self):
         # 📂 Path set to the internal bot directory
@@ -93,6 +97,17 @@ class BacktestEngine:
             # Use the better of win_rate or profit_factor score
             # This lets trend strategies pass via profit factor even with low win rate
             confidence = max(win_rate, pf_score)
+
+            # Guard against TV-sourced results with inflated win rates (lookahead bias, unlimited compounding).
+            # Win rates above 65% from TV backtester are suspect; cap confidence until re-validated via
+            # Python backtester (batch_backtest.py with fixed notional + 15 bps slippage).
+            if win_rate > _TV_WIN_RATE_SUSPECT_THRESHOLD:
+                logger.warning(
+                    f"Win rate {win_rate:.1%} exceeds {_TV_WIN_RATE_SUSPECT_THRESHOLD:.0%} threshold — "
+                    f"likely TV-sourced result. Capping confidence at {_TV_SUSPECT_CONFIDENCE_CAP} "
+                    f"until re-validated via batch_backtest.py."
+                )
+                confidence = min(confidence, _TV_SUSPECT_CONFIDENCE_CAP)
 
             logger.info(f"Confidence: {confidence:.3f} (WR: {win_rate:.3f}, PF: {profit_factor:.2f}, PF_score: {pf_score:.3f})")
             return confidence
