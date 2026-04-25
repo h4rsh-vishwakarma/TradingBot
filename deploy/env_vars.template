@@ -57,7 +57,7 @@ POLL_INTERVAL_SECONDS="5"
 # ===== SAFETY PLACEHOLDERS =====
 # Stop-Loss: must be 0.5–5.0 (gate check enforces this). Default 2.0 for 4H ETHUSDT.
 STOP_LOSS_PCT=2.0
-TAKE_PROFIT_PCT=12.0
+TAKE_PROFIT_PCT=4.0
 
 # Circuit Breaker
 CB_DAILY_LOSS_PCT=8.0
