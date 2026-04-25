@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-25
 
-> Auto-generated — last updated `2026-04-25T04:10:01Z`
+> Auto-generated — last updated `2026-04-25T05:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,13 +10,13 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (3 of 28 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-25T04:10:01Z |
+| Last run | 2026-04-25T05:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
-| Version | v14 |
-| Updated | 2026-04-23T13:47:09.093889+00:00 |
+| Version | v15 |
+| Updated | 2026-04-25T10:00:00.000000+00:00 |
 | Total candidates | 2 |
 | ALPHA (live-ready) | 2 |
 | RESEARCH (no Pine yet) | 0 |
@@ -53,7 +53,7 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260425_0405 |
+| Last heartbeat file | heartbeat_20260425_0505 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -90,21 +90,32 @@ _None outstanding as of 2026-04-16. All legacy 401 sources resolved (G-series JS
 
 ## Commits Today (2026-04-25)
 ```
-a63f8b9 | 2026-04-25 03:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T03:10:01Z
-65b8525 | 2026-04-25 02:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T02:10:01Z
-e6a9e6c | 2026-04-25 01:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T01:10:02Z
-dfa53f8 | 2026-04-25 00:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T00:10:01Z
-bc2fdf1 | 2026-04-24 23:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T23:10:02Z
-8157fa2 | 2026-04-24 22:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T22:10:01Z
-e0db2bc | 2026-04-24 21:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T21:10:01Z
-9d0a4e9 | 2026-04-24 20:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T20:10:01Z
-c5f55cc | 2026-04-24 19:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T19:10:01Z
-cb97051 | 2026-04-24 18:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T18:10:02Z
-dcf3c97 | 2026-04-24 17:10:02 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T17:10:01Z
-2c6b185 | 2026-04-24 16:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T16:10:01Z
-6fe97af | 2026-04-24 15:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T15:10:01Z
-2fef574 | 2026-04-24 14:10:02 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T14:10:01Z
-d8d311a | 2026-04-24 13:10:02 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T13:10:01Z
+3bcddfa | 2026-04-25 10:10:56 +0530 | fix(tests): remove duplicate secretless order-fill test + update to P-06 behavior
+5cf5504 | 2026-04-25 10:08:10 +0530 | Merge remote-tracking branch 'origin/main'
+db6bd80 | 2026-04-25 10:05:38 +0530 | docs: refresh DECISION_LANE_STATUS — 3/28 FAIL, Apr 25 live gate state
+f28f794 | 2026-04-25 10:03:21 +0530 | docs: define personal_live class in GO_LIVE_GATE.md
+a8eec7f | 2026-04-25 10:02:39 +0530 | governance: manifest v15 — remove duplicate ML Lorentzian entry
+1705102 | 2026-04-25 04:30:37 +0000 | chore: sync server stash — pine version stamps + test eth_account skip guard
+a86702b | 2026-04-25 04:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T04:10:01Z
+015f361 | 2026-04-25 03:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T03:10:01Z
+ee518e4 | 2026-04-25 02:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T02:10:01Z
+252daaf | 2026-04-25 01:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T01:10:02Z
+d951bcc | 2026-04-25 00:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T00:10:01Z
+a63f2a0 | 2026-04-24 23:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T23:10:02Z
+7c86845 | 2026-04-24 22:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T22:10:01Z
+f5aecef | 2026-04-24 21:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T21:10:01Z
+0ceb187 | 2026-04-24 20:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T20:10:01Z
+5ad226c | 2026-04-24 19:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T19:10:01Z
+f4f9e85 | 2026-04-24 18:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T18:10:02Z
+5d58009 | 2026-04-24 17:10:02 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T17:10:01Z
+7133848 | 2026-04-24 16:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T16:10:01Z
+d7e3673 | 2026-04-24 15:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T15:10:01Z
+6f37676 | 2026-04-24 14:10:02 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T14:10:01Z
+2c16321 | 2026-04-24 13:10:02 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T13:10:01Z
+70061a5 | 2026-04-24 18:37:39 +0530 | fix: remove duplicate decision_lane_recency_check call in gate check
+2c1a944 | 2026-04-24 18:17:51 +0530 | fix: P-04 signal drought Telegram alert + P-06 secretless order-fill manifest pre-check
+dbd69c2 | 2026-04-24 17:59:34 +0530 | docs: H-01 resolved — TV alerts for CCI Trend + Donchian Trend confirmed correct
+58de343 | 2026-04-24 17:46:35 +0530 | fix: H-06..H-09 — gate recency hard-fail, TV fill 200, eth_account skip, DECISION_LANE auto-update
 1b8174a | 2026-04-24 12:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-24T12:10:01Z
 0e26b97 | 2026-04-24 12:01:20 +0000 | fix(tests): extend Orchestrator import guard to test_lighter_client + test_strategy_decision_alerts
 5fdeaf5 | 2026-04-24 11:55:21 +0000 | fix(audit): resolve H-02 H-03 H-04 H-05 from CEO Apr 24 audit
