@@ -505,7 +505,7 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                  use_atr=True, atr_sl_mult=1.5, atr_tp_mult=2.5, trailing_pct=2.0,
                  max_bars_held=48, use_vwap=True, use_obv=True,
                  sizing_mode="fixed_notional", fixed_notional=1000.0,
-                 max_equity_fraction=0.25, min_notional=25.0, slippage_bps=5.0):
+                 max_equity_fraction=0.25, min_notional=25.0, slippage_bps=15.0):
     """
     Run backtest with ATR-based SL/TP and trailing stop.
 
@@ -875,8 +875,8 @@ def main():
                         help="Max fraction of equity allowed in a trade (default: 0.25)")
     parser.add_argument("--min-notional", type=float, default=25.0,
                         help="Minimum notional required to open a trade (default: 25)")
-    parser.add_argument("--slippage-bps", type=float, default=5.0,
-                        help="Adverse slippage in basis points applied to each fill (default: 5)")
+    parser.add_argument("--slippage-bps", type=float, default=15.0,
+                        help="Adverse slippage in basis points applied to each fill (default: 15)")
     parser.add_argument("--walk-forward-folds", type=int, default=4,
                         help="Number of walk-forward segments for stability scoring (default: 4)")
     parser.add_argument("--shortlist-limit", type=int, default=5,

@@ -15,3 +15,6 @@
 
 # 6. Weekly Sunday 03:00: SQLite VACUUM to reclaim space
 0 3 * * 0 cd /home/ubuntu/tradingview_webhook_bot && /home/ubuntu/tradingview_webhook_bot/venv/bin/python3 -c "import sqlite3; [sqlite3.connect(f).execute('VACUUM') or sqlite3.connect(f).close() for f in ['tradingview_webhook_bot/storage/signal_queue.db','tradingview_webhook_bot/storage/idempotency.db']]" >> /home/ubuntu/tradingview_webhook_bot/cron_logs.log 2>&1
+
+# 7. Daily 02:00 UTC (7:30 AM IST): Paper simulation engine — simulate paper_only strategy P&L
+0 2 * * * cd /home/ubuntu/tradingview_webhook_bot && /home/ubuntu/tradingview_webhook_bot/venv/bin/python3 scripts/paper_sim_engine.py --days 30 >> /home/ubuntu/tradingview_webhook_bot/cron_logs.log 2>&1
