@@ -430,6 +430,75 @@ def inventory_ready() -> bool:
 
 
 # ── Verdict + formatting ─────────────────────────────────────────────────────
+def load_paper_sim_summary() -> dict:
+    """Load last saved paper_sim_results.json and return a compact summary."""
+    sim_file = PROJECT_ROOT / "storage" / "reports" / "paper_sim" / "paper_sim_results.json"
+    empty = {
+        "available": False,
+        "generated_at": None,
+        "total_pnl": 0.0,
+        "strategies_with_trades": 0,
+        "strategies_total": 0,
+        "top3": [],
+        "worst3": [],
+        "open_positions": 0,
+        "simulation_days": 0,
+        "sl_pct": 0.0,
+        "tp_pct": 0.0,
+    }
+    if not sim_file.exists():
+        return empty
+    try:
+        data = json.loads(sim_file.read_text(encoding="utf-8"))
+        strategies = data.get("strategies", [])
+        if not strategies:
+            return empty
+
+        total_pnl = sum(s.get("total_pnl_usd", 0.0) for s in strategies)
+        with_trades = [s for s in strategies if s.get("closed_trades", 0) > 0]
+        open_pos = sum(s.get("open_trades", 0) for s in strategies)
+
+        sorted_by_pnl = sorted(strategies, key=lambda s: s.get("total_pnl_usd", 0.0), reverse=True)
+        top3 = [
+            {
+                "strategy": s["strategy"][:30],
+                "symbol": s["symbol"],
+                "pnl": s["total_pnl_usd"],
+                "trades": s["closed_trades"],
+                "wr": s["win_rate_pct"],
+            }
+            for s in sorted_by_pnl[:3] if s.get("closed_trades", 0) > 0
+        ]
+        worst3 = [
+            {
+                "strategy": s["strategy"][:30],
+                "symbol": s["symbol"],
+                "pnl": s["total_pnl_usd"],
+                "trades": s["closed_trades"],
+                "wr": s["win_rate_pct"],
+            }
+            for s in sorted_by_pnl if s.get("closed_trades", 0) > 0
+        ][-3:]
+        worst3.reverse()
+
+        return {
+            "available": True,
+            "generated_at": data.get("generated_at", ""),
+            "total_pnl": round(total_pnl, 2),
+            "strategies_with_trades": len(with_trades),
+            "strategies_total": len(strategies),
+            "top3": top3,
+            "worst3": worst3,
+            "open_positions": open_pos,
+            "simulation_days": data.get("simulation_days", 0),
+            "sl_pct": data.get("sl_pct", 0.0),
+            "tp_pct": data.get("tp_pct", 0.0),
+        }
+    except Exception as exc:
+        logger.warning(f"paper sim results load failed: {exc}")
+        return empty
+
+
 def determine_verdict(ctx: dict) -> str:
     """HEALTHY / WATCH / ACTION NEEDED."""
     services_ok = all(ctx["services"].values())
@@ -560,6 +629,53 @@ def format_report(ctx: dict) -> str:
     now_ist = datetime.now(IST).strftime("%Y-%m-%d %I:%M %p IST")
     _dlq_label = "Clean" if ctx["dlq"] == 0 else f"{ctx['dlq']} failed"
 
+    # ── Paper sim section ────────────────────────────────────────────────
+    paper_sim = ctx.get("paper_sim", {})
+    if paper_sim.get("available"):
+        gen_at = paper_sim["generated_at"]
+        try:
+            gen_dt = datetime.fromisoformat(gen_at.replace("Z", "+00:00"))
+            age_h = (datetime.now(UTC) - gen_dt).total_seconds() / 3600
+            gen_label = gen_dt.astimezone(IST).strftime("%Y-%m-%d %I:%M %p IST") + f" ({age_h:.0f}h ago)"
+        except Exception:
+            gen_label = gen_at
+
+        pnl_sign = "+" if paper_sim["total_pnl"] >= 0 else ""
+        top_lines = "\n".join(
+            f"  #{i+1} {r['strategy'][:28]} | {r['symbol']} | "
+            f"${r['pnl']:+.2f} | {r['trades']}t | WR {r['wr']:.0f}%"
+            for i, r in enumerate(paper_sim["top3"])
+        ) or "  No closed trades yet"
+        worst_lines = "\n".join(
+            f"  #{i+1} {r['strategy'][:28]} | {r['symbol']} | "
+            f"${r['pnl']:+.2f} | {r['trades']}t | WR {r['wr']:.0f}%"
+            for i, r in enumerate(paper_sim["worst3"])
+        ) or "  No closed trades yet"
+
+        paper_sim_block = (
+            f"📋 <b>Paper Lane Simulation (paper_only strategies)</b>\n"
+            f"• Last run: {gen_label}\n"
+            f"• Lookback: {paper_sim['simulation_days']} days | "
+            f"SL {paper_sim['sl_pct']}% / TP {paper_sim['tp_pct']}% | "
+            f"$100 notional/trade\n"
+            f"• Strategies tracked: {paper_sim['strategies_with_trades']}"
+            f"/{paper_sim['strategies_total']} have trades\n"
+            f"• Open simulated positions: {paper_sim['open_positions']}\n"
+            f"• Total simulated P&amp;L: ${pnl_sign}{paper_sim['total_pnl']:.2f}\n"
+            f"\n"
+            f"  <b>Top performers:</b>\n{top_lines}\n"
+            f"\n"
+            f"  <b>Worst performers:</b>\n{worst_lines}\n"
+            f"\n"
+            f"  <i>Run: python scripts/paper_sim_engine.py --days 30</i>\n\n"
+        )
+    else:
+        paper_sim_block = (
+            f"📋 <b>Paper Lane Simulation</b>\n"
+            f"• Not yet run — execute on server:\n"
+            f"  <code>python scripts/paper_sim_engine.py --days 30</code>\n\n"
+        )
+
     msg = (
         f"<b>HOURLY TRADING HEARTBEAT</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
@@ -593,6 +709,7 @@ def format_report(ctx: dict) -> str:
         f"• Missing SL/TP: 0\n"
         f"• Freeze diff: {freeze['status']}\n\n"
         f"<b>Issues:</b>\n{issues_block}\n\n"
+        f"{paper_sim_block}"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"<i>{now_ist}</i>"
     )
@@ -641,6 +758,7 @@ def main() -> int:
         "dlq": dlq_count(),
         "queue": signal_queue_stats(),
         "inventory_ready": inventory_ready(),
+        "paper_sim": load_paper_sim_summary(),
     }
 
     message = format_report(ctx)
