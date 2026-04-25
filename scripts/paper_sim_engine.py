@@ -398,8 +398,31 @@ def _build_strategy_summary(results: dict) -> list[dict]:
     return rows
 
 
+def _build_daily_pnl(summary: list[dict]) -> dict[str, float]:
+    """
+    Aggregate closed-trade P&L by entry date (IST).
+    Returns {date_str: pnl_sum} sorted oldest→newest.
+    """
+    daily: dict[str, float] = {}
+    for row in summary:
+        for trade in row.get("trades", []):
+            if trade.get("exit_reason") == "still_open":
+                continue
+            entry_dt_raw = trade.get("entry_dt", "")
+            pnl = trade.get("pnl_usd", 0.0)
+            try:
+                dt = datetime.fromisoformat(str(entry_dt_raw).replace("Z", "+00:00"))
+                dt_ist = dt.astimezone(IST)
+                date_key = dt_ist.strftime("%Y-%m-%d")
+            except Exception:
+                date_key = "unknown"
+            daily[date_key] = round(daily.get(date_key, 0.0) + pnl, 4)
+    return dict(sorted(daily.items()))
+
+
 def _save_results(summary: list[dict], days: int, sl_pct: float, tp_pct: float) -> None:
     SIM_DIR.mkdir(parents=True, exist_ok=True)
+    daily_pnl = _build_daily_pnl(summary)
     out = {
         "generated_at": datetime.now(UTC).isoformat(),
         "simulation_days": days,
@@ -407,6 +430,7 @@ def _save_results(summary: list[dict], days: int, sl_pct: float, tp_pct: float) 
         "tp_pct": tp_pct,
         "fixed_notional_usd": DEFAULT_FIXED_NOTIONAL,
         "note": "Paper-only strategies simulated against Binance OHLCV. No real capital involved.",
+        "daily_pnl": daily_pnl,
         "strategies": summary,
     }
     SIM_RESULTS_FILE.write_text(json.dumps(out, indent=2))

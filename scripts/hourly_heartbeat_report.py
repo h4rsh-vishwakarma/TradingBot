@@ -481,6 +481,14 @@ def load_paper_sim_summary() -> dict:
         ][-3:]
         worst3.reverse()
 
+        # Daily P&L — last 7 days, newest first
+        raw_daily = data.get("daily_pnl", {})
+        today_ist = datetime.now(IST).strftime("%Y-%m-%d")
+        daily_last7 = []
+        for date_key in sorted(raw_daily.keys(), reverse=True)[:7]:
+            label = "Today" if date_key == today_ist else date_key
+            daily_last7.append({"date": date_key, "label": label, "pnl": raw_daily[date_key]})
+
         return {
             "available": True,
             "generated_at": data.get("generated_at", ""),
@@ -493,6 +501,7 @@ def load_paper_sim_summary() -> dict:
             "simulation_days": data.get("simulation_days", 0),
             "sl_pct": data.get("sl_pct", 0.0),
             "tp_pct": data.get("tp_pct", 0.0),
+            "daily_last7": daily_last7,
         }
     except Exception as exc:
         logger.warning(f"paper sim results load failed: {exc}")
@@ -652,6 +661,19 @@ def format_report(ctx: dict) -> str:
             for i, r in enumerate(paper_sim["worst3"])
         ) or "  No closed trades yet"
 
+        # Daily P&L last 7 days
+        daily_last7 = paper_sim.get("daily_last7", [])
+        if daily_last7:
+            daily_lines = "\n".join(
+                f"  {d['label']:<12}  ${d['pnl']:+.2f}"
+                for d in daily_last7
+            )
+        else:
+            daily_lines = "  No closed trades yet"
+
+        # Running total from daily data
+        daily_total = sum(d["pnl"] for d in daily_last7)
+
         paper_sim_block = (
             f"📋 <b>Paper Lane Simulation (paper_only strategies)</b>\n"
             f"• Last run: {gen_label}\n"
@@ -661,7 +683,12 @@ def format_report(ctx: dict) -> str:
             f"• Strategies tracked: {paper_sim['strategies_with_trades']}"
             f"/{paper_sim['strategies_total']} have trades\n"
             f"• Open simulated positions: {paper_sim['open_positions']}\n"
-            f"• Total simulated P&amp;L: ${pnl_sign}{paper_sim['total_pnl']:.2f}\n"
+            f"• Total simulated P&amp;L (closed trades): ${pnl_sign}{paper_sim['total_pnl']:.2f}\n"
+            f"\n"
+            f"  <b>Daily P&amp;L (last 7 days — closed trades only):</b>\n"
+            f"{daily_lines}\n"
+            f"  {'─'*24}\n"
+            f"  {'7-day total':<12}  ${daily_total:+.2f}\n"
             f"\n"
             f"  <b>Top performers:</b>\n{top_lines}\n"
             f"\n"
