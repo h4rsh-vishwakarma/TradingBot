@@ -533,14 +533,56 @@ def min_closed_trades_gate(candidates: list[dict]) -> tuple[bool, str]:
 
 
 def decision_lane_recency_check(candidates, warn_after_hours: float = 72.0):
-    """Fail if no ETHUSDT decision-lane signal received in last warn_after_hours."""
+    """Fail if no ETHUSDT decision-lane signal received in last warn_after_hours.
+
+    Checks signal_queue.db (signal receipt) as the primary source so test signals
+    and paper signals count — not just fills in execution_metrics.jsonl.
+    Falls back to execution_metrics.jsonl if the queue DB is unavailable.
+    """
     import json as _json
+    import sqlite3 as _sqlite3
     import time as _time
-    metrics_path = PROJECT_ROOT / "storage" / "reports" / "paper_validation" / "execution_metrics.jsonl"
-    if not metrics_path.exists():
-        return True, "metrics file not found — cannot check"
+    import re as _re
     now_ts = _time.time()
     candidate_names = {str(c.get("strategy", "")).strip() for c in candidates}
+    candidate_names_norm = {_re.sub(r"[^a-z0-9]+", " ", n.lower()).strip() for n in candidate_names}
+
+    # Primary: check signal_queue.db for received signals from candidate strategies on ETHUSDT
+    signal_db = PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "signal_queue.db"
+    if signal_db.exists():
+        last_ts, last_strat = 0.0, None
+        try:
+            with _sqlite3.connect(str(signal_db)) as conn:
+                rows = conn.execute(
+                    "SELECT payload, created_at FROM signals ORDER BY created_at DESC LIMIT 5000"
+                ).fetchall()
+            for raw, created_at in rows:
+                try:
+                    data = _json.loads(raw)
+                    payload = data.get("payload", data) if isinstance(data, dict) else {}
+                    strat_raw = str(payload.get("strategy", ""))
+                    sym = str(payload.get("symbol", "")).upper().strip()
+                    strat_norm = _re.sub(r"[^a-z0-9]+", " ", strat_raw.lower()).strip()
+                    if strat_norm in candidate_names_norm and sym == "ETHUSDT":
+                        ts = float(created_at)
+                        if ts > last_ts:
+                            last_ts, last_strat = ts, strat_raw.strip()
+                except Exception:
+                    continue
+            if last_ts > 0:
+                age_h = (now_ts - last_ts) / 3600
+                from datetime import timezone as _tz
+                last_dt = datetime.fromtimestamp(last_ts, tz=_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                detail = f"Last ETHUSDT signal: {last_strat} at {last_dt} ({age_h:.1f}h ago)"
+                return age_h <= warn_after_hours, detail
+            # No candidate ETHUSDT signal in queue DB — fall through to metrics file
+        except Exception:
+            pass  # fall through to execution_metrics fallback
+
+    # Fallback: execution_metrics.jsonl (only populated on actual fills)
+    metrics_path = PROJECT_ROOT / "storage" / "reports" / "paper_validation" / "execution_metrics.jsonl"
+    if not metrics_path.exists():
+        return False, "No ETHUSDT decision-lane signal ever recorded (queue DB empty, metrics file missing)"
     last_ts, last_strat = 0.0, None
     try:
         with open(metrics_path) as fh:
