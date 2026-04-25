@@ -24,6 +24,14 @@ Run:
     python scripts/realtime_backtest_v4.py --symbol BTCUSDT       # one symbol
     python scripts/realtime_backtest_v4.py --tf 1d                # daily bars
     python scripts/realtime_backtest_v4.py --no-mc                # skip Monte Carlo
+
+Fixes in v4.1
+─────────────────────────────────────────────────────────────────────
+  MC FIX    Bootstrap WITH replacement (not shuffle) — real confidence interval
+  5YR DATA  Force-download for all symbols, not just BNB
+  CORR      Portfolio correlation check — flag strategies that fire together
+  MIN OOS   Auto-scaled MIN_OOS_TRADES based on data length
+  REC PARAMS Show WFA-recommended live SL/TP from most recent fold
 """
 from __future__ import annotations
 
@@ -33,6 +41,9 @@ import os
 import sys
 import time
 import urllib.request
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 from datetime import datetime, timezone
 from itertools import product
 from pathlib import Path
@@ -73,6 +84,7 @@ WFA_ADX_GRID = [0, 20, 25, 30]          # 0 = no filter — also swept in IS gri
 ADX_SWEEP_THRESHOLDS = [0, 15, 20, 25, 30]
 MONTE_CARLO_SIMS = 500
 YEARS_OF_DATA    = 5
+MIN_OOS_TRADES_BASE = 10   # scaled up with data length in run_wfa()
 
 SLIPPAGE_BASE: dict[str, float] = {
     "ETHUSDT": 0.0008, "BTCUSDT": 0.0006, "SOLUSDT": 0.0010,
@@ -91,23 +103,25 @@ SEP2 = "═" * 82
 
 # ── Data loading (5-year Binance download) ───────────────────────────────────
 
-def load_data(symbol: str, tf_key: str) -> pd.DataFrame:
+def load_data(symbol: str, tf_key: str, force_download: bool = False) -> pd.DataFrame:
     """Load from CSV cache or download 5 years from Binance public API."""
     data_file = DATA_DIR / f"{symbol}_5y_{tf_key}.csv"
 
-    if data_file.exists():
+    if data_file.exists() and not force_download:
         df = pd.read_csv(data_file)
         df.columns = [c.lower() for c in df.columns]
-        print(f"  [{symbol} {tf_key}] {len(df)} bars loaded from cache")
+        bars_yr = round(len(df) / YEARS_OF_DATA / 365 * (365 / BARS_PER_DAY.get(tf_key, 6)), 1)
+        print(f"  [{symbol} {tf_key}] {len(df)} bars (5yr) loaded from cache")
         return df
 
-    # Try legacy 3y file
-    legacy = DATA_DIR / f"{symbol}_3y_{tf_key}.csv"
-    if legacy.exists():
-        df = pd.read_csv(legacy)
-        df.columns = [c.lower() for c in df.columns]
-        print(f"  [{symbol} {tf_key}] {len(df)} bars from 3y cache (no 5y yet)")
-        return df
+    # 3y fallback only when no 5y and not force-downloading
+    if not force_download:
+        legacy = DATA_DIR / f"{symbol}_3y_{tf_key}.csv"
+        if legacy.exists():
+            df = pd.read_csv(legacy)
+            df.columns = [c.lower() for c in df.columns]
+            print(f"  [{symbol} {tf_key}] {len(df)} bars from 3y cache (run --force-download for 5yr)")
+            return df
 
     print(f"  [{symbol} {tf_key}] Downloading 5 years from Binance...", flush=True)
     try:
@@ -282,8 +296,8 @@ def signals_ema_stack(df: pd.DataFrame) -> pd.Series:
     e9, e21, e50 = _ema(df["close"], 9), _ema(df["close"], 21), _ema(df["close"], 50)
     bull = (e9 > e21) & (e21 > e50)
     bear = (e9 < e21) & (e21 < e50)
-    long_x  = bull & ~bull.shift(1).fillna(False)
-    short_x = bear & ~bear.shift(1).fillna(False)
+    long_x  = bull & ~bull.shift(1, fill_value=False)
+    short_x = bear & ~bear.shift(1, fill_value=False)
     sig = np.where(long_x, 1, np.where(short_x, -1, 0))
     return pd.Series(sig, index=df.index, name="sig")
 
@@ -333,7 +347,7 @@ def signals_bb_squeeze(df: pd.DataFrame) -> pd.Series:
     # Momentum at release
     momentum = close - (df["high"].rolling(20).max() + df["low"].rolling(20).min()) / 2
     momentum = momentum - momentum.rolling(20).mean()
-    released = ~squeeze & squeeze.shift(1).fillna(False)
+    released = ~squeeze & squeeze.shift(1, fill_value=False)
     long_x  = released & (momentum > 0)
     short_x = released & (momentum < 0)
     sig = np.where(long_x, 1, np.where(short_x, -1, 0))
@@ -522,6 +536,8 @@ def run_wfa(df, signal_fn, symbol, n_folds=3, oos_frac=0.20):
     total   = len(df)
     oos_len = int(total * oos_frac)
     is_len  = total - n_folds * oos_len
+    # Auto-scale min OOS trades with data size: more data → higher bar
+    min_oos = max(MIN_OOS_TRADES_BASE, total // 500)
     results = []
 
     for fold in range(n_folds):
@@ -537,7 +553,7 @@ def run_wfa(df, signal_fn, symbol, n_folds=3, oos_frac=0.20):
             sig_tr = signal_fn(df_tr)
             sig_tr = apply_adx(sig_tr, df_tr, adx_t)
             r = simulate(df_tr, sig_tr, symbol=symbol, sl_pct=sl, tp_pct=tp)
-            if r.get("total_trades", 0) >= MIN_OOS_TRADES and r.get("profit_factor", 0) > best_pf:
+            if r.get("total_trades", 0) >= min_oos and r.get("profit_factor", 0) > best_pf:
                 best_pf  = r["profit_factor"]
                 best_sl, best_tp, best_adx = sl, tp, adx_t
 
@@ -547,7 +563,7 @@ def run_wfa(df, signal_fn, symbol, n_folds=3, oos_frac=0.20):
 
         oos_trades = oos_r.get("total_trades", 0)
         oos_pf     = oos_r.get("profit_factor", 0)
-        verdict    = ("SKIP" if oos_trades < MIN_OOS_TRADES
+        verdict    = ("SKIP" if oos_trades < min_oos
                       else "PASS" if oos_pf >= 1.0 else "FAIL")
         oos_ts     = df_oos["timestamp"] if "timestamp" in df_oos.columns else pd.Series(["?", "?"])
         results.append({
@@ -568,7 +584,7 @@ def run_wfa(df, signal_fn, symbol, n_folds=3, oos_frac=0.20):
 # ── Monte Carlo ───────────────────────────────────────────────────────────────
 
 def monte_carlo(pnl_list: list[float], n_sims: int = MONTE_CARLO_SIMS) -> dict:
-    """Shuffle trade order N times — gives realistic P&L distribution & max DD."""
+    """Bootstrap WITH replacement — real confidence interval (not shuffle which gives same sum)."""
     if len(pnl_list) < 5:
         return {}
     arr  = np.array(pnl_list)
@@ -576,10 +592,10 @@ def monte_carlo(pnl_list: list[float], n_sims: int = MONTE_CARLO_SIMS) -> dict:
     dds  = []
     rng  = np.random.default_rng(42)
     for _ in range(n_sims):
-        shuffled = rng.permutation(arr)
-        eq       = np.cumsum(np.concatenate([[0], shuffled]))
-        peak     = np.maximum.accumulate(eq)
-        pnls.append(float(shuffled.sum()))
+        sample = rng.choice(arr, size=len(arr), replace=True)   # bootstrap, not permutation
+        eq     = np.cumsum(np.concatenate([[0], sample]))
+        peak   = np.maximum.accumulate(eq)
+        pnls.append(float(sample.sum()))
         dds.append(float((eq - peak).min()))
     pa, da = np.array(pnls), np.array(dds)
     return {
@@ -592,6 +608,35 @@ def monte_carlo(pnl_list: list[float], n_sims: int = MONTE_CARLO_SIMS) -> dict:
         "dd_median":    round(float(np.median(da)),          2),
         "dd_worst_p5":  round(float(np.percentile(da,  5)), 2),
     }
+
+
+# ── Portfolio correlation check ───────────────────────────────────────────────
+
+def correlation_check(df: pd.DataFrame, strategy_results: list) -> list:
+    """Pairwise signal correlation for profitable strategies on same symbol.
+    Returns list of (strat_a, strat_b, corr, warning) for abs(corr) > 0.5."""
+    profitable = {r["strategy"]: ALL_STRATEGIES[r["strategy"]]
+                  for r in strategy_results if r.get("profit_factor", 0) > 1.0}
+    if len(profitable) < 2:
+        return []
+    names = list(profitable.keys())
+    signals = {}
+    for name, fn in profitable.items():
+        try:
+            signals[name] = fn(df).values.astype(float)
+        except Exception:
+            pass
+    pairs = []
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            a, b = names[i], names[j]
+            if a not in signals or b not in signals:
+                continue
+            corr = float(np.corrcoef(signals[a], signals[b])[0, 1])
+            if abs(corr) > 0.5:
+                tag = "HIGH" if abs(corr) > 0.7 else "MODERATE"
+                pairs.append((a, b, round(corr, 3), f"{tag} correlation — cap combined exposure"))
+    return pairs
 
 
 # ── Scoring for leaderboard ───────────────────────────────────────────────────
@@ -616,20 +661,21 @@ def fmt_verdict(pf, pass_c, fail_c):
 
 # ── Main runner ───────────────────────────────────────────────────────────────
 
-def run_all(symbols: list[str], tf_key: str, run_mc: bool = True) -> list[dict]:
+def run_all(symbols: list[str], tf_key: str, run_mc: bool = True,
+            force_download: bool = False) -> list[dict]:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     leaderboard: list[dict] = []
 
     # ── Download data for all symbols ─────────────────────────────────────────
     print(f"\n{SEP2}")
-    print(f"  REALTIME BACKTEST v4  —  5-Year Multi-Strategy Global Leaderboard")
+    print(f"  REALTIME BACKTEST v4.1  —  5-Year Multi-Strategy Global Leaderboard")
     print(f"  {datetime.now(UTC).isoformat()}")
     print(SEP2)
     print(f"\nLoading {YEARS_OF_DATA}-year data for: {', '.join(symbols)} @ {tf_key}")
 
     datasets: dict[str, pd.DataFrame] = {}
     for sym in symbols:
-        df = load_data(sym, tf_key)
+        df = load_data(sym, tf_key, force_download=force_download)
         datasets[sym] = df
 
     n_combos = len(symbols) * len(ALL_STRATEGIES)
@@ -707,12 +753,23 @@ def run_all(symbols: list[str], tf_key: str, run_mc: bool = True) -> list[dict]:
         # ── Per-symbol mini leaderboard ────────────────────────────────────
         sym_rows.sort(key=lambda r: r["profit_factor"], reverse=True)
         print(f"\n  ── {sym} Top 5 ──")
-        print(f"  {'Strategy':<22} {'Trades':>6} {'WR%':>6} {'PF':>6} {'PnL':>9} {'WFA':>8} Verdict")
+        print(f"  {'Strategy':<22} {'Trades':>6} {'WR%':>6} {'PF':>6} {'PnL':>9} {'WFA':>8} {'Rec SL/TP':>12} Verdict")
         for r in sym_rows[:5]:
             wfa_tag = f"{r['wfa_pass']}P/{r['wfa_fail']}F"
+            # Show recommended SL/TP from latest WFA fold
+            latest = r["wfa_folds"][-1] if r["wfa_folds"] else {}
+            rec_params = (f"SL{latest.get('best_sl_pct','?')}%/TP{latest.get('best_tp_pct','?')}%"
+                          if latest else "─")
             print(f"  {r['strategy']:<22} {r['total_trades']:>6} {r['win_rate_pct']:>5.1f}% "
                   f"{r['profit_factor']:>6.3f} ${r['total_pnl_usd']:>8.2f} "
-                  f"{wfa_tag:>8}  {r['verdict']}")
+                  f"{wfa_tag:>8} {rec_params:>12}  {r['verdict']}")
+
+        # ── Correlation check for profitable pairs on this symbol ──────────
+        corr_pairs = correlation_check(df, sym_rows)
+        if corr_pairs:
+            print(f"\n  ── {sym} Correlation Warning ──")
+            for a, b, c, note in corr_pairs:
+                print(f"  ⚠  {a} ↔ {b}  corr={c:+.3f}  {note}")
 
     # ── Global leaderboard ────────────────────────────────────────────────────
     leaderboard.sort(key=lambda r: (r["profit_factor"], r["wfa_score"]), reverse=True)
@@ -804,15 +861,16 @@ def run_all(symbols: list[str], tf_key: str, run_mc: bool = True) -> list[dict]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--symbol",  default=None, help="Single symbol override")
-    ap.add_argument("--tf",      default="4h")
-    ap.add_argument("--no-mc",   action="store_true", help="Skip Monte Carlo")
+    ap.add_argument("--symbol",         default=None, help="Single symbol override")
+    ap.add_argument("--tf",             default="4h")
+    ap.add_argument("--no-mc",          action="store_true", help="Skip Monte Carlo")
+    ap.add_argument("--force-download", action="store_true", help="Re-download 5yr data even if cached")
     args = ap.parse_args()
 
     tf_key  = TF_MAP.get(args.tf, "4h")
     symbols = [args.symbol.upper()] if args.symbol else DEFAULT_SYMBOLS
 
-    run_all(symbols, tf_key, run_mc=not args.no_mc)
+    run_all(symbols, tf_key, run_mc=not args.no_mc, force_download=args.force_download)
 
 
 if __name__ == "__main__":
