@@ -198,25 +198,6 @@ class TestWebhookToQueue:
 
             assert resp.status_code == 401
 
-    def test_secretless_order_fill_alert_accepted(self):
-        """TradingView order-fill plain text without explicit secret is accepted (format-trusted)."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
-            from tradingview_webhook_bot.core.webhook_server import WebhookServer
-            import tempfile
-            tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
-            config = {"webhook": {"secret": "test_secret_123"}}
-            server = WebhookServer(config=config, signals_queue_file=tf.name)
-            server.app.config["TESTING"] = True
-            client = server.app.test_client()
-
-            text = "TestStrategy: order buy @ 10 filled on SOLUSDT. New strategy position is 10"
-            resp = client.post("/webhook/tradingview",
-                data=text,
-                content_type="text/plain")
-
-            # TV order-fill format is trusted by format specificity — no secret required
-            assert resp.status_code == 200
-
     def test_secret_and_signature_mode_rejects_missing_signature(self):
         """Configured signature mode rejects requests without X-Signature."""
         with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret_and_signature"}):
@@ -262,8 +243,8 @@ class TestWebhookToQueue:
 
             assert resp.status_code == 401
 
-    def test_secretless_order_fill_alert_accepted(self):
-        """TradingView order-fill plain text without explicit secret is accepted (format-trusted)."""
+    def test_secretless_order_fill_unknown_strategy_rejected(self):
+        """P-06: secretless TV order-fill for a strategy not in manifest returns 403."""
         with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
@@ -278,8 +259,8 @@ class TestWebhookToQueue:
                 data=text,
                 content_type="text/plain")
 
-            # TV order-fill format is trusted by format specificity — no secret required
-            assert resp.status_code == 200
+            # P-06: secretless TV order-fill for unlisted strategy is rejected (403)
+            assert resp.status_code == 403
 
     def test_secret_and_signature_mode_rejects_missing_signature(self):
         """Configured signature mode rejects requests without X-Signature."""
