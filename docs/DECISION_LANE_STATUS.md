@@ -43,7 +43,7 @@ VERDICT: NO-GO  (1 of 28 gates FAILED)
 
 **Only remaining blocker:** Gate #2 — trade count. Needs 4 more CCI closed trades + 5 Donchian closed trades on ETHUSDT 4H. No manual workaround — wait for live market signals to trigger and close.
 
-> ⚠️ **STOP_DISPATCH active since 2026-04-23 11:45 UTC** — `tradingview_webhook_bot/storage/STOP_DISPATCH` file present on server. All signals are being received and queued (status=completed) but are NOT dispatched to the exchange. Gate #2 cannot accumulate any new closed trades in this state. **Harsh must explicitly decide: remove `STOP_DISPATCH` to resume dispatch, or document why it should remain set.**
+> ✅ **STOP_DISPATCH removed 2026-04-25** — File was active since 2026-04-23 11:45 UTC (42h). Removed by Harsh. Dispatch resumed. Decision-lane signals will now execute and closed trades will accumulate toward gate #2.
 
 ---
 
