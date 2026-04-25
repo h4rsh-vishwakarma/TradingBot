@@ -199,6 +199,39 @@ python scripts/run_alpha_pipeline.py --notify-telegram
 - `READY_FOR_CAPPED_SCALE`: tiny-capital stage passes under a separate review
 
 
+## Approval Classes
+
+Each manifest entry carries an `approval_class` that controls execution routing:
+
+| Class | Description | Gate |
+|-------|-------------|------|
+| `paper_only` | Research lane — signals processed but no real capital routed | None (observe only) |
+| `candidate_for_tiny_capital` | Decision-lane candidate — must pass full go-live gate before capital routing | Full 28-gate check + 5 closed paper trades |
+| `personal_live` | Harsh personal capital only — separate from checkpoint decision lane | See below |
+
+### `personal_live` Class Rules
+
+This class is reserved for Harsh's personal trading strategies. It is **not part of the CEO checkpoint decision lane** and does not count toward or against the go-live gate for company capital.
+
+**Requirements before using `personal_live` capital:**
+1. TradingView alert must be deployed and confirmed `LIVE_VERIFIED` in `tv_inventory_report.csv` (smoke-test signal received on the correct symbol/timeframe).
+2. A backtest result must exist in the manifest `notes` field (TV backtester results are acceptable; OOS is not required but preferred).
+3. Operator is `harsh` — no CEO approval required.
+4. Capital is personal account only. No company funds may be routed via a `personal_live` strategy.
+5. SL and TP must be set in the Pine script or orchestrator config before any live execution.
+
+**What `personal_live` does NOT do:**
+- It does not satisfy the paper validation requirement for `candidate_for_tiny_capital`.
+- It does not affect the go-live gate verdict.
+- It does not count as decision-lane evidence.
+
+**Current `personal_live` strategies (as of 2026-04-25):**
+
+| Strategy | Symbol | TF | TV Status | Notes |
+|----------|--------|----|-----------|-------|
+| EMA Stack 15M | BTCUSDT / ETHUSDT / SOLUSDT | 15m | MISSING — alert not yet deployed | Must deploy before personal capital use |
+
+
 ## Paper Window Hard-Stop Conditions (NO_GO Triggers)
 
 If ANY of the following occur during the 7-day paper window, the result is **immediate NO_GO**:
