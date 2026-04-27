@@ -1,6 +1,6 @@
 {
-  "version": 16,
-  "updated_at": "2026-04-27T05:00:00.000000+00:00",
+  "version": 17,
+  "updated_at": "2026-04-27T10:00:00.000000+00:00",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -232,7 +232,7 @@
       "approved_at": "2026-04-14T06:58:50Z",
       "backtest_hash": "manual_approval_g79_fisher_donchian_202604140631",
       "label": "ALPHA",
-      "notes": "Fisher Transform cross. ETH: CAGR=3890%, ROI/day=1.01%, champion of batch. XRP: CAGR=2297%, PF=12-16. DOT excluded \u2014 17-26% DD across all G-family, unsafe.",
+      "notes": "[TV_BACKTEST_ONLY \u2014 infinite compounding artifact, pre-lookahead-fix] [SHORTLIST_ELIMINATED \u2014 CORR=1.00 with G108 same trades, 2026-04-27] Fisher Transform cross. ETH: CAGR=3890%, ROI/day=1.01%, champion of batch. XRP: CAGR=2297%, PF=12-16. DOT excluded \u2014 17-26% DD across all G-family, unsafe.",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
       "shortlist_priority": false
@@ -251,7 +251,7 @@
       "approved_at": "2026-04-14T06:31:43Z",
       "backtest_hash": "manual_approval_g80_uo_donchian_202604140631",
       "label": "ALPHA",
-      "notes": "Ultimate Oscillator 50 cross, TV PF 10-13, CAGR 926-1255 pct",
+      "notes": "[TV_BACKTEST_ONLY — infinite compounding artifact, pre-lookahead-fix] Ultimate Oscillator 50 cross, TV PF 10-13, CAGR 926-1255 pct",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
       "shortlist_priority": false
@@ -270,7 +270,7 @@
       "approved_at": "2026-04-14T06:32:04Z",
       "backtest_hash": "manual_approval_g83_demarker_donchian_202604140632",
       "label": "ALPHA",
-      "notes": "DeMarker 0.3 0.7 cross, TV PF 11-18 ETH, CAGR 324-549 pct",
+      "notes": "[TV_BACKTEST_ONLY — infinite compounding artifact, pre-lookahead-fix] DeMarker 0.3 0.7 cross, TV PF 11-18 ETH, CAGR 324-549 pct",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
       "shortlist_priority": false
@@ -289,7 +289,7 @@
       "approved_at": "2026-04-14T06:32:32Z",
       "backtest_hash": "manual_approval_g86_klinger_donchian_202604140632",
       "label": "ALPHA",
-      "notes": "Klinger Volume Osc, TV PF 12-14, CAGR 1033-1569 pct",
+      "notes": "[TV_BACKTEST_ONLY — infinite compounding artifact, pre-lookahead-fix] Klinger Volume Osc, TV PF 12-14, CAGR 1033-1569 pct",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
       "shortlist_priority": false
@@ -308,7 +308,7 @@
       "approved_at": "2026-04-14T06:32:42Z",
       "backtest_hash": "manual_approval_g77_roc_donchian_202604140632",
       "label": "ALPHA",
-      "notes": "ROC 12 cross, TV PF 13-16, CAGR 770-1121 pct",
+      "notes": "[TV_BACKTEST_ONLY — infinite compounding artifact, pre-lookahead-fix] ROC 12 cross, TV PF 13-16, CAGR 770-1121 pct",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
       "shortlist_priority": false
@@ -327,7 +327,7 @@
       "approved_at": "2026-04-14T06:32:53Z",
       "backtest_hash": "manual_approval_g81_tsi_donchian_202604140632",
       "label": "ALPHA",
-      "notes": "True Strength Index zero cross, TV PF 11-14, CAGR 348-589 pct",
+      "notes": "[TV_BACKTEST_ONLY — infinite compounding artifact, pre-lookahead-fix] True Strength Index zero cross, TV PF 11-14, CAGR 348-589 pct",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
       "shortlist_priority": false
@@ -346,7 +346,7 @@
       "approved_at": "2026-04-14T06:33:44Z",
       "backtest_hash": "manual_approval_g84_vwma_cross_donchian_202604140633",
       "label": "ALPHA",
-      "notes": "VWMA 20 50 cross, TV PF 12-13, CAGR 334-540 pct",
+      "notes": "[TV_BACKTEST_ONLY — infinite compounding artifact, pre-lookahead-fix] VWMA 20 50 cross, TV PF 12-13, CAGR 334-540 pct",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
       "shortlist_priority": false
