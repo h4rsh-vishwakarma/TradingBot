@@ -1,6 +1,6 @@
-# Runtime Log — 2026-04-25
+# Runtime Log — 2026-04-27
 
-> Auto-generated — last updated `2026-04-25T14:10:02Z`
+> Auto-generated — last updated `2026-04-27T08:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,15 +8,15 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (1 of 30 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (2 of 30 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-25T14:10:02Z |
+| Last run | 2026-04-27T08:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
-| Version | v15 |
-| Updated | 2026-04-25T10:00:00.000000+00:00 |
+| Version | v18 |
+| Updated | 2026-04-27T12:00:00.000000+00:00 |
 | Total candidates | 2 |
 | ALPHA (live-ready) | 2 |
 | RESEARCH (no Pine yet) | 0 |
@@ -44,17 +44,17 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 18 |
-| Completed | 18 |
-| Last signal | 2026-04-25 08:02 UTC |
-| Last strategy | G94 Pivot Point Reclaim / LDOUSDT |
+| Signals received | 0 |
+| Completed | 0 |
+| Last signal | none |
+| Last strategy | none |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260425_1405 |
-| Verdict | HEALTHY |
+| Last heartbeat file | heartbeat_20260427_0805 |
+| Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions -- Decision Lane (Harsh / live-approved)
@@ -82,8 +82,19 @@ _No outstanding operational issues._
 | Dashboard | https://tradingbot.operatorbrief.xyz/ | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
-## Commits Today (2026-04-25)
+## Commits Today (2026-04-27)
 ```
+59d8cda | 2026-04-27 13:28:29 +0530 | fix: infra audit — 13 priority fixes across capital risk, logic, and config
+b82bf19 | 2026-04-27 12:01:25 +0530 | fix: manifest v17 — flag 7 TV backtest CAGR artifacts, eliminate G79 shortlist
+609512d | 2026-04-27 10:22:52 +0530 | fix: resolve all Harsh-side audit blockers (H-2 through H-5)
+beae2ff | 2026-04-25 22:56:10 +0530 | feat: v4.1 — bootstrap MC fix, correlation check, auto MIN_OOS_TRADES, force-download flag
+31117d1 | 2026-04-25 22:00:51 +0530 | feat: add realtime_backtest_v4.py — 5-year multi-strategy global leaderboard
+87ff86d | 2026-04-25 21:23:29 +0530 | chore: update TAKE_PROFIT_PCT default 12.0 -> 4.0 in env_vars.template
+8fe6615 | 2026-04-25 21:22:35 +0530 | feat: add realtime_backtest_v3.py — ADX regime filter + profitability path
+ea7e09d | 2026-04-25 21:08:02 +0530 | feat: add realtime_backtest_v2.py — all 5 CEO gaps filled
+24ccaf2 | 2026-04-25 20:39:35 +0530 | Merge remote-tracking branch 'origin/main'
+91ca5d8 | 2026-04-25 20:37:36 +0530 | feat(H-33): evidence-grade backtest engine v1 + fix paper_sim SL/TP
+189eed1 | 2026-04-25 14:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-25T14:10:02Z
 d3d1276 | 2026-04-25 19:35:37 +0530 | merge: resolve DECISION_LANE_STATUS.md conflict, keep H-26..H-29 entries
 039ccfe | 2026-04-25 19:32:50 +0530 | fix(H-26..H-29): correct STOP_LOSS_PCT, systemd kill guards, env template, gate validations
 6b28129 | 2026-04-25 13:42:46 +0000 | fix(H-21/H-22/H-23/H-24/H-25): unblock decision-lane + systemd + doc correction
