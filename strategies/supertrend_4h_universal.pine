@@ -13,11 +13,12 @@ strategy(
      title       = "SuperTrend [Universal] v3  4H ALL SYMBOLS",
      shorttitle  = "ST-4H-UNIVERSAL",
      overlay     = true,
-     default_qty_type  = strategy.percent_of_equity,
-     default_qty_value = 10,
+     default_qty_type  = strategy.fixed,
+     default_qty_value = 1000,
      commission_type   = strategy.commission.percent,
-     commission_value  = 0.06,
-     initial_capital   = 10000
+     commission_value  = 0.30,
+     initial_capital   = 10000,
+     process_orders_on_close = false
  )
 
 // 

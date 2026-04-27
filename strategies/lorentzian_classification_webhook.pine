@@ -8,11 +8,12 @@ strategy('ML: Lorentzian Classification - Webhook',
          overlay=true, 
          precision=4, 
          max_labels_count=500,
-         default_qty_type=strategy.percent_of_equity,
-         default_qty_value=100,
+         default_qty_type=strategy.fixed,
+         default_qty_value=1000,
          commission_type=strategy.commission.percent,
-         commission_value=0.075,
-         slippage=2) 
+         commission_value=0.30,
+         slippage=2,
+         process_orders_on_close=false)
 
 import jdehorty/MLExtensions/2 as ml
 import jdehorty/KernelFunctions/2 as kernels

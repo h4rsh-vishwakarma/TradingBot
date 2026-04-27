@@ -7,9 +7,9 @@
 //                 OPUSDT Mult=1.57 Len=8  | UNIUSDT Mult=2.07 Len=12
 // ============================================================
 strategy("Keltner Breakout [Webhook] v2", shorttitle="KB-WH", overlay=true,
-     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
-     commission_type=strategy.commission.percent, commission_value=0.1,
-     calc_on_order_fills=false, calc_on_every_tick=false)
+     default_qty_type=strategy.fixed, default_qty_value=1000,
+     commission_type=strategy.commission.percent, commission_value=0.30,
+     calc_on_order_fills=false, calc_on_every_tick=false, process_orders_on_close=false)
 
 // ── Inputs ──────────────────────────────────────────────────
 ema_len   = input.int(15,   "EMA Length",      minval=5,  maxval=50,  tooltip="FILUSDT=15, LDOUSDT=19, OPUSDT=8, UNIUSDT=12")

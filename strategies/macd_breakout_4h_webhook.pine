@@ -15,9 +15,9 @@
 // 
 strategy("MACD Breakout [Webhook] v3  4H", shorttitle="MB-4H",
      overlay=false,
-     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
-     commission_type=strategy.commission.percent, commission_value=0.06,
-     calc_on_order_fills=false, calc_on_every_tick=false)
+     default_qty_type=strategy.fixed, default_qty_value=1000,
+     commission_type=strategy.commission.percent, commission_value=0.30,
+     calc_on_order_fills=false, calc_on_every_tick=false, process_orders_on_close=false)
 
 //  Inputs 
 grp_c = "Core Settings"

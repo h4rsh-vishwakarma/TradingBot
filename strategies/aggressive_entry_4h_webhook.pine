@@ -14,9 +14,9 @@
 // 
 strategy("Aggressive Entry [Webhook] v3  4H", shorttitle="AE-4H",
      overlay=true,
-     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
-     commission_type=strategy.commission.percent, commission_value=0.06,
-     calc_on_order_fills=false, calc_on_every_tick=false)
+     default_qty_type=strategy.fixed, default_qty_value=1000,
+     commission_type=strategy.commission.percent, commission_value=0.30,
+     calc_on_order_fills=false, calc_on_every_tick=false, process_orders_on_close=false)
 
 //  Inputs 
 rsi_len  = input.int(14,    "RSI Length",            minval=5,  maxval=30, tooltip="FILUSDT=14, LDOUSDT=16, OPUSDT=12")

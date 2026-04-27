@@ -3,9 +3,9 @@
 // USE ON 15m CHART | ADX>20 + ATR guard + cooldown
 // FILUSDT Len=9(fast) Mult=3.03 | LDOUSDT Len=7 Mult=2.53 | OPUSDT Len=4 Mult=1.83
 strategy("Aggressive Entry [Webhook] v2", shorttitle="AE-WH", overlay=true,
-     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
-     commission_type=strategy.commission.percent, commission_value=0.1,
-     calc_on_order_fills=false, calc_on_every_tick=false)
+     default_qty_type=strategy.fixed, default_qty_value=1000,
+     commission_type=strategy.commission.percent, commission_value=0.30,
+     calc_on_order_fills=false, calc_on_every_tick=false, process_orders_on_close=false)
 fast_len  = input.int(9, "Fast EMA", minval=3, maxval=30)
 slow_mult = input.float(3.03, "Slow EMA Mult", minval=1.0, maxval=5.0, step=0.01)
 sl_pct    = input.float(1.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1)

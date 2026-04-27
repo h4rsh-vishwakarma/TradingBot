@@ -3,9 +3,9 @@
 // ADX>20 filter + ATR volatility guard + 3-loss cooldown
 // FILUSDT Len=11 Mult=2.06 | LDOUSDT Len=14 Mult=2.56 | OPUSDT Len=14 Mult=2.56
 strategy("Ichimoku MACD Pro [Webhook] v2", shorttitle="IMP-WH", overlay=true,
-     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
-     commission_type=strategy.commission.percent, commission_value=0.1,
-     calc_on_order_fills=false, calc_on_every_tick=false)
+     default_qty_type=strategy.fixed, default_qty_value=1000,
+     commission_type=strategy.commission.percent, commission_value=0.30,
+     calc_on_order_fills=false, calc_on_every_tick=false, process_orders_on_close=false)
 tenkan_len = input.int(11, "Tenkan/MACD Fast", minval=5, maxval=30, tooltip="FILUSDT=11, LDOUSDT=14, OPUSDT=14")
 kijun_mult = input.float(2.06, "Kijun Mult", minval=1.0, maxval=5.0, step=0.01, tooltip="FILUSDT=2.06, LDOUSDT=2.56, OPUSDT=2.56")
 sl_pct     = input.float(1.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1)

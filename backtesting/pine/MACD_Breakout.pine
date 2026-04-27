@@ -3,9 +3,9 @@
 // ADX>20 filter + ATR volatility guard + 3-loss cooldown
 // FILUSDT Len=13 Mult=2.02 | LDOUSDT Len=13 Mult=2.02 | OPUSDT Len=16 Mult=2.52
 strategy("MACD Breakout [Webhook] v2", shorttitle="MB-WH", overlay=false,
-     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
-     commission_type=strategy.commission.percent, commission_value=0.1,
-     calc_on_order_fills=false, calc_on_every_tick=false)
+     default_qty_type=strategy.fixed, default_qty_value=1000,
+     commission_type=strategy.commission.percent, commission_value=0.30,
+     calc_on_order_fills=false, calc_on_every_tick=false, process_orders_on_close=false)
 macd_len = input.int(13, "MACD Fast Len", minval=5, maxval=30, tooltip="FILUSDT=13, LDOUSDT=13, OPUSDT=16")
 atr_mult = input.float(2.02, "Slow Mult", minval=1.0, maxval=5.0, step=0.01, tooltip="FILUSDT=2.02, LDOUSDT=2.02, OPUSDT=2.52")
 sl_pct   = input.float(1.0, "Stop Loss %", minval=0.1, maxval=5.0, step=0.1)

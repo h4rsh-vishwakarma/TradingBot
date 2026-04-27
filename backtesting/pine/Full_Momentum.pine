@@ -3,9 +3,9 @@
 // ADX>20 filter + ATR volatility guard + 3-loss cooldown
 // FILUSDT Len=10 Mult=1.84 | LDOUSDT Len=12 Mult=2.04 | OPUSDT Len=15 Mult=2.54
 strategy("Full Momentum [Webhook] v2", shorttitle="FM-WH", overlay=false,
-     default_qty_type=strategy.percent_of_equity, default_qty_value=10,
-     commission_type=strategy.commission.percent, commission_value=0.1,
-     calc_on_order_fills=false, calc_on_every_tick=false)
+     default_qty_type=strategy.fixed, default_qty_value=1000,
+     commission_type=strategy.commission.percent, commission_value=0.30,
+     calc_on_order_fills=false, calc_on_every_tick=false, process_orders_on_close=false)
 macd_fast = input.int(10, "MACD Fast", minval=5, maxval=30, tooltip="FILUSDT=10, LDOUSDT=12, OPUSDT=15")
 slow_mult = input.float(1.84, "Slow Multiplier", minval=1.0, maxval=5.0, step=0.01, tooltip="FILUSDT=1.84, LDOUSDT=2.04, OPUSDT=2.54")
 ema_trend = input.int(50, "Trend EMA", minval=20, maxval=200)

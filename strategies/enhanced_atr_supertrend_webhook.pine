@@ -9,7 +9,9 @@
 // 
 
 strategy("Enhanced ATR Supertrend  Webhook", shorttitle="ATR ST Webhook", overlay=true,
-         default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+         default_qty_type=strategy.fixed, default_qty_value=1000,
+         commission_type=strategy.commission.percent, commission_value=0.30,
+         calc_on_order_fills=false, calc_on_every_tick=false, process_orders_on_close=false)
 
 // 
 // WEBHOOK CONFIGURATION
