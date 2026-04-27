@@ -387,6 +387,21 @@ sudo systemctl restart trading_orchestrator
 python3 -m tradingview_webhook_bot.recon.reconciler
 ```
 
+### R-04 Quarantined Positions (Documented Exception)
+
+The gate check reports 6 positions quarantined under R-04. These are positions that
+were opened by signals outside the ETHUSDT decision lane (pre-G-01 governance
+enforcement, before 2026-04-18) and are now inert — they generate no new orders and
+carry no active capital. They appear in the reconciler snapshot but do not affect
+live P&L or the SIDE_MISMATCH drift check.
+
+**H-4 Idempotency Audit (2026-04-27):** 0 duplicate signal_ids found in the
+idempotency DB for the Apr 25–27 window during the duplicate orchestrator incident.
+The idempotency DB absorbed all signals cleanly — no double-executions occurred.
+
+Resolution: these positions will be closed at next paper-window reset. Until then,
+they are documented here as a known, inert exception.
+
 ### Clear Signal Queue
 
 ```bash

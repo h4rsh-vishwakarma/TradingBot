@@ -72,10 +72,15 @@ _TF_TO_BINANCE_INTERVAL = {
 
 # ─── Binance helpers ───────────────────────────────────────────────────────────
 
+def _clean_symbol(symbol: str) -> str:
+    """Strip exchange-specific suffixes (e.g. .P) before Binance API calls."""
+    return re.sub(r'\.[A-Z]+$', '', symbol.upper())
+
+
 def _binance_klines(symbol: str, interval: str, start_ms: int, limit: int = 100) -> list[list]:
     """Fetch OHLCV from Binance Futures public endpoint."""
     url = f"{BINANCE_BASE}/fapi/v1/klines"
-    params = {"symbol": symbol.upper(), "interval": interval,
+    params = {"symbol": _clean_symbol(symbol), "interval": interval,
                "startTime": start_ms, "limit": limit}
     try:
         resp = requests.get(url, params=params, timeout=10)
@@ -90,7 +95,7 @@ def _binance_mark_price(symbol: str) -> float | None:
     """Current mark price for a symbol."""
     try:
         url = f"{BINANCE_BASE}/fapi/v1/premiumIndex"
-        resp = requests.get(url, params={"symbol": symbol.upper()}, timeout=5)
+        resp = requests.get(url, params={"symbol": _clean_symbol(symbol)}, timeout=5)
         resp.raise_for_status()
         return float(resp.json()["markPrice"])
     except Exception:

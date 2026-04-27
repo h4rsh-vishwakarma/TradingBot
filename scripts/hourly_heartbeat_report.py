@@ -61,6 +61,7 @@ TOURNAMENT_FILES = [
 
 SIGNAL_GAP_WATCH_MIN  = 8 * 60
 SIGNAL_GAP_ACTION_MIN = 24 * 60
+DECISION_LANE_GAP_WARN_MIN = 60 * 60  # 60h — Gate #28 fails at 72h, alert before it breaks
 
 
 
@@ -535,6 +536,13 @@ def determine_verdict(ctx: dict) -> str:
     if ingestion_minutes > SIGNAL_GAP_ACTION_MIN:
         return "Attention needed"
 
+    # Decision-lane ETHUSDT signal recency — alert before Gate #28 (72h) breaks
+    last_approved = (ctx.get("flow") or {}).get("last_approved") or {}
+    if last_approved.get("created_at"):
+        approved_gap_min = int((datetime.now(UTC).timestamp() - float(last_approved["created_at"])) / 60)
+        if approved_gap_min > DECISION_LANE_GAP_WARN_MIN:
+            return "ACTION NEEDED"
+
     # WATCH
     if drifts["medium"] > 0:
         return "WATCH"
@@ -622,6 +630,11 @@ def format_report(ctx: dict) -> str:
         issues.append(f"Manifest scope off — {scope.get('candidate_count', '?')} candidate rows")
     if not ingestion.get("ok"):
         issues.append(ingestion.get("detail", "Signal ingestion issue"))
+    last_approved_flow = (ctx.get("flow") or {}).get("last_approved") or {}
+    if last_approved_flow.get("created_at"):
+        approved_gap_min = int((datetime.now(UTC).timestamp() - float(last_approved_flow["created_at"])) / 60)
+        if approved_gap_min > DECISION_LANE_GAP_WARN_MIN:
+            issues.append(f"⚠️ Decision-lane signal gap {approved_gap_min // 60}h — Gate #28 (72h) will break in {(72 * 60 - approved_gap_min) // 60}h")
     issues_block = "\n".join(f"• {x}" for x in issues) if issues else "• None"
 
     pos_lines = []

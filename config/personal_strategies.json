@@ -1,0 +1,24 @@
+{
+    "version": 1,
+    "note": "Personal trading strategies for Harsh — isolated from the decision-lane gate and governance manifest. These are NOT subject to the paper-window or go-live gate requirements.",
+    "strategies": [
+        {
+            "strategy": "EMA Stack 15M",
+            "exchange": "binance",
+            "symbols": [
+                "BTCUSDT",
+                "ETHUSDT",
+                "SOLUSDT"
+            ],
+            "timeframes": [
+                "15"
+            ],
+            "operator": "harsh",
+            "approved_at": "2026-04-21",
+            "backtest_hash": "tv_backtest_ema_stack_15m_pf156",
+            "label": "PERSONAL_LIVE",
+            "notes": "Personal HF strategy. EMA 5/13/50 stack scalper 15M. PF=1.56, 461 trades/6yr, SL=0.8%, TP=1.6%. Separate from ETH 4H decision lane.",
+            "class_reason": "Harsh personal trading — not part of checkpoint decision lane. Isolated here so the production manifest stays clean for governance audits."
+        }
+    ]
+}
