@@ -1,6 +1,6 @@
 {
-  "version": 17,
-  "updated_at": "2026-04-27T10:00:00.000000+00:00",
+  "version": 18,
+  "updated_at": "2026-04-27T12:00:00.000000+00:00",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -87,7 +87,7 @@
       "approved_at": "2026-04-13T12:11:30Z",
       "backtest_hash": "combo_oos_RSI_x_BB_x_PSAR_ARBUSDT_20260413",
       "label": "RESEARCH",
-      "notes": "Auto-discovered combo: RSI oversold + BB bounce + PSAR flip. OOS PF=127.108 WR=72.7% DD=-0.04%. Pine: strategies/pine_combos/",
+      "notes": "[UNREALISTIC_OOS_ARTIFACT — multiple-comparison artifact from combo search, PF=127x impossible with real fees] Auto-discovered combo: RSI oversold + BB bounce + PSAR flip. OOS PF=127.108 WR=72.7% DD=-0.04%. Pine: strategies/pine_combos/",
       "approval_class": "paper_only",
       "class_reason": "Demoted 2026-04-15: insufficient OOS live-trade sample (<5 closed trades) to justify capital routing. Monitor paper results for 7 days.",
       "oos_pf": 127.108,

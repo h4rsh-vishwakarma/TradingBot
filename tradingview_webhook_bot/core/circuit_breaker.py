@@ -5,6 +5,7 @@ Automatically pauses trading when loss thresholds are exceeded.
 
 import time
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict
 import logging
@@ -48,6 +49,7 @@ class CircuitBreaker:
                 self.manual_pause = state.get('manual_pause', False)
                 self.daily_start_balance = state.get('daily_start_balance', None)
                 self.daily_start_time = state.get('daily_start_time', None)
+                self.daily_utc_date = state.get('daily_utc_date', None)
                 self.consecutive_losses = state.get('consecutive_losses', 0)
                 self.peak_balance = state.get('peak_balance', None)
                 
@@ -67,6 +69,7 @@ class CircuitBreaker:
         self.manual_pause = False
         self.daily_start_balance = None
         self.daily_start_time = None
+        self.daily_utc_date = None
         self.consecutive_losses = 0
         self.peak_balance = None
         self._save_state()
@@ -81,6 +84,7 @@ class CircuitBreaker:
                 'manual_pause': self.manual_pause,
                 'daily_start_balance': self.daily_start_balance,
                 'daily_start_time': self.daily_start_time,
+                'daily_utc_date': self.daily_utc_date,
                 'consecutive_losses': self.consecutive_losses,
                 'peak_balance': self.peak_balance,
                 'last_updated': time.time()
@@ -106,14 +110,15 @@ class CircuitBreaker:
             True if trading should be paused
         """
         current_time = time.time()
-        
-        # Reset daily tracking if it's a new day (24h passed)
-        if (self.daily_start_time is None or 
-            current_time - self.daily_start_time > 86400):
+        current_utc_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+        # Reset daily tracking at UTC midnight (not rolling 24h)
+        if self.daily_start_time is None or self.daily_utc_date != current_utc_date:
             self.daily_start_balance = current_balance
             self.daily_start_time = current_time
+            self.daily_utc_date = current_utc_date
             self._save_state()
-            logger.info(f"📅 New trading day started | Balance: ${current_balance:.2f}")
+            logger.info(f"📅 New trading day started ({current_utc_date}) | Balance: ${current_balance:.2f}")
             return False
         
         if self.peak_balance is None or current_balance > self.peak_balance:

@@ -645,12 +645,10 @@ class WebhookServer:
                     }
                 }
 
-                                # Strategy alias map (empty — orphaned TV alerts deleted 2026-04-15)
-                _STRATEGY_ALIASES = {
-                    "EMA_Stack_Scalper_15M": "EMA Stack 15M",
-                    "EMA_Stack_Scalper": "EMA Stack 15M",
-                }
+                # --- Strategy alias map: resolve before manifest check ---
+                _STRATEGY_ALIASES: dict = {}   # add entries here if TV alert names differ from manifest
                 strategy = _STRATEGY_ALIASES.get(strategy, strategy)
+                clean_payload["payload"]["strategy"] = strategy
 
                 # --- Strategy allowlist check: skip unapproved/test strategies silently ---
                 _manifest_path = Path(__file__).resolve().parents[2] / 'config' / 'approved_strategies.json'
@@ -668,9 +666,11 @@ class WebhookServer:
                     return jsonify({'status': 'success', 'message': 'Signal acknowledged'}), 200
                 # --- End allowlist check ---
 
-                # Queue signal to both JSONL (legacy) and SQLite (durable)
-                self.queue.enqueue(clean_payload)
-                self.durable_queue.enqueue(clean_payload)
+                # Route to exactly one queue — durable SQLite (primary) or legacy JSONL (fallback)
+                if os.getenv("USE_DURABLE_QUEUE", "true").lower() == "true":
+                    self.durable_queue.enqueue(clean_payload)
+                else:
+                    self.queue.enqueue(clean_payload)
                 logger.info(f"✅ Signal Queued: {symbol} {side} @ ${price_val} | Strategy: {strategy} (ID: {signal_id})")
 
                 # Return 200 IMMEDIATELY

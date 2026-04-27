@@ -4,12 +4,16 @@ After=network.target
 
 [Service]
 User=ubuntu
-WorkingDirectory=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems
-Environment="PATH=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems/venv/bin"
-Environment="PYTHONPATH=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems"
-ExecStart=/home/ubuntu/Multi-Strategy-Crypto-Trading-Systems/venv/bin/python3 tradingview-webhook-bot/main_engine.py
+WorkingDirectory=/home/ubuntu/tradingview_webhook_bot
+Environment="PATH=/home/ubuntu/tradingview_webhook_bot/venv/bin"
+Environment="PYTHONPATH=/home/ubuntu/tradingview_webhook_bot"
+EnvironmentFile=/etc/tradingbot/env_vars
+ExecStartPre=/bin/bash -c 'pkill -f "python3.*orchestrator" || true'
+ExecStart=/home/ubuntu/tradingview_webhook_bot/venv/bin/python3 -m tradingview_webhook_bot.core.orchestrator
 Restart=always
 RestartSec=5
+StandardOutput=append:/home/ubuntu/tradingview_webhook_bot/logs/orchestrator.log
+StandardError=append:/home/ubuntu/tradingview_webhook_bot/logs/orchestrator.log
 
 [Install]
 WantedBy=multi-user.target

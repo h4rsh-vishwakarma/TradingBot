@@ -548,13 +548,18 @@ def run_wfa(df, signal_fn, symbol, n_folds=3, oos_frac=0.20):
         df_tr  = df.iloc[:oos_start].reset_index(drop=True)
         df_oos = df.iloc[oos_start:oos_end].reset_index(drop=True)
 
-        best_pf, best_sl, best_tp, best_adx = -1, WFA_SL_GRID[0], WFA_TP_GRID[0], 0
+        best_score, best_sl, best_tp, best_adx = -1.0, WFA_SL_GRID[0], WFA_TP_GRID[0], 0
         for sl, tp, adx_t in product(WFA_SL_GRID, WFA_TP_GRID, WFA_ADX_GRID):
             sig_tr = signal_fn(df_tr)
             sig_tr = apply_adx(sig_tr, df_tr, adx_t)
             r = simulate(df_tr, sig_tr, symbol=symbol, sl_pct=sl, tp_pct=tp)
-            if r.get("total_trades", 0) >= min_oos and r.get("profit_factor", 0) > best_pf:
-                best_pf  = r["profit_factor"]
+            # Composite IS score: 50% capped-PF + 50% capped-Sharpe
+            # Prevents single large win dominating PF and selecting fragile params
+            _pf = min(r.get("profit_factor", 0), 5.0) / 5.0
+            _sh = min(max(r.get("sharpe", 0), 0.0), 3.0) / 3.0
+            _score = 0.5 * _pf + 0.5 * _sh
+            if r.get("total_trades", 0) >= min_oos and _score > best_score:
+                best_score = _score
                 best_sl, best_tp, best_adx = sl, tp, adx_t
 
         sig_oos = signal_fn(df_oos)

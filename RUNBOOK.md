@@ -9,7 +9,7 @@
 ### Signal Flow
 
 ```
-TradingView (7 Approved Strategies on ETHUSDT/BTCUSDT)
+TradingView (2 Candidates + 28 Paper-Only strategies — ETHUSDT 4h decision lane + G-series)
       |
       v  HTTPS POST (JSON + Plain Text alerts)
 +-----+------+

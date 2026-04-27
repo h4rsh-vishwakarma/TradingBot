@@ -302,7 +302,7 @@ class BinanceClient:
                     return {"status": "SUCCESS", "avg_price": status["avg_price"],
                             "orderId": status.get("orderId"), "recovered_from_timeout": True}
                 logger.warning(f"⏱️ -1007 timeout: order {client_order_id} not filled — treating as TIMEOUT")
-                return {"status": "TIMEOUT", "client_order_id": client_order_id, "symbol": symbol}
+                return {"status": "TIMEOUT", "reason": "timeout_unknown", "client_order_id": client_order_id, "symbol": symbol}
             status_code = getattr(e, 'status_code', 0)
             if status_code in [429, 500, 502, 503, 504]:
                 raise RuntimeError(f"Transient Binance Failure: {e.message}")
@@ -311,7 +311,7 @@ class BinanceClient:
             # Order may or may not have been submitted — caller must verify via get_order_status()
             client_order_id = signal_id if signal_id else f"bot_{int(time.time())}"
             logger.warning(f"⏱️ Timeout placing order for {symbol} (ID: {client_order_id}) — status unknown")
-            return {"status": "TIMEOUT", "client_order_id": client_order_id, "symbol": symbol}
+            return {"status": "TIMEOUT", "reason": "timeout_unknown", "client_order_id": client_order_id, "symbol": symbol}
         except Exception as e:
             if isinstance(e, RuntimeError):
                 raise e
@@ -422,6 +422,9 @@ class BinanceClient:
 
     def close_all_positions(self):
         """Emergency kill switch: close ALL open futures positions."""
+        if not self.allow_real:
+            logger.warning("⚠️ close_all_positions called in paper/dry-run mode — no real orders placed")
+            return []
         closed = []
         try:
             positions = self.client.futures_position_information()

@@ -3,12 +3,17 @@ import numpy as np
 import glob
 import os
 import gc
+import logging
+from pathlib import Path
 from my_strategies import apply_strategy
 
+logger = logging.getLogger(__name__)
+
 def strategy_tournament():
-    PINE_FOLDER = '/home/ubuntu/tradingview_webhook_bot/backtesting/pine/'
-    DATA_FILES = glob.glob('/home/ubuntu/tradingview_webhook_bot/storage/backtest_data/*_3y_15m.csv')
-    REPORT_PATH = '/home/ubuntu/tradingview_webhook_bot/storage/reports/tournament_winners.csv'
+    _ROOT = Path(__file__).resolve().parents[1]
+    PINE_FOLDER = str(_ROOT / 'backtesting' / 'pine') + os.sep
+    DATA_FILES = glob.glob(str(_ROOT / 'storage' / 'backtest_data' / '*_3y_15m.csv'))
+    REPORT_PATH = str(_ROOT / 'storage' / 'reports' / 'tournament_winners.csv')
 
     all_files = sorted([f for f in os.listdir(PINE_FOLDER) if os.path.isfile(os.path.join(PINE_FOLDER, f))])
     results = []
@@ -113,6 +118,8 @@ def strategy_tournament():
                         results[existing_idx] = row
             gc.collect()
 
+    if not results:
+        raise RuntimeError("Tournament produced zero results — DATA_FILES may be empty or all strategies errored. Not writing CSV to avoid silent gate bypass.")
     final_df = pd.DataFrame(results).sort_values(by=["Daily_ROI_%"], ascending=False)
     final_df.to_csv(REPORT_PATH, index=False)
     
@@ -345,7 +352,8 @@ def run_test(df_raw, name, optimize, mult, length, reverse=False):
             status = "🎯 ALPHA"
 
         return daily_roi, gross_dd, net_dd, win_rate, sharpe, total_trades, status, gross_dd_date, net_dd_date, gross_dd_capital, net_dd_capital
-    except:
+    except Exception as e:
+        logger.error(f"run_test error [{name}]: {e}")
         return -1, -1, -1, 0.0, 0.0, 0, "💀 ERROR", "N/A", "N/A", 0, 0
 
 if __name__ == "__main__":

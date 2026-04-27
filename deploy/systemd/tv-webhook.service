@@ -8,7 +8,7 @@ Group=www-data
 WorkingDirectory=/home/ubuntu/tradingview_webhook_bot
 Environment="PATH=/home/ubuntu/tradingview_webhook_bot/venv/bin"
 EnvironmentFile=/etc/tradingbot/env_vars
-ExecStart=/home/ubuntu/tradingview_webhook_bot/venv/bin/gunicorn --workers 4 --threads 4 --worker-class gthread --timeout 60 --max-requests 1000 --max-requests-jitter 50 --bind unix:app.sock -m 007 wsgi:app
+ExecStart=/home/ubuntu/tradingview_webhook_bot/venv/bin/gunicorn --workers 2 --threads 2 --worker-class gthread --timeout 60 --max-requests 1000 --max-requests-jitter 50 --bind unix:app.sock -m 007 wsgi:app
 
 [Install]
 WantedBy=multi-user.target

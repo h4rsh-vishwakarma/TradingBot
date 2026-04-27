@@ -60,7 +60,7 @@ def _read_env(key: str, fallback: str) -> str:
     return os.getenv(key, fallback)
 
 DEFAULT_SL_PCT = float(_read_env("STOP_LOSS_PCT", "2.0"))
-DEFAULT_TP_PCT = float(_read_env("TAKE_PROFIT_PCT", "12.0"))
+DEFAULT_TP_PCT = float(_read_env("TAKE_PROFIT_PCT", "4.0"))
 DEFAULT_FIXED_NOTIONAL = 100.0   # $100 per simulated trade (paper only)
 
 _TF_TO_BINANCE_INTERVAL = {
@@ -526,7 +526,7 @@ def main() -> int:
     summary = _build_strategy_summary(results)
     _save_results(summary, days=args.days, sl_pct=args.sl, tp_pct=args.tp)
 
-    if args.report or True:   # always print
+    if args.report:
         _print_report(summary)
 
     return 0
