@@ -137,6 +137,7 @@ def run_backtest(
     min_trades      : int   = 10,
     exit_on_signal_off: bool = True,
     sizing_mode     : str   = "fixed",
+    slippage_bps    : float = 15.0,
 ) -> Optional[dict]:
     """
     Core trade-simulation backtest.
@@ -159,6 +160,7 @@ def run_backtest(
     min_trades    : Minimum trades for a valid result (returns None if fewer)
     exit_on_signal_off : If True (default), close position when signal turns 0.
     sizing_mode   : "fixed" (default, 95% equity) or "kelly" (Half-Kelly dynamic)
+    slippage_bps  : Adverse slippage per fill in basis points (default 15 = 0.15%)
 
     Returns
     -------
@@ -188,6 +190,7 @@ def run_backtest(
             break
 
     # ── Simulation state ─────────────────────────────────────────────────────
+    _slip = slippage_bps / 10_000  # convert bps to decimal fraction
     capital        = float(initial_capital)
     position       = 0          # 0=flat, 1=long, -1=short
     entry_price    = 0.0
@@ -331,7 +334,8 @@ def run_backtest(
                 kelly_sizes.append(_entry_size)
 
                 position    = sig
-                entry_price = price
+                # Slippage applied adversely to entry: longs pay more, shorts receive less
+                entry_price = price * (1.0 + _slip) if sig == 1 else price * (1.0 - _slip)
                 entry_bar   = i
                 if trail_pct > 0.0:
                     trail_stop = price * (1.0 - trail_pct) if sig == 1 else price * (1.0 + trail_pct)

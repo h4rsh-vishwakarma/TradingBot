@@ -468,6 +468,8 @@ def simulate(df, sig, symbol="ETHUSDT", sl_pct=None, tp_pct=None,
                 vol_skip += 1; continue
             slip  = _vol_slippage(base_slip, ai, la, True)
             lat   = _latency_slip(ai, open_a[i + 1])
+            # Slippage is built into ep (entry price). Since ret = (xp - ep)/ep,
+            # slippage is fully reflected in P&L — not a separate deduction.
             ep    = open_a[i + 1] * (1 + lat if si == 1 else 1 - lat)
             pos   = si; eb = i
 

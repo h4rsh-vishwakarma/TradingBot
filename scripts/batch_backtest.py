@@ -271,27 +271,29 @@ def strategy_ema_cloud(df, params):
     mid = calc_ema(df['close'], params['ema_mid'])
     slow = calc_ema(df['close'], params['ema_slow'])
     adx = calc_adx(df['high'], df['low'], df['close'], params['adx_period'])
-
     signals = pd.Series(0, index=df.index)
-    signals[(fast > mid) & (mid > slow) & (adx > params['adx_threshold'])] = 1
-    signals[(fast < mid) & (mid < slow) & (adx > params['adx_threshold'])] = -1
+    # Crossover entry only — prevents re-entry cascade after SL fires on same regime bar
+    signals[(fast > mid) & (fast.shift(1) <= mid.shift(1)) & (mid > slow) & (adx > params['adx_threshold'])] = 1
+    signals[(fast < mid) & (fast.shift(1) >= mid.shift(1)) & (mid < slow) & (adx > params['adx_threshold'])] = -1
     return signals
 
 def strategy_lookback_momentum(df, params):
     lookback = params['lookback']
+    close = df['close']
+    # Breakout crossover: price crosses above/below lookback-bar rolling high/low (previous bar's window)
+    lookback_high = close.shift(1).rolling(lookback).max()
+    lookback_low  = close.shift(1).rolling(lookback).min()
     signals = pd.Series(0, index=df.index)
-    for i in range(lookback, len(df)):
-        if df['close'].iloc[i] > df['close'].iloc[i - lookback]:
-            signals.iloc[i] = 1
-        elif df['close'].iloc[i] < df['close'].iloc[i - lookback]:
-            signals.iloc[i] = -1
+    signals[(close > lookback_high) & (close.shift(1) <= lookback_high.shift(1))] = 1
+    signals[(close < lookback_low)  & (close.shift(1) >= lookback_low.shift(1))]  = -1
     return signals
 
 def strategy_bollinger_reversion(df, params):
     sma, upper, lower = calc_bollinger(df['close'], params['period'], params['mult'])
     signals = pd.Series(0, index=df.index)
-    signals[df['close'] < lower] = 1   # Buy at lower band
-    signals[df['close'] > upper] = -1  # Sell at upper band
+    # Band-cross entry only — fires once on the bar price first crosses the band
+    signals[(df['close'] < lower) & (df['close'].shift(1) >= lower.shift(1))] = 1
+    signals[(df['close'] > upper) & (df['close'].shift(1) <= upper.shift(1))] = -1
     return signals
 
 
@@ -299,10 +301,9 @@ def strategy_rsi_divergence(df, params):
     rsi = calc_rsi(df['close'], params['rsi_period'])
     ema = calc_ema(df['close'], params['ema_period'])
     signals = pd.Series(0, index=df.index)
-    # RSI oversold + price above EMA = buy dip in uptrend
-    signals[(rsi < params['rsi_oversold']) & (df['close'] > ema)] = 1
-    # RSI overbought + price below EMA = sell rally in downtrend
-    signals[(rsi > params['rsi_overbought']) & (df['close'] < ema)] = -1
+    # Entry on RSI zone-entry crossover — fires once when RSI crosses the threshold
+    signals[(rsi < params['rsi_oversold'])  & (rsi.shift(1) >= params['rsi_oversold'])  & (df['close'] > ema)] = 1
+    signals[(rsi > params['rsi_overbought']) & (rsi.shift(1) <= params['rsi_overbought']) & (df['close'] < ema)] = -1
     return signals
 
 def strategy_macd_histogram(df, params):
@@ -501,7 +502,7 @@ def fetch_binance_data(symbol, timeframe="4h", days=365*3):
 # ================= BACKTESTER =================
 
 def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
-                 capital=10000, commission_pct=0.1, sl_pct=3.0, tp_pct=5.0,
+                 capital=10000, commission_pct=0.06, sl_pct=3.0, tp_pct=5.0,
                  use_atr=True, atr_sl_mult=1.5, atr_tp_mult=2.5, trailing_pct=2.0,
                  max_bars_held=48, use_vwap=True, use_obv=True,
                  sizing_mode="fixed_notional", fixed_notional=1000.0,
@@ -561,7 +562,7 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                 qty = position_qty
                 pnl_pct_time = ((exit_price - entry_price) / entry_price * 100) * position
                 pnl_usd_time = qty * (exit_price - entry_price) * position
-                commission_time = ((qty * entry_price) + (qty * exit_price)) * commission_pct / 100
+                commission_time = qty * entry_price * 2 * commission_pct / 100  # per-side × 2 on entry notional (matches v4 standard)
                 net_pnl_time = pnl_usd_time - commission_time
                 equity += net_pnl_time
                 trades.append({
@@ -621,7 +622,7 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                 pnl_pct = ((exit_price - entry_price) / entry_price * 100) * position
                 qty = position_qty
                 pnl_usd = qty * (exit_price - entry_price) * position
-                commission = ((qty * entry_price) + (qty * exit_price)) * commission_pct / 100
+                commission = qty * entry_price * 2 * commission_pct / 100  # per-side × 2 on entry notional (matches v4 standard)
                 net_pnl = pnl_usd - commission
                 equity += net_pnl
 
@@ -673,7 +674,7 @@ def run_backtest(df, strategy_name, strategy_config, symbol, timeframe,
                 pnl_pct = ((exit_price - entry_price) / entry_price * 100) * position
                 qty = position_qty
                 pnl_usd = qty * (exit_price - entry_price) * position
-                commission = ((qty * entry_price) + (qty * exit_price)) * commission_pct / 100
+                commission = qty * entry_price * 2 * commission_pct / 100  # per-side × 2 on entry notional (matches v4 standard)
                 net_pnl = pnl_usd - commission
                 equity += net_pnl
 
