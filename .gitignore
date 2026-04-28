@@ -80,4 +80,5 @@ strategies/pine_v3/
 config/settings.json.bak*
 tradingview_webhook_bot/core/*.bak*
 tradingview_webhook_bot/storage/*.jsonl.*
-backtesting/pine/
+backtesting/pine/generated/
+backtesting/pine/*.auto.pine

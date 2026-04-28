@@ -1,0 +1,106 @@
+//@version=5
+// G27 CCI Donchian Wide — CCI cross OR Donchian breakout (either triggers entry)
+// Fixes applied 2026-04-28:
+//   - trail_pct double-divide bug: was close*trail_pct/100/mintick (0.035%), now close*trail_pct/mintick (3.5%)
+//   - commission_value: 0.1 -> 0.30 (audit standard)
+//   - process_orders_on_close, calc_on_order_fills, calc_on_every_tick explicitly set
+strategy("G27 CCI Donchian Wide [Webhook]", overlay=true, initial_capital=10000,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=95,
+     commission_type=strategy.commission.percent, commission_value=0.30,
+     calc_on_order_fills=false, calc_on_every_tick=false, process_orders_on_close=false)
+
+WEBHOOK_SECRET = "squeeze_tradingview_cluster_2026_secure"
+long_alert       = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"G27 CCI Donchian Wide","action":"buy","ticker":"{{ticker}}","interval":"{{interval}}","price":"{{close}}"}'
+short_alert      = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"G27 CCI Donchian Wide","action":"sell","ticker":"{{ticker}}","interval":"{{interval}}","price":"{{close}}"}'
+close_long_alert = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"G27 CCI Donchian Wide","action":"sell","is_exit":"true","ticker":"{{ticker}}","interval":"{{interval}}","price":"{{close}}"}'
+close_short_alert= '{"secret":"' + WEBHOOK_SECRET + '","strategy":"G27 CCI Donchian Wide","action":"buy","is_exit":"true","ticker":"{{ticker}}","interval":"{{interval}}","price":"{{close}}"}'
+
+// ── INPUTS ──
+dc_len    = input.int(20,   "Donchian Length")
+dc_exit   = input.int(10,   "Exit Channel Length")
+cci_len   = input.int(20,   "CCI Length")
+sl_pct    = input.float(1.5,  "SL %")    / 100
+tp_pct    = input.float(15.0, "TP %")    / 100
+trail_pct = input.float(3.5,  "Trail %") / 100   // stored as 0.035
+
+// ── DONCHIAN ──
+dc_upper    = ta.highest(high, dc_len)
+dc_lower    = ta.lowest(low,  dc_len)
+exit_lower  = ta.lowest(low,  dc_exit)
+exit_upper  = ta.highest(high, dc_exit)
+breakout_up   = close > dc_upper[1]
+breakout_down = close < dc_lower[1]
+
+// ── CCI ──
+cci = ta.cci(close, cci_len)
+cci_cross_up   = ta.crossover(cci, 100)
+cci_cross_down = ta.crossunder(cci, -100)
+
+// ── CONFIRMATION ──
+ema50 = ta.ema(close, 50)
+[diplus, diminus, adx] = ta.dmi(14, 14)
+atr14  = ta.atr(14)
+atr_ma = ta.sma(atr14, 100)
+vol_ok = atr14 < atr_ma * 2
+rsi    = ta.rsi(close, 14)
+
+// ── ENTRY: EITHER signal triggers (wider net) ──
+long_trigger  = breakout_up   or cci_cross_up
+short_trigger = breakout_down or cci_cross_down
+
+long_entry  = long_trigger  and close > ema50 and adx > 18
+short_entry = short_trigger and close < ema50 and adx > 18
+
+// ── EXIT: tighter — first signal to leave ──
+long_exit  = close < exit_lower[1] or ta.crossunder(cci, 0) or rsi > 80
+short_exit = close > exit_upper[1] or ta.crossover(cci, 0)  or rsi < 20
+
+// ── ANTI-OVERTRADING ──
+var int   trades_today  = 0
+var int   consec_losses = 0
+var int   cooldown      = 0
+var float day_equity    = strategy.equity
+is_new_day = ta.change(time("D")) != 0
+if is_new_day
+    trades_today := 0
+    day_equity   := strategy.equity
+if cooldown > 0
+    cooldown -= 1
+was_closed = strategy.position_size[1] != 0 and strategy.position_size == 0
+if was_closed
+    trades_today += 1
+    if strategy.netprofit < strategy.netprofit[1]
+        consec_losses += 1
+        if consec_losses >= 3
+            cooldown      := 6
+            consec_losses := 0
+    else
+        consec_losses := 0
+daily_pnl = (strategy.equity - day_equity) / day_equity
+can_trade = trades_today < 3 and cooldown == 0 and daily_pnl > -0.03
+
+// ── EXECUTION ──
+// trail_pct is already the decimal fraction (e.g. 0.035 for 3.5%)
+// trail_points/trail_offset must be in ticks: price * fraction / mintick
+if long_entry and can_trade and vol_ok and strategy.position_size <= 0
+    strategy.entry("Long", strategy.long, alert_message=long_alert)
+    strategy.exit("L_X", "Long",
+         stop=close*(1-sl_pct), limit=close*(1+tp_pct),
+         trail_points=close*trail_pct/syminfo.mintick,
+         trail_offset=close*trail_pct/syminfo.mintick,
+         alert_message=close_long_alert)
+if short_entry and can_trade and vol_ok and strategy.position_size >= 0
+    strategy.entry("Short", strategy.short, alert_message=short_alert)
+    strategy.exit("S_X", "Short",
+         stop=close*(1+sl_pct), limit=close*(1-tp_pct),
+         trail_points=close*trail_pct/syminfo.mintick,
+         trail_offset=close*trail_pct/syminfo.mintick,
+         alert_message=close_short_alert)
+if long_exit and strategy.position_size > 0
+    strategy.close("Long",  alert_message=close_long_alert)
+if short_exit and strategy.position_size < 0
+    strategy.close("Short", alert_message=close_short_alert)
+
+plot(dc_upper, "DC Hi",  color.green)
+plot(dc_lower, "DC Lo",  color.red)
+plot(ema50,    "EMA50",  color.blue, 2)

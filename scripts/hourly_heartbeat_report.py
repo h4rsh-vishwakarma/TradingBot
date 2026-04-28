@@ -203,6 +203,47 @@ def signal_flow_last_60m() -> dict:
 
 
 
+def per_candidate_signal_gap() -> dict:
+    """Check last ETHUSDT signal time per decision-lane candidate strategy.
+    Returns dict: strategy_name -> hours_since_last_signal (None if never).
+    Warns at 48h so there is a 24h window before Gate #28 fails at 72h.
+    """
+    result = {}
+    if not SIGNAL_DB.exists():
+        return result
+    try:
+        with sqlite3.connect(str(SIGNAL_DB)) as conn:
+            rows = conn.execute(
+                "SELECT payload, created_at FROM signals ORDER BY created_at DESC LIMIT 500"
+            ).fetchall()
+        seen: dict[str, float] = {}
+        for raw, created_at in rows:
+            try:
+                p = json.loads(raw)
+                inner = p.get("payload", p)
+                strat = str(inner.get("strategy", "")).strip()
+                sym = str(inner.get("symbol", "")).upper().strip()
+            except Exception:
+                continue
+            if sym != "ETHUSDT":
+                continue
+            strat_norm = re.sub(r"[^a-z0-9 ]+", " ", strat.lower()).strip()
+            for canonical in ("cci trend", "donchian trend"):
+                if canonical not in seen:
+                    # normalise both ways
+                    if strat_norm == canonical or strat_norm == canonical.replace(" ", "_"):
+                        seen[canonical] = float(created_at)
+            if len(seen) == 2:
+                break
+        now_ts = datetime.now(UTC).timestamp()
+        for canonical in ("cci trend", "donchian trend"):
+            last_ts = seen.get(canonical)
+            result[canonical] = None if last_ts is None else (now_ts - last_ts) / 3600
+    except Exception as exc:
+        logger.warning(f"per_candidate_signal_gap failed: {exc}")
+    return result
+
+
 def signal_ingestion_check(flow: dict) -> dict:
     """Checks how long since last bot-visible signal."""
     last_bv = flow.get("last_bot_visible")
@@ -635,6 +676,14 @@ def format_report(ctx: dict) -> str:
         approved_gap_min = int((datetime.now(UTC).timestamp() - float(last_approved_flow["created_at"])) / 60)
         if approved_gap_min > DECISION_LANE_GAP_WARN_MIN:
             issues.append(f"⚠️ Decision-lane signal gap {approved_gap_min // 60}h — Gate #28 (72h) will break in {(72 * 60 - approved_gap_min) // 60}h")
+    # Per-strategy Donchian gap: warn at >48h so there is 24h before gate failure
+    for strat_key, gap_h in (ctx.get("candidate_gaps") or {}).items():
+        if gap_h is None:
+            issues.append(f"⚠️ {strat_key.title()} ETHUSDT: no signal ever recorded — check TV alert")
+        elif gap_h > 72:
+            issues.append(f"⚠️ {strat_key.title()} ETHUSDT: {gap_h:.0f}h since last signal — gate failure risk, check TV alert now")
+        elif gap_h > 48:
+            issues.append(f"⚠️ {strat_key.title()} ETHUSDT: {gap_h:.0f}h since last signal — warning (gate fails at 72h)")
     issues_block = "\n".join(f"• {x}" for x in issues) if issues else "• None"
 
     pos_lines = []
@@ -801,6 +850,7 @@ def main() -> int:
         "queue": signal_queue_stats(),
         "inventory_ready": inventory_ready(),
         "paper_sim": load_paper_sim_summary(),
+        "candidate_gaps": per_candidate_signal_gap(),
     }
 
     message = format_report(ctx)
