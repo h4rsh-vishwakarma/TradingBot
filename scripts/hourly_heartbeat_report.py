@@ -50,6 +50,7 @@ MANIFEST_PATH = PROJECT_ROOT / "config" / "approved_strategies.json"
 FREEZE_LATEST = PROJECT_ROOT / "storage" / "reports" / "paper_validation" / "execution_freeze_latest.json"
 INVENTORY_CSV = PROJECT_ROOT / "storage" / "reports" / "tv_inventory_report.csv"
 RECON_DIR = PROJECT_ROOT / "storage" / "reports" / "paper_validation"
+EXEC_METRICS = RECON_DIR / "execution_metrics.jsonl"
 PAPER_WINDOW_START = os.getenv("PAPER_WINDOW_START", "2026-04-07")
 
 TOURNAMENT_FILES = [
@@ -201,6 +202,33 @@ def signal_flow_last_60m() -> dict:
 
     return result
 
+
+
+def decision_lane_progress() -> dict:
+    """Count closed ETHUSDT exits per decision-lane candidate from execution_metrics.jsonl.
+    Returns: {"cci trend": {"exits": int, "needed": int}, "donchian trend": {...}}
+    """
+    THRESHOLDS = {"cci trend": 5, "donchian trend": 5}
+    counts: dict[str, int] = {"cci trend": 0, "donchian trend": 0}
+    if not EXEC_METRICS.exists():
+        return {k: {"exits": 0, "needed": v} for k, v in THRESHOLDS.items()}
+    try:
+        for line in EXEC_METRICS.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            d = json.loads(line)
+            if not d.get("is_exit"):
+                continue
+            sym = str(d.get("symbol", "")).upper().strip()
+            if sym != "ETHUSDT":
+                continue
+            strat = re.sub(r"[^a-z0-9 ]", " ", str(d.get("strategy", "")).lower()).strip()
+            for canonical in counts:
+                if canonical in strat or canonical.replace(" ", "_") in strat:
+                    counts[canonical] += 1
+    except Exception as exc:
+        logger.warning(f"decision_lane_progress failed: {exc}")
+    return {k: {"exits": counts[k], "needed": THRESHOLDS[k]} for k in THRESHOLDS}
 
 
 def per_candidate_signal_gap() -> dict:
@@ -767,6 +795,18 @@ def format_report(ctx: dict) -> str:
             f"  <code>python scripts/paper_sim_engine.py --days 30</code>\n\n"
         )
 
+    # ── Decision lane gate progress ──────────────────────────────────────
+    lane_progress = ctx.get("lane_progress", {})
+    def _progress_bar(exits: int, needed: int) -> str:
+        filled = min(exits, needed)
+        return "▓" * filled + "░" * (needed - filled) + f"  {exits}/{needed}"
+    lane_lines = "\n".join(
+        f"• {name.title()}: {_progress_bar(v['exits'], v['needed'])}"
+        for name, v in lane_progress.items()
+    ) or "• No data"
+    gate_clear = all(v["exits"] >= v["needed"] for v in lane_progress.values()) if lane_progress else False
+    gate_icon = "✅" if gate_clear else "❌"
+
     msg = (
         f"<b>HOURLY TRADING HEARTBEAT</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
@@ -800,6 +840,8 @@ def format_report(ctx: dict) -> str:
         f"• Missing SL/TP: 0\n"
         f"• Freeze diff: {freeze['status']}\n\n"
         f"<b>Issues:</b>\n{issues_block}\n\n"
+        f"{gate_icon} <b>Decision Lane Gate Progress (ETHUSDT 4H)</b>\n"
+        f"{lane_lines}\n\n"
         f"{paper_sim_block}"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"<i>{now_ist}</i>"
@@ -851,6 +893,7 @@ def main() -> int:
         "inventory_ready": inventory_ready(),
         "paper_sim": load_paper_sim_summary(),
         "candidate_gaps": per_candidate_signal_gap(),
+        "lane_progress": decision_lane_progress(),
     }
 
     message = format_report(ctx)
