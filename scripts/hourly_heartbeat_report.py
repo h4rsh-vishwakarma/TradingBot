@@ -642,9 +642,11 @@ def format_report(ctx: dict) -> str:
         strategy_label = p.get("strategy", "Aggregate")
         if strategy_label == "Aggregate":
             strategy_label = "—"
+        realized = p['realized_pnl']
+        realized_label = f"Realized ${realized:+.2f} (pos open — unrealized not tracked)" if realized == 0 else f"Realized ${realized:+.2f}"
         pos_lines.append(
             f"• {p['symbol']} | {strategy_label} | {p['side']} | "
-            f"Entry {p['entry']:.2f} | Realized ${p['realized_pnl']:+.2f}"
+            f"Entry {p['entry']:.2f} | {realized_label}"
         )
     pos_block = "\n".join(pos_lines) if pos_lines else "• No open positions"
 
@@ -689,7 +691,7 @@ def format_report(ctx: dict) -> str:
 
         paper_sim_block = (
             f"📋 <b>Paper Lane Simulation (paper_only strategies)</b>\n"
-            f"• Last run: {gen_label}\n"
+            f"• Last run: {gen_label} | Next: 02:00 & 14:00 UTC daily\n"
             f"• Lookback: {paper_sim['simulation_days']} days | "
             f"SL {paper_sim['sl_pct']}% / TP {paper_sim['tp_pct']}% | "
             f"$100 notional/trade\n"
