@@ -602,15 +602,10 @@ def determine_verdict(ctx: dict) -> str:
     if not scope_ok:
         return "ACTION NEEDED"
     ingestion_minutes = (ctx.get("ingestion") or {}).get("minutes_since") or 0
-    if ingestion_minutes > SIGNAL_GAP_ACTION_MIN:
-        return "Attention needed"
-
-    # Decision-lane ETHUSDT signal recency — alert before Gate #28 (72h) breaks
-    last_approved = (ctx.get("flow") or {}).get("last_approved") or {}
-    if last_approved.get("created_at"):
-        approved_gap_min = int((datetime.now(UTC).timestamp() - float(last_approved["created_at"])) / 60)
-        if approved_gap_min > DECISION_LANE_GAP_WARN_MIN:
-            return "ACTION NEEDED"
+    # NOTE: signal gap alone does NOT trigger WATCH or ACTION NEEDED.
+    # 4H strategies are naturally quiet for 8-24h between candles.
+    # Pipeline health is determined by: services down, DLQ growth, or
+    # synthetic probe failure (webhook_health_monitor.py alerts independently).
 
     # WATCH
     if drifts["medium"] > 0:
@@ -618,8 +613,6 @@ def determine_verdict(ctx: dict) -> str:
     if unauthorized >= 5:
         return "WATCH"
     if queue_pending > 0:
-        return "WATCH"
-    if ingestion_minutes > SIGNAL_GAP_WATCH_MIN:
         return "WATCH"
 
     return "HEALTHY"
