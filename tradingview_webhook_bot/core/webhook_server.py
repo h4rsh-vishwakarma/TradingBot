@@ -430,13 +430,6 @@ class WebhookServer:
     def setup_routes(self):
         @self.app.route('/webhook/tradingview', methods=['POST'])
         def receive_signal():
-            # Flask-Limiter rate check (60 req/min per IP)
-            if self._limiter and not self.app.testing:
-                from flask_limiter.errors import RateLimitExceeded
-                try:
-                    self._limiter.check()
-                except RateLimitExceeded:
-                    return jsonify({'error': 'rate limit exceeded'}), 429
             try:
                 # Rate limiting
                 if self._check_rate_limit():

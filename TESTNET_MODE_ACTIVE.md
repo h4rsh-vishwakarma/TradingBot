@@ -128,3 +128,17 @@ sudo systemctl restart trading_orchestrator.service
 - Created: 2026-04-11 (Phase 1 testnet expansion)
 - Guard script: scripts/check_testnet_invariant.py
 - Linked commit: (will be filled by git commit message)
+---
+## Audit Confirmation — 2026-04-28
+
+Confirmed by system audit on 2026-04-28:
+
+| Item | Status | Evidence |
+|---|---|---|
+| Exchange mode | **TESTNET** | `BINANCE_TESTNET=true`, `HL_IS_TESTNET=True` in `/etc/tradingbot/env_vars` |
+| Real capital at risk | **NO** | All exchanges on testnet endpoints — fake USDT only |
+| Open positions | 1 open — LDOUSDT SHORT -1071 @ 0.4519 | Testnet position, paper_only lane (G94 Pivot Point Reclaim) |
+| Decision-lane positions | None open | CCI Trend / Donchian Trend — no live testnet positions |
+| Balance shown in circuit breaker | $3,767.27 | Binance **testnet** balance (fake USDT) |
+
+This file must be updated before any mainnet switch.

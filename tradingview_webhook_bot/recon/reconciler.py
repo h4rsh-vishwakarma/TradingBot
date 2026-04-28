@@ -128,11 +128,3 @@ class Reconciler:
             f"Correction: {report['correction']}\n"
             f"Ledger After: {report['post_sync_qty']}"
         )
-        return (
-            f"🚨 *RECONCILIATION FIX: {symbol}*\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"📈 *Old Ledger:* `{report['ledger_qty']}`\n"
-            f"📉 *Exchange:* `{report['exchange_qty']}`\n"
-            f"🔧 *Status:* Ledger Synced to Exchange\n"
-            f"━━━━━━━━━━━━━━━━━━"
-        )

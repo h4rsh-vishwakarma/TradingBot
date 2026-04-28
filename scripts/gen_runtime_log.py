@@ -100,7 +100,7 @@ try:
     import subprocess as _sp, datetime as _dt
     _today = _dt.date.today().strftime('%Y-%m-%d')
     _res = _sp.run(
-        ['sudo', 'journalctl', '-u', 'trading_webhook.service',
+        ['sudo', 'journalctl', '-u', 'tradingbot-webhook.service',
          '--since', _today + ' 00:00:00', '--no-pager'],
         capture_output=True, text=True
     )
@@ -361,26 +361,22 @@ with open('docs/RUNTIME_LOG.md', 'w') as f:
 print('Written: docs/RUNTIME_LOG.md')
 print('Length:', len(log.splitlines()), 'lines')
 
-# Auto-push to GitHub so runtime log stays fresh (replaces disabled hourly cron push)
+# Auto-push RUNTIME_LOG to runtime-logs branch -- keeps main history clean
 try:
-    _push = subprocess.run(
-        ['git', 'add', 'docs/RUNTIME_LOG.md'],
-        capture_output=True, text=True
-    )
-    _diff = subprocess.run(
-        ['git', 'diff', '--cached', '--stat'],
-        capture_output=True, text=True
-    )
+    subprocess.run(['git', 'add', 'docs/RUNTIME_LOG.md'], capture_output=True, text=True)
+    _diff = subprocess.run(['git', 'diff', '--cached', '--stat'], capture_output=True, text=True)
     if 'RUNTIME_LOG' in _diff.stdout:
         subprocess.run(
             ['git', 'commit', '-m', f'chore: auto-update RUNTIME_LOG {ts}'],
             capture_output=True, text=True
         )
         subprocess.run(
-            ['git', 'push', 'origin', 'main'],
+            ['git', 'push', '--force', 'origin', 'HEAD:refs/heads/runtime-logs'],
             capture_output=True, text=True
         )
-        print('GitHub push: RUNTIME_LOG.md updated')
+        subprocess.run(['git', 'reset', '--soft', 'HEAD~1'], capture_output=True, text=True)
+        subprocess.run(['git', 'reset', 'HEAD', 'docs/RUNTIME_LOG.md'], capture_output=True, text=True)
+        print('GitHub push: RUNTIME_LOG.md -> runtime-logs (main kept clean)')
     else:
         print('GitHub push: no changes to push')
 except Exception as _e:

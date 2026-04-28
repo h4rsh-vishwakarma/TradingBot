@@ -244,7 +244,7 @@ def unauthorized_count_60m() -> int:
     """Count 401/invalid auth rejections in webhook logs over last 60m."""
     try:
         r = subprocess.run(
-            ["journalctl", "-u", "trading_webhook.service",
+            ["journalctl", "-u", "tradingbot-webhook.service",
              "--since", "60 minutes ago", "--no-pager"],
             capture_output=True, text=True, timeout=10,
         )
@@ -781,10 +781,10 @@ def main() -> int:
 
     ctx = {
         "services": {
-            "webhook": check_service("trading_webhook.service"),
-            "orchestrator": check_service("trading_orchestrator.service"),
+            "webhook": check_service("tradingbot-webhook.service"),
+            "orchestrator": check_service("tradingbot-orchestrator.service"),
             "dashboard": check_service("trading_dashboard.service"),
-            "telegram": check_service("trading_telegram.service"),
+            "telegram": check_service("tradingbot-telegram.service"),
         },
         "scope": load_manifest_scope(),
         "flow": flow,
