@@ -1,6 +1,6 @@
 {
-  "version": 18,
-  "updated_at": "2026-04-27T12:00:00.000000+00:00",
+  "version": 19,
+  "updated_at": "2026-04-29T00:00:00Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -14,11 +14,17 @@
       "operator": "harsh",
       "approved_at": "2026-04-07T10:23:25Z",
       "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
-      "label": "ALPHA",
-      "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['LDOUSDT', 'ETHUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance.",
-      "shortlist_priority": true
+      "label": "R03_FLAGGED",
+      "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['LDOUSDT', 'ETHUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18. | R-03 2026-04-29: TRAIL BUG CONFIRMED — tv_first_40_CCI_Trend.pine uses trail_pct/100 extra division; effective TV trail=0.04% not 4%. TV metrics generated with bug active. Python OOS at TV-matching 0.04% trail: PF=0.702, ROI=-0.065%/day. PF delta=-0.438. Both PF<1 and negative ROI. Capital decision BLOCKED pending bug fix and re-validation.",
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-29 (R-03): Python OOS fails — PF=0.702 ROI=-0.065%/day at TV-matching trail. TV metrics themselves reflect a buggy trail (trail_pct/100 extra division in Pine, effective trail=0.04%). Cannot deploy capital on buggy TV evidence. Re-validate after Pine fix + OOS re-run.",
+      "r03_python_oos_pf": 0.702,
+      "r03_python_oos_roi_day": -0.065,
+      "r03_tv_pf": 1.14,
+      "r03_pf_delta": -0.438,
+      "r03_trail_bug": "trail_pct/100 extra division — effective TV trail=0.04% not 4%",
+      "r03_flagged_at": "2026-04-29T00:00:00Z",
+      "shortlist_priority": false
     },
     {
       "strategy": "Donchian Trend",
@@ -32,11 +38,17 @@
       "operator": "harsh",
       "approved_at": "2026-04-07T10:23:28Z",
       "backtest_hash": "realistic_run_20260407_fixed500_slip01_oos30",
-      "label": "ALPHA",
-      "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['ETHUSDT', 'SUIUSDT', 'LDOUSDT', 'LINKUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18.",
-      "approval_class": "candidate_for_tiny_capital",
-      "class_reason": "Current ETHUSDT 4h paper-lane candidate with realistic fixed-$500 / 0.1% slippage / 30% OOS provenance.",
-      "shortlist_priority": true
+      "label": "R03_FLAGGED",
+      "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['ETHUSDT', 'SUIUSDT', 'LDOUSDT', 'LINKUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18. | R-03 2026-04-29: TRAIL BUG CONFIRMED — tv_first_35_Donchian_Trend.pine uses trail_pct/100 extra division; effective TV trail=0.04% not 4%. TV metrics generated with bug active. Python OOS at TV-matching 0.04% trail: PF=0.662, ROI=-0.071%/day. PF delta=-0.418. Both PF<1 and negative ROI. Capital decision BLOCKED pending bug fix and re-validation.",
+      "approval_class": "paper_only",
+      "class_reason": "Demoted 2026-04-29 (R-03): Python OOS fails — PF=0.662 ROI=-0.071%/day at TV-matching trail. TV metrics themselves reflect a buggy trail (trail_pct/100 extra division in Pine, effective trail=0.04%). Cannot deploy capital on buggy TV evidence. Re-validate after Pine fix + OOS re-run.",
+      "r03_python_oos_pf": 0.662,
+      "r03_python_oos_roi_day": -0.071,
+      "r03_tv_pf": 1.08,
+      "r03_pf_delta": -0.418,
+      "r03_trail_bug": "trail_pct/100 extra division — effective TV trail=0.04% not 4%",
+      "r03_flagged_at": "2026-04-29T00:00:00Z",
+      "shortlist_priority": false
     },
     {
       "strategy": "G19 Donchian Volume Surge",
