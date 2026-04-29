@@ -63,6 +63,7 @@ TOURNAMENT_FILES = [
 SIGNAL_GAP_WATCH_MIN  = 8 * 60
 SIGNAL_GAP_ACTION_MIN = 24 * 60
 DECISION_LANE_GAP_WARN_MIN = 60 * 60  # 60h — Gate #28 fails at 72h, alert before it breaks
+AUTO_PROMOTE_FREEZE_WARN_DAYS = 7     # warn if AUTO_PROMOTE_FREEZE active this long without clearing
 
 
 
@@ -434,6 +435,22 @@ def freeze_status() -> dict:
         return {"status": "error", "changed": []}
 
 
+def auto_promote_freeze_check() -> dict:
+    """Return AUTO_PROMOTE_FREEZE age info. Warns if active >WARN_DAYS without checkpoint note."""
+    active = os.getenv("AUTO_PROMOTE_FREEZE", "false").lower() == "true"
+    if not active:
+        return {"active": False, "days": 0, "warn": False}
+    freeze_date_str = os.getenv("FREEZE_SET_DATE", "")
+    if not freeze_date_str:
+        return {"active": True, "days": None, "warn": True}
+    try:
+        set_date = datetime.strptime(freeze_date_str, "%Y-%m-%d").replace(tzinfo=UTC)
+        days = (datetime.now(UTC) - set_date).days
+        return {"active": True, "days": days, "warn": days >= AUTO_PROMOTE_FREEZE_WARN_DAYS}
+    except Exception:
+        return {"active": True, "days": None, "warn": True}
+
+
 def dlq_count() -> int:
     if not DLQ_PATH.exists():
         return 0
@@ -614,6 +631,8 @@ def determine_verdict(ctx: dict) -> str:
         return "WATCH"
     if queue_pending > 0:
         return "WATCH"
+    if (ctx.get("freeze_expiry") or {}).get("warn"):
+        return "WATCH"
 
     return "HEALTHY"
 
@@ -697,6 +716,15 @@ def format_report(ctx: dict) -> str:
         approved_gap_min = int((datetime.now(UTC).timestamp() - float(last_approved_flow["created_at"])) / 60)
         if approved_gap_min > DECISION_LANE_GAP_WARN_MIN:
             issues.append(f"⚠️ Decision-lane signal gap {approved_gap_min // 60}h — Gate #28 (72h) will break in {(72 * 60 - approved_gap_min) // 60}h")
+    # AUTO_PROMOTE_FREEZE expiry warning
+    fe = ctx.get("freeze_expiry") or {}
+    if fe.get("active"):
+        days = fe.get("days")
+        if days is None:
+            issues.append("⚠️ AUTO_PROMOTE_FREEZE=true but FREEZE_SET_DATE not set — freeze age unknown")
+        elif fe.get("warn"):
+            issues.append(f"⚠️ AUTO_PROMOTE_FREEZE active {days}d — add checkpoint note or clear (AUTO_PROMOTE_FREEZE=false)")
+
     # Per-strategy Donchian gap: warn at >48h so there is 24h before gate failure
     for strat_key, gap_h in (ctx.get("candidate_gaps") or {}).items():
         if gap_h is None:
@@ -887,6 +915,7 @@ def main() -> int:
         "paper_sim": load_paper_sim_summary(),
         "candidate_gaps": per_candidate_signal_gap(),
         "lane_progress": decision_lane_progress(),
+        "freeze_expiry": auto_promote_freeze_check(),
     }
 
     message = format_report(ctx)
