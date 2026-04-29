@@ -1234,6 +1234,7 @@ class Orchestrator:
                         "gross_edge_usd": gross_edge_usd,
                         "order_type_used": execution_res.get("order_type_used", ""),
                         "paper": bool(execution_res.get("paper", False)),
+                        "is_testnet": os.getenv("BINANCE_TESTNET", "true").strip().lower() == "true",
                     }, path=self.execution_metrics_path)
                 except Exception as telemetry_error:
                     logger.warning(f"Execution telemetry append failed: {telemetry_error}")

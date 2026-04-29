@@ -654,6 +654,13 @@ def main() -> int:
     leverage = os.getenv("LEVERAGE", os.getenv("TRADE_LEVERAGE", ""))
     check("Leverage is configured", bool(leverage), f"value={leverage or 'NOT SET'}")
 
+    testnet_val = os.getenv("BINANCE_TESTNET", "true").strip().lower()
+    check(
+        "BINANCE_TESTNET=true (paper-phase safety)",
+        testnet_val == "true",
+        f"BINANCE_TESTNET={testnet_val} — must remain true until live-enable sign-off",
+    )
+
     gate_doc = PROJECT_ROOT / "docs" / "GO_LIVE_GATE.md"
     check("GO_LIVE_GATE.md exists", gate_doc.exists())
 

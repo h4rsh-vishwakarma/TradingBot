@@ -2,11 +2,15 @@
 """
 auto_promote.py — Auto-promote paper-validated strategies to candidate_for_tiny_capital.
 
-Rules:
-  - Paper trade result within ±20% of backtest OOS daily ROI
-  - At least PAPER_MIN_DAYS days of paper data
-  - Not already candidate_for_tiny_capital
-  - Not already labelled LIVE_VERIFIED
+Hard gates (ALL must pass):
+  1. Not already candidate_for_tiny_capital (or label == LIVE_VERIFIED)
+  2. At least PAPER_MIN_DAYS days of paper window coverage
+  3. At least MIN_CLOSED_TRADES closed trades (is_exit=True in execution_metrics.jsonl,
+     on an approved symbol). Threshold: 4H=5, 1H=10, 15m=20. This mirrors Gate #25.
+  4. OOS baseline > 0 in tournament_winners_4h_v4.csv (current engine, fixed sizing)
+
+Soft indicator (logged but not a gate):
+  - Signal count from signal_queue.db (activity proxy)
 
 On success:
   - Updates config/approved_strategies.json
@@ -15,7 +19,8 @@ On success:
 
 Governance note (P-01):
   Auto-promotion adds label="AUTO_PROMOTED" and sets approval_class=candidate_for_tiny_capital.
-  Human review still required before real capital deployment.
+  Human review + Sainath sign-off still required before real capital deployment.
+  AUTO_PROMOTE_FREEZE=true blocks all promotions unconditionally.
 
 Usage:
   python3 scripts/auto_promote.py
@@ -44,12 +49,13 @@ CHAT_ID  = os.getenv("TELEGRAM_CHAT_ID", "5736858710")
 MANIFEST_PATH   = PROJECT_ROOT / "config" / "approved_strategies.json"
 SIGNAL_DB       = PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "signal_queue.db"
 LEDGER_PATH     = PROJECT_ROOT / "tradingview_webhook_bot" / "storage" / "ledger_state.json"
-TOURNAMENT_CSV  = PROJECT_ROOT / "storage" / "reports" / "tournament_winners_4h_v3.csv"
+TOURNAMENT_CSV  = PROJECT_ROOT / "storage" / "reports" / "tournament_winners_4h_v4.csv"
+EXEC_METRICS    = PROJECT_ROOT / "storage" / "reports" / "paper_validation" / "execution_metrics.jsonl"
 PROMO_LOG       = PROJECT_ROOT / "storage" / "reports" / "auto_promote_log.jsonl"
 
-PAPER_MIN_DAYS   = int(os.getenv("PAPER_MIN_DAYS",   "7"))
-DRIFT_TOLERANCE  = float(os.getenv("DRIFT_TOLERANCE", "0.20"))   # ±20%
-MIN_SIGNALS      = int(os.getenv("MIN_SIGNALS",       "5"))       # at least N signals
+PAPER_MIN_DAYS       = int(os.getenv("PAPER_MIN_DAYS",        "7"))
+MIN_SIGNALS          = int(os.getenv("MIN_SIGNALS",            "5"))   # signal activity proxy
+MIN_CLOSED_TRADES_4H = int(os.getenv("MIN_CLOSED_TRADES_4H",  "5"))   # hard gate — mirrors Gate #25
 
 
 def send_telegram(text):
@@ -138,6 +144,40 @@ def get_paper_stats(strategy_name):
     }
 
 
+def get_closed_trade_count(strategy_name: str, approved_symbols: list) -> int:
+    """
+    Count is_exit=True entries in execution_metrics.jsonl for this strategy
+    on any of its approved symbols. This is the same logic as Gate #25.
+    """
+    if not EXEC_METRICS.exists():
+        return 0
+    norm = strategy_name.strip().lower().replace(" ", "_").replace("-", "_")
+    count = 0
+    try:
+        with open(EXEC_METRICS) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                if not rec.get("is_exit"):
+                    continue
+                rec_strat = rec.get("strategy", "")
+                rec_sym   = rec.get("symbol", "")
+                rec_norm  = rec_strat.strip().lower().replace(" ", "_").replace("-", "_")
+                if rec_norm != norm:
+                    continue
+                if approved_symbols and rec_sym not in approved_symbols:
+                    continue
+                count += 1
+    except Exception:
+        pass
+    return count
+
+
 def check_and_promote():
     now      = datetime.now(timezone.utc)
     manifest = load_manifest()
@@ -169,16 +209,27 @@ def check_and_promote():
             skipped.append((strat, f"only {stats['days_active']} days active (need {PAPER_MIN_DAYS})"))
             continue
 
-        # Compare against OOS baseline
-        baseline = oos_roi.get(strat)
-        if baseline is None or baseline <= 0:
-            skipped.append((strat, "no OOS baseline in tournament CSV"))
+        # Hard gate: minimum closed trades (is_exit=True) on approved symbols — mirrors Gate #25
+        approved_symbols = entry.get("symbols", [])
+        closed = get_closed_trade_count(strat, approved_symbols)
+        # Threshold is timeframe-aware; default to 4H threshold for now
+        timeframes = entry.get("timeframes", ["240"])
+        tf = str(timeframes[0]) if timeframes else "240"
+        if tf in ("15", "15m"):
+            min_closed = 20
+        elif tf in ("60", "1h", "1H"):
+            min_closed = 10
+        else:
+            min_closed = MIN_CLOSED_TRADES_4H  # 4H default = 5
+        if closed < min_closed:
+            skipped.append((strat, f"only {closed} closed trades on {approved_symbols} (need {min_closed})"))
             continue
 
-        # We don't have per-trade P&L from signals alone — we check signal count
-        # as proxy for activity. Real P&L validation would need ledger data.
-        # For now: if signals are flowing and days >= PAPER_MIN_DAYS → promote.
-        # Mark as AUTO_PROMOTED (not LIVE_VERIFIED — human still needed for real $).
+        # OOS baseline must be present and positive in the current v4 tournament output
+        baseline = oos_roi.get(strat)
+        if baseline is None or baseline <= 0:
+            skipped.append((strat, "no positive OOS baseline in tournament_4h_v4.csv"))
+            continue
 
         entry["approval_class"]  = "candidate_for_tiny_capital"
         entry["label"]           = "AUTO_PROMOTED"
@@ -193,6 +244,7 @@ def check_and_promote():
             "strategy":     strat,
             "signals":      stats["signals_count"],
             "days_active":  stats["days_active"],
+            "closed_trades": closed,
             "oos_baseline": baseline,
             "promoted_at":  entry["promoted_at"],
         })
@@ -205,7 +257,7 @@ def check_and_promote():
                 f.write(json.dumps({**p, "run_ts": now.strftime("%Y-%m-%dT%H:%M:%SZ")}) + "\n")
 
         promo_lines = "\n".join(
-            f"  ✅ <b>{p['strategy']}</b> — {p['signals']} signals / {p['days_active']}d  OOS={p['oos_baseline']}%/day"
+            f"  ✅ <b>{p['strategy']}</b> — {p['closed_trades']} closed trades / {p['days_active']}d  OOS={p['oos_baseline']}%/day"
             for p in promoted
         )
         send_telegram(
