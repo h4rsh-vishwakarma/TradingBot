@@ -1,6 +1,6 @@
 # Runtime Log — 2026-04-29
 
-> Auto-generated — last updated `2026-04-29T05:10:02Z`
+> Auto-generated — last updated `2026-04-29T06:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -10,7 +10,7 @@
 |---|---|
 | Verdict | **VERDICT: NO-GO  (1 of 30 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-29T05:10:02Z |
+| Last run | 2026-04-29T06:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -53,7 +53,7 @@
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260429_0505 |
+| Last heartbeat file | heartbeat_20260429_0605 |
 | Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
@@ -84,6 +84,7 @@ _No outstanding operational issues._
 
 ## Commits Today (2026-04-29)
 ```
+f11bf83 | 2026-04-29 05:12:54 +0000 | fix: audit remediation — H-01 freeze baseline, H-03 stale manifest, H-04 docs, H-07 test, G-02 promotion criteria
 2a5995c | 2026-04-28 17:15:53 +0530 | fix: heartbeat verdict — remove signal gap as standalone pipeline-stuck trigger
 0d81621 | 2026-04-28 16:44:22 +0530 | fix: backtest engine audit — signal lookahead, commission, slippage
 e314526 | 2026-04-28 13:24:00 +0530 | feat: decision lane gate progress in hourly heartbeat
