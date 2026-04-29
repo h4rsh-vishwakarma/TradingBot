@@ -82,3 +82,13 @@ tradingview_webhook_bot/core/*.bak*
 tradingview_webhook_bot/storage/*.jsonl.*
 backtesting/pine/generated/
 backtesting/pine/*.auto.pine
+# Auto-generated daily/nightly report artifacts
+storage/reports/daily_top/
+storage/reports/funding_rates/
+storage/reports/heartbeat/
+storage/reports/gate_verdict_cache.json
+storage/reports/paper_sim/
+storage/reports/realtime_backtest/
+storage/reports/strategy_discovery/
+storage/reports/pre_isolation_snapshot_*.json
+storage/reports/wfa_results_*.json
