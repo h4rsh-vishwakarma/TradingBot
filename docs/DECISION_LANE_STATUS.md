@@ -19,10 +19,10 @@
 
 ---
 
-## Gate Verdict (live as of 2026-04-25 18:40 IST)
+## Gate Verdict (live as of 2026-04-29 10:40 IST)
 
 ```
-VERDICT: NO-GO  (1 of 28 gates FAILED)
+VERDICT: NO-GO  (1 of 30 gates FAILED)
 [FAIL] Candidates have min closed paper trades (4H=5,1H=10,15m=20) -- CCI Trend:1(NEED 5); Donchian Trend:0(NEED 5)
 ```
 

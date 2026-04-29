@@ -262,6 +262,7 @@ class TestWebhookServer:
         resp = app_client.post("/webhook/tradingview", json=payload)
         assert resp.status_code == 400
 
+    @patch.dict(os.environ, {"USE_DURABLE_QUEUE": "false"})
     def test_signal_queued_to_jsonl(self, client):
         app_client, queue_file = client
         payload = {

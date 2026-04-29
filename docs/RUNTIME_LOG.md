@@ -1,6 +1,6 @@
-# Runtime Log — 2026-04-28
+# Runtime Log — 2026-04-29
 
-> Auto-generated — last updated `2026-04-28T04:10:01Z`
+> Auto-generated — last updated `2026-04-29T05:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,9 +8,9 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (3 of 30 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (1 of 30 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-28T04:10:01Z |
+| Last run | 2026-04-29T05:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -37,28 +37,28 @@
 ## Decision-Lane Scoreboard (ETHUSDT 4H)
 | Strategy | Closed ETHUSDT Trades | Last ETHUSDT Signal |
 |---|---|---|
-| CCI Trend | 1/5 (NEED MORE) | 2026-04-25T05:17 UTC |
+| CCI Trend | 1/5 (NEED MORE) | 2026-04-28T04:42 UTC |
 | Donchian Trend | 0/5 (NEED MORE) | 2026-04-25T05:17 UTC |
 > Gate requires 5 closed ETHUSDT trades per strategy. OK = threshold met.
 
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 0 |
-| Completed | 0 |
-| Last signal | none |
-| Last strategy | none |
+| Signals received | 6 |
+| Completed | 6 |
+| Last signal | 2026-04-29 04:00 UTC |
+| Last strategy | G91 ATR Compression Breakout / LDOUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260428_0405 |
-| Verdict | ACTION NEEDED |
+| Last heartbeat file | heartbeat_20260429_0505 |
+| Verdict | HEALTHY |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions -- Decision Lane (Harsh / live-approved)
-- None
+- `binance:ETHUSDT:CCI Trend` qty=0.15 @ 2289.08495349
 Realized P&L: $0.00
 
 ## Open Positions -- Research Lane (Garima / paper_only)
@@ -82,27 +82,37 @@ _No outstanding operational issues._
 | Dashboard | https://tradingbot.operatorbrief.xyz/ | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
-## Commits Today (2026-04-28)
+## Commits Today (2026-04-29)
 ```
-e399ecf | 2026-04-28 03:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-28T03:10:01Z
-50a83d4 | 2026-04-28 02:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-28T02:10:01Z
-694f716 | 2026-04-28 01:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-28T01:10:01Z
-1cee725 | 2026-04-28 00:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-28T00:10:01Z
-416867d | 2026-04-27 23:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T23:10:01Z
-bfce9db | 2026-04-27 22:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T22:10:01Z
-4cf4f47 | 2026-04-27 21:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T21:10:01Z
-74600b4 | 2026-04-27 20:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T20:10:02Z
-c081ea2 | 2026-04-27 19:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T19:10:02Z
-9922606 | 2026-04-27 18:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T18:10:01Z
-c7d689a | 2026-04-27 17:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T17:10:01Z
-20a54d8 | 2026-04-27 16:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T16:10:01Z
-2e311ba | 2026-04-27 15:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T15:10:01Z
-56b3db5 | 2026-04-27 14:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T14:10:01Z
-8130c49 | 2026-04-27 13:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T13:10:01Z
-fd90ce1 | 2026-04-27 12:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T12:10:01Z
-162cc0d | 2026-04-27 11:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T11:10:01Z
-f49b645 | 2026-04-27 10:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T10:10:01Z
-8618232 | 2026-04-27 09:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T09:10:01Z
+2a5995c | 2026-04-28 17:15:53 +0530 | fix: heartbeat verdict — remove signal gap as standalone pipeline-stuck trigger
+0d81621 | 2026-04-28 16:44:22 +0530 | fix: backtest engine audit — signal lookahead, commission, slippage
+e314526 | 2026-04-28 13:24:00 +0530 | feat: decision lane gate progress in hourly heartbeat
+5518d67 | 2026-04-28 13:20:15 +0530 | feat: synthetic webhook POST health monitor — alerts on 5xx/timeout
+e87e9a0 | 2026-04-28 11:15:38 +0530 | fix: P-01/P-03/I-01/I-02 — Donchian gap alert, G27 trail fix, gitignore, per-strategy monitoring
+65b659e | 2026-04-28 10:45:00 +0530 | fix: heartbeat — label unrealized P&L on open positions, add midday paper sim schedule note
+cadeb38 | 2026-04-28 04:38:09 +0000 | fix: Harsh audit fixes — signal pipeline, heartbeat names, deploy process, reconciler
+09a1ecf | 2026-04-28 04:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-28T04:10:01Z
+9afd66c | 2026-04-28 03:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-28T03:10:01Z
+a12b0f7 | 2026-04-28 02:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-28T02:10:01Z
+8b68f0f | 2026-04-28 01:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-28T01:10:01Z
+50f286a | 2026-04-28 00:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-28T00:10:01Z
+16d9c10 | 2026-04-27 23:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T23:10:01Z
+1d96a6a | 2026-04-27 22:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T22:10:01Z
+0c6543f | 2026-04-27 21:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T21:10:01Z
+5b6b915 | 2026-04-27 20:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T20:10:02Z
+2538e20 | 2026-04-27 19:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T19:10:02Z
+d85892c | 2026-04-27 18:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T18:10:01Z
+601811e | 2026-04-27 17:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T17:10:01Z
+e9519df | 2026-04-27 16:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T16:10:01Z
+a7bf7cf | 2026-04-27 15:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T15:10:01Z
+742ad07 | 2026-04-27 14:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T14:10:01Z
+492e0d8 | 2026-04-27 13:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T13:10:01Z
+7a4df74 | 2026-04-27 12:10:04 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T12:10:01Z
+d000e63 | 2026-04-27 11:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T11:10:01Z
+0cc9fcc | 2026-04-27 10:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T10:10:01Z
+5802f30 | 2026-04-27 09:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T09:10:01Z
+f5d393f | 2026-04-27 13:58:38 +0530 | chore: merge remote changes before pine script push
+3643d99 | 2026-04-27 13:57:55 +0530 | fix: Pine Script CEO audit — process_orders_on_close, commission 0.30%, fixed qty
 ec59972 | 2026-04-27 08:10:03 +0000 | chore: auto-update RUNTIME_LOG 2026-04-27T08:10:02Z
 59d8cda | 2026-04-27 13:28:29 +0530 | fix: infra audit — 13 priority fixes across capital risk, logic, and config
 b82bf19 | 2026-04-27 12:01:25 +0530 | fix: manifest v17 — flag 7 TV backtest CAGR artifacts, eliminate G79 shortlist
