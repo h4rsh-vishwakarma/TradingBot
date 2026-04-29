@@ -11,8 +11,8 @@ Fixes applied vs previous engines
  SL/TP execution                 close price only       Intrabar High/Low
  Commission                      0 (tournament) /       0.06% per side
                                   0.1% (donchian)        (same as TV default)
- Position sizing                 100% compound /        95% equity per trade
-                                  no sizing              (Pine default_qty=95)
+ Position sizing                 100% compound /        fixed 00 notional
+                                  no sizing              (Pine strategy.cash fix)
  Win rate basis                  per-bar (tournament)   per trade (entry→exit)
  Sharpe basis                    per-bar √2190           daily P&L √252
  Drawdown types                  1–2 types              4 types (Max/Gross/Net/
@@ -29,7 +29,7 @@ from typing import Optional
 
 # ── Defaults (match TradingView + Pine Script defaults) ──────────────────────
 COMMISSION_PER_SIDE = 0.0006   # 0.06% futures taker  (TV: commission=0.06)
-POSITION_SIZE_PCT   = 0.95     # 95% equity per trade  (Pine: default_qty=95)
+POSITION_SIZE_PCT   = 0.05     # 5% of $10K = $500 fixed notional (Pine: strategy.cash fix)
 INITIAL_CAPITAL     = 10_000
 LEVERAGE_DEFAULT    = 2.0
 TOTAL_DAYS          = 1095     # 3-year backtest window

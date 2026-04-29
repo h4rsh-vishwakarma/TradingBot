@@ -44,16 +44,14 @@ def strategy_tournament():
             best_res = None
 
             for params in param_grid:
-                # Add unique entropy per strategy
-                idx = all_files.index(raw_name)
-                e_mult = params['mult'] + (idx * 0.01)
-                e_len = params['len'] + (idx % 3)
+                mult = params['mult']
+                length = params['len']
 
-                daily, gross_dd, net_dd, win_rate, sharpe, trades, status, gdd_date, ndd_date, gdd_cap, ndd_cap = run_test(df_raw, clean_name, True, e_mult, e_len)
+                daily, gross_dd, net_dd, win_rate, sharpe, trades, status, gdd_date, ndd_date, gdd_cap, ndd_cap = run_test(df_raw, clean_name, True, mult, length)
 
                 if daily > best_daily and status != "💀 ERROR":
                     best_daily = daily
-                    best_res = (daily, gross_dd, net_dd, win_rate, sharpe, trades, status, {'mult': e_mult, 'len': e_len}, gdd_date, ndd_date, gdd_cap, ndd_cap)
+                    best_res = (daily, gross_dd, net_dd, win_rate, sharpe, trades, status, {'mult': mult, 'len': length}, gdd_date, ndd_date, gdd_cap, ndd_cap)
 
             if best_res:
                 daily_roi, gross_dd, net_dd, win_rate, sharpe, trades, tier, opt_p, gdd_date, ndd_date, gdd_cap, ndd_cap = best_res

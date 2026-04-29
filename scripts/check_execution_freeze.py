@@ -24,9 +24,9 @@ TRACKED_PATHS = [
     ("reconciler", PROJECT_ROOT / "tradingview_webhook_bot" / "recon" / "reconciler.py"),
     ("approval_manifest", PROJECT_ROOT / "config" / "approved_strategies.json"),
     ("env_vars", Path("/etc/tradingbot/env_vars")),
-    ("webhook_service", Path("/etc/systemd/system/trading_webhook.service")),
-    ("orchestrator_service", Path("/etc/systemd/system/trading_orchestrator.service")),
-    ("telegram_service", Path("/etc/systemd/system/trading_telegram.service")),
+    ("webhook_service", Path("/etc/systemd/system/tradingbot-webhook.service")),
+    ("orchestrator_service", Path("/etc/systemd/system/tradingbot-orchestrator.service")),
+    ("telegram_service", Path("/etc/systemd/system/tradingbot-telegram.service")),
 ]
 
 

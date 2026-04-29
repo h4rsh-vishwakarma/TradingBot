@@ -61,7 +61,7 @@ def _read_env(key: str, fallback: str) -> str:
 
 DEFAULT_SL_PCT = float(_read_env("STOP_LOSS_PCT", "2.0"))
 DEFAULT_TP_PCT = float(_read_env("TAKE_PROFIT_PCT", "4.0"))
-DEFAULT_FIXED_NOTIONAL = 100.0   # $100 per simulated trade (paper only)
+DEFAULT_FIXED_NOTIONAL = 500.0   # $500 per simulated trade — matches backtest_engine_v4 fixed notional standard
 
 _TF_TO_BINANCE_INTERVAL = {
     "1": "1m", "3": "3m", "5": "5m", "15": "15m", "30": "30m",
