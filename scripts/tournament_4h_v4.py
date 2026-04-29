@@ -10,7 +10,7 @@ What changed from V3 → V4
  bar_ret.sum() / days  (linear ROI)   CAGR daily ROI  (TV Validator formula)
  bar-level clip SL/TP                 Intrabar High/Low SL/TP  (like TV Pine)
  No commission                        0.06%/side per trade
- No position sizing                   95% equity per trade
+ No position sizing                   $500 fixed notional (5% of $10K)
  Win rate per-bar                     Win rate per trade (entry→exit pair)
  Sharpe per-bar √2190                 Daily P&L Sharpe √252
  1–2 drawdown types                   4 drawdown types (Max/Gross/Net/Current)
@@ -170,7 +170,7 @@ def run_tournament():
     print(f"  ×  {len(PARAM_GRID)} param combos  =  "
           f"{len(data_files)*len(CORE_STRATEGIES)*len(PARAM_GRID):,} tests")
     print(f"  LEVERAGE={LEVERAGE}x  SL={STOP_LOSS*100:.1f}%  TP={TAKE_PROFIT*100:.1f}%")
-    print(f"  Commission=0.06%/side  PositionSize=95%  Intrabar=True")
+    print(f"  Commission=0.06%/side  PositionSize=$500-fixed(5%)  Intrabar=False")
     print(f"  MAX_HOLD={MAX_HOLD_BARS} bars  MIN_BAR_GAP={MIN_BAR_GAP}  MIN_TRADES={MIN_TRADES}")
     print(f"  Ranked by: OOS Daily ROI (CAGR)  |  Target ≥ {TIER_PREMIUM}%/day OOS")
     print("-" * 70)
@@ -338,7 +338,7 @@ def run_tournament():
     print(f"  Avg OOS Win Rate   : {avg_wr:.1f}%")
     print(f"  Avg OOS Max DD     : {avg_dd:.1f}%")
     print(f"  Commission applied : 0.06%/side (0.12% round-trip)")
-    print(f"  Pos sizing         : 95% equity / trade  |  Leverage: {LEVERAGE}x")
+    print(f"  Pos sizing         : $500 fixed notional (5% of $10K)  |  Leverage: {LEVERAGE}x")
     if avg_oos >= TIER_PREMIUM:
         print(f"\n  ✅ TARGET ACHIEVED — avg OOS ≥ {TIER_PREMIUM}%/day")
     else:
