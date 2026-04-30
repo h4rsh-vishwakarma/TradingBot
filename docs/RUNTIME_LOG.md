@@ -1,6 +1,6 @@
-# Runtime Log — 2026-04-29
+# Runtime Log — 2026-04-30
 
-> Auto-generated — last updated `2026-04-29T06:10:01Z`
+> Auto-generated — last updated `2026-04-30T08:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,28 +8,25 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (1 of 30 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (5 of 31 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-29T06:10:01Z |
+| Last run | 2026-04-30T08:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
-| Version | v18 |
-| Updated | 2026-04-27T12:00:00.000000+00:00 |
-| Total candidates | 2 |
-| ALPHA (live-ready) | 2 |
+| Version | v19 |
+| Updated | 2026-04-29T00:00:00Z |
+| Total candidates | 0 |
+| ALPHA (live-ready) | 0 |
 | RESEARCH (no Pine yet) | 0 |
 
 ### Production Decision Lane (ETH 4h ONLY)
 | Strategy | Symbols | Timeframe | Label |
 |---|---|---|---|
-| CCI Trend | ['ETHUSDT'] | ['240'] | ALPHA |
-| Donchian Trend | ['ETHUSDT'] | ['240'] | ALPHA |
 
 ### All ALPHA Strategies
-- CCI Trend | ['ETHUSDT'] | label=ALPHA
-- Donchian Trend | ['ETHUSDT'] | label=ALPHA
+
 
 ### RESEARCH (placeholder — not yet on TradingView)
 
@@ -46,15 +43,15 @@
 |---|---|
 | Signals received | 6 |
 | Completed | 6 |
-| Last signal | 2026-04-29 04:00 UTC |
-| Last strategy | G91 ATR Compression Breakout / LDOUSDT |
+| Last signal | 2026-04-29 20:00 UTC |
+| Last strategy | G27 CCI Donchian Wide / LDOUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260429_0605 |
-| Verdict | HEALTHY |
+| Last heartbeat file | heartbeat_20260430_0805 |
+| Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
 ## Open Positions -- Decision Lane (Harsh / live-approved)
@@ -82,8 +79,16 @@ _No outstanding operational issues._
 | Dashboard | https://tradingbot.operatorbrief.xyz/ | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
-## Commits Today (2026-04-29)
+## Commits Today (2026-04-30)
 ```
+4354c58 | 2026-04-29 17:40:59 +0530 | fix: R-03 — demote CCI Trend and Donchian Trend; trail bug + Python OOS fail
+ab5587b | 2026-04-29 17:11:48 +0530 | fix: P-01/P-02/P-03/P-04 — auto-promoter gate, testnet gate, bak cleanup, telemetry field
+e447fa4 | 2026-04-29 16:35:43 +0530 | fix: tournament_4h_v4 stale position-sizing label
+89d35e0 | 2026-04-29 16:16:54 +0530 | feat: H-P03 — AUTO_PROMOTE_FREEZE expiry alert in heartbeat
+17fd1da | 2026-04-29 07:51:38 +0000 | docs: mid-session progress report 2026-04-29 07:47 UTC
+83414c4 | 2026-04-29 06:23:45 +0000 | chore: auto-update runtime docs post-audit remediation 2026-04-29
+29c20f9 | 2026-04-29 06:23:24 +0000 | chore: track pine placeholders, combo scripts, gitignore runtime artifacts
+f907d3e | 2026-04-29 06:21:00 +0000 | fix: P-01/P-02/P-03/P-05/R-02/R-03/R-07 — infra+backtest audit remediation
 f11bf83 | 2026-04-29 05:12:54 +0000 | fix: audit remediation — H-01 freeze baseline, H-03 stale manifest, H-04 docs, H-07 test, G-02 promotion criteria
 2a5995c | 2026-04-28 17:15:53 +0530 | fix: heartbeat verdict — remove signal gap as standalone pipeline-stuck trigger
 0d81621 | 2026-04-28 16:44:22 +0530 | fix: backtest engine audit — signal lookahead, commission, slippage
@@ -361,7 +366,7 @@ be1cc5d | 2026-04-13 05:11:32 +0000 | fix(ops): R-04/R-05/R-10 operational harde
 ```
 
 ## Governance Note (P-01)
-Runtime has 2 candidate_for_tiny_capital strategies.
+Runtime has 0 candidate_for_tiny_capital strategies.
 Apr 14 decision scope is locked to: **CCI Trend + Donchian Trend on ETHUSDT 4h only.**
 All other strategies are testnet/research — not part of Apr 14 go-live decision.
 
