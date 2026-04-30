@@ -568,13 +568,15 @@ def load_paper_sim_summary() -> dict:
         ][-3:]
         worst3.reverse()
 
-        # Daily P&L — last 7 days, newest first
+        # Daily P&L — always last 7 calendar days, zero-fill missing days
         raw_daily = data.get("daily_pnl", {})
-        today_ist = datetime.now(IST).strftime("%Y-%m-%d")
+        today_ist_date = datetime.now(IST).date()
         daily_last7 = []
-        for date_key in sorted(raw_daily.keys(), reverse=True)[:7]:
-            label = "Today" if date_key == today_ist else date_key
-            daily_last7.append({"date": date_key, "label": label, "pnl": raw_daily[date_key]})
+        for i in range(7):
+            day = today_ist_date - timedelta(days=i)
+            date_key = day.strftime("%Y-%m-%d")
+            label = "Today" if i == 0 else date_key
+            daily_last7.append({"date": date_key, "label": label, "pnl": round(raw_daily.get(date_key, 0.0), 2)})
 
         return {
             "available": True,
@@ -588,6 +590,7 @@ def load_paper_sim_summary() -> dict:
             "simulation_days": data.get("simulation_days", 0),
             "sl_pct": data.get("sl_pct", 0.0),
             "tp_pct": data.get("tp_pct", 0.0),
+            "fixed_notional_usd": data.get("fixed_notional_usd", 100.0),
             "daily_last7": daily_last7,
         }
     except Exception as exc:
@@ -792,7 +795,7 @@ def format_report(ctx: dict) -> str:
             f"• Last run: {gen_label} | Next: 02:00 & 14:00 UTC daily\n"
             f"• Lookback: {paper_sim['simulation_days']} days | "
             f"SL {paper_sim['sl_pct']}% / TP {paper_sim['tp_pct']}% | "
-            f"$100 notional/trade\n"
+            f"${paper_sim['fixed_notional_usd']:.0f} notional/trade\n"
             f"• Strategies tracked: {paper_sim['strategies_with_trades']}"
             f"/{paper_sim['strategies_total']} have trades\n"
             f"• Open simulated positions: {paper_sim['open_positions']}\n"
