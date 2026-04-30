@@ -643,21 +643,25 @@ class WebhookServer:
                 strategy = _STRATEGY_ALIASES.get(strategy, strategy)
                 clean_payload["payload"]["strategy"] = strategy
 
-                # --- Strategy allowlist check: skip unapproved/test strategies silently ---
+                # --- Strategy allowlist gate: hard 403 for non-manifest strategies ---
+                # Fail-closed: manifest load failure rejects all signals to prevent ungoverned execution.
                 _manifest_path = Path(__file__).resolve().parents[2] / 'config' / 'approved_strategies.json'
                 _approved_names = set()
+                _manifest_loaded = False
                 try:
                     with open(_manifest_path) as _mf:
                         _manifest_data = json.load(_mf)
-                    _approved_names = {a['strategy'].replace(' ', '_') for a in _manifest_data.get('approvals', [])} | {a['strategy'] for a in _manifest_data.get('approvals', [])}
-                except Exception:
-                    pass
-                if _approved_names and strategy not in _approved_names:
-                    logger.info(
-                        f"Signal skipped (not in manifest): strategy={strategy} symbol={symbol} - returning 200 silently"
+                    _approved_names = (
+                        {a['strategy'].replace(' ', '_') for a in _manifest_data.get('approvals', [])}
+                        | {a['strategy'] for a in _manifest_data.get('approvals', [])}
                     )
-                    return jsonify({'status': 'success', 'message': 'Signal acknowledged'}), 200
-                # --- End allowlist check ---
+                    _manifest_loaded = True
+                except Exception as _manifest_err:
+                    logger.error(f"🔴 Manifest load failed — failing closed: {_manifest_err}")
+                if not _manifest_loaded or strategy not in _approved_names:
+                    logger.warning(f"🚫 Signal rejected — not in manifest: strategy={strategy} symbol={symbol}")
+                    return jsonify({'status': 'error', 'message': 'Strategy not authorized'}), 403
+                # --- End allowlist gate ---
 
                 # Route to exactly one queue — durable SQLite (primary) or legacy JSONL (fallback)
                 if os.getenv("USE_DURABLE_QUEUE", "true").lower() == "true":
