@@ -206,13 +206,26 @@ def signal_flow_last_60m() -> dict:
 
 
 def decision_lane_progress() -> dict:
-    """Count closed ETHUSDT exits per decision-lane candidate from execution_metrics.jsonl.
-    Returns: {"cci trend": {"exits": int, "needed": int}, "donchian trend": {...}}
+    """Count closed ETHUSDT exits per active candidate_for_tiny_capital strategy.
+    Returns {} when decision lane is empty (no candidates in manifest).
     """
-    THRESHOLDS = {"cci trend": 5, "donchian trend": 5}
-    counts: dict[str, int] = {"cci trend": 0, "donchian trend": 0}
+    candidates: dict[str, int] = {}
+    try:
+        with open(MANIFEST_PATH) as f:
+            data = json.load(f)
+        for a in data.get("approvals", []):
+            if a.get("approval_class") == "candidate_for_tiny_capital":
+                name = re.sub(r"[^a-z0-9 ]", " ", a["strategy"].lower()).strip()
+                candidates[name] = 5
+    except Exception as exc:
+        logger.warning(f"decision_lane_progress manifest load failed: {exc}")
+
+    if not candidates:
+        return {}
+
+    counts = {k: 0 for k in candidates}
     if not EXEC_METRICS.exists():
-        return {k: {"exits": 0, "needed": v} for k, v in THRESHOLDS.items()}
+        return {k: {"exits": 0, "needed": v} for k, v in candidates.items()}
     try:
         for line in EXEC_METRICS.read_text(encoding="utf-8").splitlines():
             if not line.strip():
@@ -229,14 +242,27 @@ def decision_lane_progress() -> dict:
                     counts[canonical] += 1
     except Exception as exc:
         logger.warning(f"decision_lane_progress failed: {exc}")
-    return {k: {"exits": counts[k], "needed": THRESHOLDS[k]} for k in THRESHOLDS}
+    return {k: {"exits": counts[k], "needed": candidates[k]} for k in candidates}
 
 
 def per_candidate_signal_gap() -> dict:
-    """Check last ETHUSDT signal time per decision-lane candidate strategy.
-    Returns dict: strategy_name -> hours_since_last_signal (None if never).
-    Warns at 48h so there is a 24h window before Gate #28 fails at 72h.
+    """Check last ETHUSDT signal time per active candidate_for_tiny_capital strategy.
+    Returns {} when decision lane is empty (no candidates in manifest).
     """
+    canonicals: list[str] = []
+    try:
+        with open(MANIFEST_PATH) as f:
+            data = json.load(f)
+        for a in data.get("approvals", []):
+            if a.get("approval_class") == "candidate_for_tiny_capital":
+                name = re.sub(r"[^a-z0-9 ]", " ", a["strategy"].lower()).strip()
+                canonicals.append(name)
+    except Exception:
+        pass
+
+    if not canonicals:
+        return {}
+
     result = {}
     if not SIGNAL_DB.exists():
         return result
@@ -257,15 +283,14 @@ def per_candidate_signal_gap() -> dict:
             if sym != "ETHUSDT":
                 continue
             strat_norm = re.sub(r"[^a-z0-9 ]+", " ", strat.lower()).strip()
-            for canonical in ("cci trend", "donchian trend"):
+            for canonical in canonicals:
                 if canonical not in seen:
-                    # normalise both ways
                     if strat_norm == canonical or strat_norm == canonical.replace(" ", "_"):
                         seen[canonical] = float(created_at)
-            if len(seen) == 2:
+            if len(seen) == len(canonicals):
                 break
         now_ts = datetime.now(UTC).timestamp()
-        for canonical in ("cci trend", "donchian trend"):
+        for canonical in canonicals:
             last_ts = seen.get(canonical)
             result[canonical] = None if last_ts is None else (now_ts - last_ts) / 3600
     except Exception as exc:
@@ -283,7 +308,7 @@ def signal_ingestion_check(flow: dict) -> dict:
     minutes_since = int((now_ts - float(last_bv["created_at"])) / 60)
     last_dt = datetime.fromtimestamp(float(last_bv["created_at"]), UTC)
     last_ts_str = last_dt.strftime("%Y-%m-%d %H:%M:%S UTC")
-    if minutes_since > SIGNAL_GAP_WATCH_MIN:
+    if minutes_since > SIGNAL_GAP_ACTION_MIN:
         detail = (
             f"Signal pipeline may be stuck: no signals reached the bot for {minutes_since}m "
             f"(last bot-visible signal {last_ts_str}). "
@@ -824,12 +849,17 @@ def format_report(ctx: dict) -> str:
     def _progress_bar(exits: int, needed: int) -> str:
         filled = min(exits, needed)
         return "▓" * filled + "░" * (needed - filled) + f"  {exits}/{needed}"
-    lane_lines = "\n".join(
-        f"• {name.title()}: {_progress_bar(v['exits'], v['needed'])}"
-        for name, v in lane_progress.items()
-    ) or "• No data"
-    gate_clear = all(v["exits"] >= v["needed"] for v in lane_progress.values()) if lane_progress else False
-    gate_icon = "✅" if gate_clear else "❌"
+    if not lane_progress:
+        gate_icon = "🔒"
+        gate_clear = False
+        lane_lines = "• EMPTY — 0 candidate_for_tiny_capital entries in manifest"
+    else:
+        lane_lines = "\n".join(
+            f"• {name.title()}: {_progress_bar(v['exits'], v['needed'])}"
+            for name, v in lane_progress.items()
+        )
+        gate_clear = all(v["exits"] >= v["needed"] for v in lane_progress.values())
+        gate_icon = "✅" if gate_clear else "❌"
 
     msg = (
         f"<b>HOURLY TRADING HEARTBEAT</b>\n"
