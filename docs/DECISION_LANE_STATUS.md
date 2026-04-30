@@ -1,29 +1,35 @@
 # Decision Lane Status Report
-> Refreshed 2026-04-25 19:30 IST
-> **Scope: CCI Trend + Donchian Trend on ETHUSDT 4h ONLY**
-> All other strategies are paper-only research — not part of go-live decision
+> Refreshed 2026-04-30 19:00 IST
+> **Scope: EMPTY — 0 active candidates**
+> CCI Trend + Donchian Trend DEMOTED to paper_only on 2026-04-29 (R-03)
+> All strategies are paper-only research — no candidate_for_tiny_capital entries exist
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
 
 ---
 
-## Decision Lane — ALPHA Strategies (ETH 4h only)
+## Decision Lane — ALPHA Strategies
 
-| Strategy | Symbols | Timeframe | Operator | Approved |
-|----------|---------|-----------|----------|---------|
-| CCI Trend | ['ETHUSDT'] | ['240'] | harsh | 2026-04-07 |
-| Donchian Trend | ['ETHUSDT'] | ['240'] | harsh | 2026-04-07 |
+**DECISION LANE IS EMPTY — manifest v19 has zero candidate_for_tiny_capital entries.**
 
-> **TV alerts repaired 2026-04-22:** All off-symbol CCI/Donchian alerts deleted.
-> ETHUSDT 4H only alerts remain. Underscore variants deleted.
-> **ML Lorentzian demoted to paper_only 2026-04-16** per A-03 governance freeze.
+### Former candidates — DEMOTED (R-03, 2026-04-29)
+
+| Strategy | Demotion Reason | Python OOS PF | Trail Bug |
+|----------|----------------|--------------|-----------|
+| CCI Trend | trail_pct/100 bug — effective trail 0.04% not 4%. Python OOS PF=0.702, ROI=-0.065%/day | 0.702 ❌ | confirmed |
+| Donchian Trend | trail_pct/100 bug — effective trail 0.04% not 4%. Python OOS PF=0.662, ROI=-0.071%/day | 0.662 ❌ | confirmed |
+
+> **Old paper counts (CCI 1/5, Donchian 0/5) are MOOT** — these counts were accumulated
+> under buggy TV trail settings. They cannot carry forward to any future paper window.
+> Any re-nomination requires: Pine fix + TV rerun + Python OOS rerun + fresh paper window from zero.
 
 ---
 
-## Gate Verdict (live as of 2026-04-29 11:40 IST)
+## Gate Verdict (live as of 2026-04-30 IST)
 
 ```
-VERDICT: NO-GO  (1 of 30 gates FAILED)
-[FAIL] Candidates have min closed paper trades (4H=5,1H=10,15m=20) -- CCI Trend:1(NEED 5); Donchian Trend:0(NEED 5)
+VERDICT: NO-GO
+REASON: Decision lane EMPTY — 0 candidate_for_tiny_capital entries in manifest v19
+        No capital path exists until replacement candidates complete full governance path.
 ```
 
 **Gate history:**
