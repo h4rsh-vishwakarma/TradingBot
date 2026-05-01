@@ -109,7 +109,12 @@ class TestWebhookToQueue:
 
     def test_json_signal_enqueued(self):
         """JSON webhook signal gets parsed and enqueued."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
+        import tempfile as _tf_mod
+        import json as _json_mod
+        _mf = _tf_mod.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+        _json_mod.dump({"version": 99, "approvals": [{"strategy": "TestStrategy", "exchange": "binance", "symbols": ["SOLUSDT"], "timeframes": ["60"], "approval_class": "paper_only", "operator": "test"}]}, _mf)
+        _mf.close()
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret", "APPROVAL_MANIFEST_PATH": _mf.name}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)
@@ -137,7 +142,12 @@ class TestWebhookToQueue:
 
     def test_plain_text_signal_enqueued(self):
         """Plain text TradingView alert gets parsed and enqueued."""
-        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret"}):
+        import tempfile as _tf_mod
+        import json as _json_mod
+        _mf = _tf_mod.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+        _json_mod.dump({"version": 99, "approvals": [{"strategy": "TestStrategy", "exchange": "binance", "symbols": ["SOLUSDT"], "timeframes": ["60"], "approval_class": "paper_only", "operator": "test"}]}, _mf)
+        _mf.close()
+        with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret", "APPROVAL_MANIFEST_PATH": _mf.name}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
             import tempfile
             tf = tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False)

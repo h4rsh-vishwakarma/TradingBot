@@ -645,7 +645,7 @@ class WebhookServer:
 
                 # --- Strategy allowlist gate: hard 403 for non-manifest strategies ---
                 # Fail-closed: manifest load failure rejects all signals to prevent ungoverned execution.
-                _manifest_path = Path(__file__).resolve().parents[2] / 'config' / 'approved_strategies.json'
+                _manifest_path = Path(os.environ.get("APPROVAL_MANIFEST_PATH", str(Path(__file__).resolve().parents[2] / "config" / "approved_strategies.json")))
                 _approved_names = set()
                 _manifest_loaded = False
                 try:
