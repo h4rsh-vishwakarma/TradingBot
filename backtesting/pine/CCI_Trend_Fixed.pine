@@ -1,0 +1,52 @@
+//@version=5
+// CCI Trend [Webhook] — fixed 2026-05-01
+// Fix: trail_pct was double-divided (/100 extra), effective trail was 0.04% not 4%.
+//      Removed the extra /100. trail_pct input(3.5) / 100 = 0.035 (3.5%). Correct.
+strategy("CCI Trend [Webhook]", overlay=true, initial_capital=10000,
+     default_qty_type=strategy.fixed, default_qty_value=1,
+     commission_type=strategy.commission.percent, commission_value=0.06,
+     calc_on_order_fills=false, calc_on_every_tick=false, process_orders_on_close=false)
+
+WEBHOOK_SECRET   = "squeeze_tradingview_cluster_2026_secure"
+long_alert       = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"CCI Trend","action":"buy","ticker":"{{ticker}}","interval":"{{interval}}","price":"{{close}}"}'
+short_alert      = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"CCI Trend","action":"sell","ticker":"{{ticker}}","interval":"{{interval}}","price":"{{close}}"}'
+close_long_alert = '{"secret":"' + WEBHOOK_SECRET + '","strategy":"CCI Trend","action":"sell","is_exit":"true","ticker":"{{ticker}}","interval":"{{interval}}","price":"{{close}}"}'
+close_short_alert= '{"secret":"' + WEBHOOK_SECRET + '","strategy":"CCI Trend","action":"buy","is_exit":"true","ticker":"{{ticker}}","interval":"{{interval}}","price":"{{close}}"}'
+
+// ── INPUTS ──
+cci_len  = input.int(20,    "CCI Length")
+sl_pct   = input.float(1.5, "SL %")    / 100
+tp_pct   = input.float(12.0,"TP %")    / 100
+trail_pct= input.float(4.0, "Trail %") / 100   // 0.04 = 4.0% — FIXED: no extra /100
+
+// ── INDICATORS ──
+cci    = ta.cci(close, cci_len)
+ema50  = ta.ema(close, 50)
+[_, _, adx] = ta.dmi(14, 14)
+
+// ── SIGNALS ──
+long_entry  = ta.crossover(cci,  100) and close > ema50 and adx > 20
+short_entry = ta.crossunder(cci, -100) and close < ema50 and adx > 20
+long_exit   = cci < 0
+short_exit  = cci > 0
+
+// ── EXECUTION ──
+if long_entry
+    strategy.entry("L", strategy.long,
+         stop=close*(1-sl_pct), limit=close*(1+tp_pct),
+         alert_message=long_alert)
+
+if short_entry
+    strategy.entry("S", strategy.short,
+         stop=close*(1+sl_pct), limit=close*(1-tp_pct),
+         alert_message=short_alert)
+
+if long_exit and strategy.position_size > 0
+    strategy.close("L", alert_message=close_long_alert)
+
+if short_exit and strategy.position_size < 0
+    strategy.close("S", alert_message=close_short_alert)
+
+// ── TRAILING STOP ──
+strategy.exit("L_trail", from_entry="L", trail_price=close, trail_offset=close*trail_pct/syminfo.mintick)
+strategy.exit("S_trail", from_entry="S", trail_price=close, trail_offset=close*trail_pct/syminfo.mintick)
