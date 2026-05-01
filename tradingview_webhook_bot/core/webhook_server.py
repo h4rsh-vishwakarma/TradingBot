@@ -554,7 +554,7 @@ class WebhookServer:
                         # P-06: Manifest pre-check before accepting secretless order-fill.
                         # Rejects spoofed order-fill payloads for unknown strategy names.
                         _tv_strat = parsed.get('strategy', '')
-                        _mf_path_tv = Path(__file__).resolve().parents[2] / 'config' / 'approved_strategies.json'
+                        _mf_path_tv = Path(os.environ.get("APPROVAL_MANIFEST_PATH", str(Path(__file__).resolve().parents[2] / 'config' / 'approved_strategies.json')))
                         _tv_approved: set = set()
                         try:
                             with open(_mf_path_tv) as _mf_tv:
@@ -642,6 +642,15 @@ class WebhookServer:
                 _STRATEGY_ALIASES: dict = {}   # add entries here if TV alert names differ from manifest
                 strategy = _STRATEGY_ALIASES.get(strategy, strategy)
                 clean_payload["payload"]["strategy"] = strategy
+
+                # --- Defense-in-depth: hard-block test/demo strategy names ---
+                # These names must never reach the execution stack regardless of manifest state.
+                # Catches integration-test signals that accidentally target the production endpoint.
+                _BLOCKED_STRATEGY_LOWER = strategy.lower()
+                if (_BLOCKED_STRATEGY_LOWER.startswith(('test', 'demo_', 'demo momentum', 'teststr'))
+                        or _BLOCKED_STRATEGY_LOWER in ('demo_momentum_test', 'teststrategy')):
+                    logger.warning(f"🚫 Signal rejected — test/demo strategy blocked at boundary: strategy={strategy}")
+                    return jsonify({'status': 'error', 'message': 'Test/demo strategies not permitted in production'}), 403
 
                 # --- Strategy allowlist gate: hard 403 for non-manifest strategies ---
                 # Fail-closed: manifest load failure rejects all signals to prevent ungoverned execution.

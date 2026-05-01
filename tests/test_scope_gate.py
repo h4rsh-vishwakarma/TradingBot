@@ -141,7 +141,7 @@ class TestManifestScopeGate:
             f"Body: {resp.get_data(as_text=True)[:200]}"
         )
         body = resp.get_json()
-        assert body.get("message") == "Strategy not authorized"
+        assert body.get("message") in ("Strategy not authorized", "Test/demo strategies not permitted in production")
 
     def test_manifest_strategy_passes_gate(self, scope_client):
         """CCI Trend (in manifest) must not be rejected at the manifest gate."""

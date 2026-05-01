@@ -31,7 +31,7 @@ def temp_storage(tmp_path):
     csv_path = storage / "reports" / "tournament_winners.csv"
     csv_path.write_text(
         "Strategy,Symbol,Tier,Optimal_Len,Optimal_Mult,Daily_ROI\n"
-        "TestStrategy,SOLUSDT,ALPHA,20,3.0,2.5\n"
+        "AroonSignal,SOLUSDT,ALPHA,20,3.0,2.5\n"
         "EMA_Cloud_Strength,BTCUSDT,ALPHA,21,2.0,1.8\n"
     )
 
@@ -112,7 +112,7 @@ class TestWebhookToQueue:
         import tempfile as _tf_mod
         import json as _json_mod
         _mf = _tf_mod.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
-        _json_mod.dump({"version": 99, "approvals": [{"strategy": "TestStrategy", "exchange": "binance", "symbols": ["SOLUSDT"], "timeframes": ["60"], "approval_class": "paper_only", "operator": "test"}]}, _mf)
+        _json_mod.dump({"version": 99, "approvals": [{"strategy": "AroonSignal", "exchange": "binance", "symbols": ["SOLUSDT"], "timeframes": ["60"], "approval_class": "paper_only", "operator": "test"}]}, _mf)
         _mf.close()
         with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret", "APPROVAL_MANIFEST_PATH": _mf.name}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
@@ -129,7 +129,7 @@ class TestWebhookToQueue:
                 "action": "BUY",
                 "price": 92.50,
                 "quantity": 0.5,
-                "strategy": "TestStrategy",
+                "strategy": "AroonSignal",
                 "exchange": "binance"
             }
             resp = client.post("/webhook/tradingview",
@@ -145,7 +145,7 @@ class TestWebhookToQueue:
         import tempfile as _tf_mod
         import json as _json_mod
         _mf = _tf_mod.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
-        _json_mod.dump({"version": 99, "approvals": [{"strategy": "TestStrategy", "exchange": "binance", "symbols": ["SOLUSDT"], "timeframes": ["60"], "approval_class": "paper_only", "operator": "test"}]}, _mf)
+        _json_mod.dump({"version": 99, "approvals": [{"strategy": "AroonSignal", "exchange": "binance", "symbols": ["SOLUSDT"], "timeframes": ["60"], "approval_class": "paper_only", "operator": "test"}]}, _mf)
         _mf.close()
         with patch.dict(os.environ, {"WEBHOOK_SECRET": "test_secret_123", "TRADINGVIEW_AUTH_MODE": "secret", "APPROVAL_MANIFEST_PATH": _mf.name}):
             from tradingview_webhook_bot.core.webhook_server import WebhookServer
@@ -156,7 +156,7 @@ class TestWebhookToQueue:
             server.app.config["TESTING"] = True
             client = server.app.test_client()
 
-            text = "TestStrategy | SOLUSDT - Webhook (test_secret_123): order buy @ 10 filled on SOLUSDT. New strategy position is 10"
+            text = "AroonSignal | SOLUSDT - Webhook (test_secret_123): order buy @ 10 filled on SOLUSDT. New strategy position is 10"
             resp = client.post("/webhook/tradingview",
                 data=text,
                 content_type="text/plain")
@@ -264,7 +264,7 @@ class TestWebhookToQueue:
             server.app.config["TESTING"] = True
             client = server.app.test_client()
 
-            text = "TestStrategy: order buy @ 10 filled on SOLUSDT. New strategy position is 10"
+            text = "AroonSignal: order buy @ 10 filled on SOLUSDT. New strategy position is 10"
             resp = client.post("/webhook/tradingview",
                 data=text,
                 content_type="text/plain")
@@ -344,7 +344,7 @@ class TestOrchestratorFlow:
             "action": "BUY",
             "price": 92.50,
             "quantity": 1.0,
-            "strategy": "TestStrategy",
+            "strategy": "AroonSignal",
             "exchange": "binance",
             "secret": "test_secret"
         }
