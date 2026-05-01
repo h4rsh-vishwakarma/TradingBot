@@ -109,6 +109,71 @@ def load_manifest_scope() -> dict:
         return {"ok": False, "error": str(exc)}
 
 
+def load_p07_nominees() -> list[dict]:
+    """Return P07_NOMINEE entries from manifest with readiness state."""
+    try:
+        with open(MANIFEST_PATH) as f:
+            data = json.load(f)
+    except Exception:
+        return []
+
+    nominees = []
+    for a in data.get("approvals", []):
+        if a.get("label") != "P07_NOMINEE":
+            continue
+        strategy = a.get("strategy", "")
+        symbols = a.get("symbols", [])
+        oos_pf = a.get("p07_oos_pf", "?")
+        oos_n = a.get("p07_oos_n", "?")
+        nominated_at = a.get("p07_nominated_at", "")
+
+        # Check if any live signals exist for this nominee
+        window_started = False
+        first_signal_ts = None
+        if SIGNAL_DB.exists():
+            try:
+                strat_norm = re.sub(r"[^a-z0-9 ]+", " ", strategy.lower()).strip()
+                with sqlite3.connect(str(SIGNAL_DB)) as conn:
+                    rows = conn.execute(
+                        "SELECT payload, created_at FROM signals ORDER BY created_at ASC LIMIT 2000"
+                    ).fetchall()
+                for raw, created_at in rows:
+                    try:
+                        p = json.loads(raw)
+                        inner = p.get("payload", p)
+                        s = re.sub(r"[^a-z0-9 ]+", " ", str(inner.get("strategy", "")).lower()).strip()
+                        sym = str(inner.get("symbol", "")).upper()
+                        if s == strat_norm and sym in [x.upper() for x in symbols]:
+                            ts = float(created_at)
+                            if nominated_at:
+                                nom_ts = datetime.fromisoformat(
+                                    nominated_at.replace("Z", "+00:00")
+                                ).timestamp()
+                                if ts >= nom_ts:
+                                    window_started = True
+                                    first_signal_ts = ts
+                                    break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+        elapsed_days = None
+        if window_started and first_signal_ts:
+            elapsed_days = (datetime.now(UTC).timestamp() - first_signal_ts) / 86400
+
+        nominees.append({
+            "strategy": strategy,
+            "symbols": symbols,
+            "oos_pf": oos_pf,
+            "oos_n": oos_n,
+            "window_started": window_started,
+            "elapsed_days": elapsed_days,
+            "first_signal_ts": first_signal_ts,
+        })
+    return nominees
+
+
 def load_approvals() -> list[dict]:
     try:
         with open(MANIFEST_PATH) as f:
@@ -896,11 +961,39 @@ def format_report(ctx: dict) -> str:
         f"<b>Issues:</b>\n{issues_block}\n\n"
         f"{gate_icon} <b>Decision Lane Gate Progress (ETHUSDT 4H)</b>\n"
         f"{lane_lines}\n\n"
+        f"{_p07_block(ctx.get('p07_nominees', []))}"
         f"{paper_sim_block}"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"<i>{now_ist}</i>"
     )
     return msg
+
+
+def _p07_block(nominees: list[dict]) -> str:
+    """Format P07 paper-nominee readiness block for heartbeat."""
+    if not nominees:
+        return ""
+    lines = []
+    for n in nominees:
+        sym = "/".join(n["symbols"])
+        pf = n["oos_pf"]
+        oos_n = n["oos_n"]
+        if n["window_started"] and n["elapsed_days"] is not None:
+            days = int(n["elapsed_days"])
+            remaining = max(0, 30 - days)
+            window_line = f"Day {days}/30 — {remaining}d remaining"
+            icon = "🟡"
+        else:
+            window_line = "NOT STARTED — awaiting P-09 TV alert"
+            icon = "⏳"
+        lines.append(
+            f"{icon} {n['strategy']} | {sym} | OOS PF={pf} n={oos_n} | {window_line}"
+        )
+    body = "\n".join(f"• {l}" for l in lines)
+    return (
+        f"📋 <b>P07 Paper Nominees ({len(nominees)}) — Gate 2 readiness</b>\n"
+        f"{body}\n\n"
+    )
 
 
 def send_telegram(text: str) -> None:
@@ -949,6 +1042,7 @@ def main() -> int:
         "candidate_gaps": per_candidate_signal_gap(),
         "lane_progress": decision_lane_progress(),
         "freeze_expiry": auto_promote_freeze_check(),
+        "p07_nominees": load_p07_nominees(),
     }
 
     message = format_report(ctx)
