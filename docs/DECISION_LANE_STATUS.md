@@ -1,7 +1,7 @@
 # Decision Lane Status Report
-> **Last updated: 2026-05-01 (P-08 — manifest v21: CCI/Donchian retired, G83/G88/G111 nominated)**
+> **Last updated: 2026-05-01 (P-10 — manifest v22: G111 asset switched SUIUSDT→LINKUSDT; P-09 authorized)**
 > **Scope: EMPTY — 0 active candidates**
-> **Manifest v21** — 0 candidate_for_tiny_capital; 31 paper_only; 3 P07_NOMINEE; 2 R01_RETIRED
+> **Manifest v22** — 0 candidate_for_tiny_capital; 31 paper_only; 3 P07_NOMINEE; 2 R01_RETIRED
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
 
 ---
@@ -20,9 +20,11 @@ Gate 1 (Python OOS) → Gate 2 (30-day paper window) → Gate 3 (Sainath sign-of
 |----------|--------|----|--------------|-------|--------|-------------|
 | G83 DeMarker Donchian | ETHUSDT | 4H | 1.18 | 217 | PASS | NOT STARTED — awaiting P-09 TV alert |
 | G88 Vortex Donchian | XRPUSDT | 4H | 1.10 | 325 | PASS | NOT STARTED — awaiting P-09 TV alert |
-| G111 Supertrend Donchian | SUIUSDT | 4H | 1.55 | 75 | PASS | NOT STARTED — awaiting P-09 TV alert |
+| G111 Supertrend Donchian | **LINKUSDT** | 4H | **1.40** | **151** | PASS | NOT STARTED — awaiting P-09 TV alert |
 
-**P-09 is the blocker.** Harsh must manually create TV alerts for all 3 nominees before the paper window clock starts. Paper window = 30 days from first live signal. Target capital review: ~2026-06-01.
+**Asset note (P-10, 2026-05-01):** G111 originally nominated on SUIUSDT (PF=1.55, n=75). Sainath rejected SUI — 75 OOS trades violates the packet's own ≥100 gate. Switched to LINKUSDT (PF=1.40, n=151, meets gate). Manifest v22.
+
+**P-09 is authorized.** Harsh must manually create TV alerts for all 3 nominees. Paper window = 30 days from first live signal per strategy. Target capital review: ~2026-06-01.
 
 ---
 

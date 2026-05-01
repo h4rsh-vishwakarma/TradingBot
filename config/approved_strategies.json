@@ -1,6 +1,6 @@
 {
-  "version": 21,
-  "updated_at": "2026-05-01T07:30:00Z",
+  "version": 22,
+  "updated_at": "2026-05-01T09:40:00Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -631,22 +631,27 @@
       "strategy": "G111 Supertrend Donchian",
       "exchange": "binance",
       "symbols": [
-        "SUIUSDT"
+        "LINKUSDT"
       ],
       "timeframes": [
         "240"
       ],
       "operator": "garima",
       "approved_at": "2026-05-01T07:30:00Z",
-      "backtest_hash": "p07_oos_g111_supertrend_donchian_SUIUSDT_4h_20260501",
+      "backtest_hash": "p07_oos_g111_supertrend_donchian_LINKUSDT_4h_20260501",
       "label": "P07_NOMINEE",
-      "notes": "P-07 2026-05-01: Python OOS PF=1.55, n=75, SUIUSDT 4H. Supertrend signal + Donchian channel filter. Selected as P-07 paper window nominee. Awaiting TV alert creation (P-09) to start paper window.",
+      "notes": "P-07 2026-05-01: Python OOS PF=1.55, n=75, SUIUSDT 4H. Supertrend signal + Donchian channel filter. Selected as P-07 paper window nominee. Awaiting TV alert creation (P-09) to start paper window. | P-10 2026-05-01: Asset switched SUIUSDT\u2192LINKUSDT per Sainath decision. SUI rejected (75 OOS trades < 100 gate). LINK: PF=1.40, n=151, meets gate.",
       "approval_class": "paper_only",
-      "class_reason": "P07_NOMINEE 2026-05-01: Python OOS PF=1.55 n=75 on SUIUSDT 4H. Gate 1 candidate. Paper window to start after P-09 TV alerts deployed.",
+      "class_reason": "P07_NOMINEE 2026-05-01: Python OOS PF=1.40 n=151 on LINKUSDT 4H. SUIUSDT (PF=1.55 n=75) rejected \u2014 sub-100 OOS trades violates packet gate. LINKUSDT meets gate (n=151 \u2265100). Paper window to start after P-09 TV alert.",
       "shortlist_priority": true,
-      "p07_oos_pf": 1.55,
-      "p07_oos_n": 75,
-      "p07_nominated_at": "2026-05-01T07:30:00Z"
+      "p07_oos_pf": 1.4,
+      "p07_oos_n": 151,
+      "p07_nominated_at": "2026-05-01T07:30:00Z",
+      "p10_sui_rejected": true,
+      "p10_sui_rejected_reason": "OOS trades=75 < packet gate of \u2265100",
+      "p10_link_oos_pf": 1.4,
+      "p10_link_oos_n": 151,
+      "p10_decided_at": "2026-05-01T09:40:00Z"
     }
   ]
 }
