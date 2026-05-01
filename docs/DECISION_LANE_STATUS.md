@@ -24,14 +24,23 @@
 
 ---
 
-## Gate Verdict (live as of 2026-04-30 IST)
+## Gate Verdict (live as of 2026-05-01 10:30 IST)
 
 ```
-VERDICT: NO-GO
-REASON: Decision lane EMPTY — 0 candidate_for_tiny_capital entries in manifest v19
-        No capital path exists until replacement candidates complete full governance path.
+VERDICT: NO-GO  (4 of 31 gates FAILED)
+[PASS] Execution-plane freeze intact -- execution diff = none; tracked=11
+[FAIL] Manifest scope is explicit and limited -- 0 candidate_for_tiny_capital; 30 paper_only
+[FAIL] Candidate paper-lane inventory verified -- No candidate_for_tiny_capital rows found
+[FAIL] Approved-lane signals fired during paper window -- 0 since 2026-04-07
+[FAIL] Decision-lane ETHUSDT signal active <72h -- no ETHUSDT decision-lane signal ever recorded
 ```
 
+> Infra fixes applied 2026-05-01:
+> - Old trading_orchestrator.service stopped, disabled, and deleted from disk
+> - 2 integration test failures fixed (APPROVAL_MANIFEST_PATH env var)
+> - Execution freeze baseline refreshed -- CLEAN
+> - Gunicorn service file aligned with running config (4w/4t, 127.0.0.1:5000)
+> - 4 remaining FAIL gates are structural -- clear only when replacement candidates complete Gate 1 + paper window
 **Gate history:**
 - Before Apr 22 session: NO-GO (3/27 FAIL)
 - After FIX-1/FIX-2 (morning): NO-GO (1/27 FAIL)
