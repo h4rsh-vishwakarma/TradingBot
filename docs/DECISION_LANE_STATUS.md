@@ -24,15 +24,14 @@
 
 ---
 
-## Gate Verdict (live as of 2026-05-01 10:30 IST)
+## Gate Verdict (live as of 2026-05-01 10:40 IST)
 
 ```
 VERDICT: NO-GO  (4 of 31 gates FAILED)
-[PASS] Execution-plane freeze intact -- execution diff = none; tracked=11
 [FAIL] Manifest scope is explicit and limited -- 0 candidate_for_tiny_capital; 30 paper_only
-[FAIL] Candidate paper-lane inventory verified -- No candidate_for_tiny_capital rows found
-[FAIL] Approved-lane signals fired during paper window -- 0 since 2026-04-07
-[FAIL] Decision-lane ETHUSDT signal active <72h -- no ETHUSDT decision-lane signal ever recorded
+[FAIL] Candidate paper-lane inventory verified -- No candidate_for_tiny_capital rows found in inventory report
+[FAIL] Approved-lane signals fired during paper window -- 0 approved-lane signal(s) recorded since 2026-04-07
+[FAIL] Decision-lane ETHUSDT signal active (<72h) -- No ETHUSDT decision-lane signal ever recorded in execution_metrics
 ```
 
 > Infra fixes applied 2026-05-01:

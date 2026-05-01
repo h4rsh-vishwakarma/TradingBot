@@ -1,6 +1,6 @@
-# Runtime Log — 2026-04-30
+# Runtime Log — 2026-05-01
 
-> Auto-generated — last updated `2026-04-30T08:10:01Z`
+> Auto-generated — last updated `2026-05-01T05:10:02Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,9 +8,9 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (5 of 31 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (4 of 31 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-04-30T08:10:01Z |
+| Last run | 2026-05-01T05:10:02Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
@@ -34,7 +34,7 @@
 ## Decision-Lane Scoreboard (ETHUSDT 4H)
 | Strategy | Closed ETHUSDT Trades | Last ETHUSDT Signal |
 |---|---|---|
-| CCI Trend | 1/5 (NEED MORE) | 2026-04-28T04:42 UTC |
+| CCI Trend | 1/5 (NEED MORE) | 2026-04-30T09:42 UTC |
 | Donchian Trend | 0/5 (NEED MORE) | 2026-04-25T05:17 UTC |
 > Gate requires 5 closed ETHUSDT trades per strategy. OK = threshold met.
 
@@ -43,14 +43,14 @@
 |---|---|
 | Signals received | 6 |
 | Completed | 6 |
-| Last signal | 2026-04-29 20:00 UTC |
-| Last strategy | G27 CCI Donchian Wide / LDOUSDT |
+| Last signal | 2026-05-01 03:19 UTC |
+| Last strategy | G27 CCI Donchian Wide / MAGICUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260430_0805 |
+| Last heartbeat file | heartbeat_20260501_0505 |
 | Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
@@ -79,8 +79,19 @@ _No outstanding operational issues._
 | Dashboard | https://tradingbot.operatorbrief.xyz/ | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
-## Commits Today (2026-04-30)
+## Commits Today (2026-05-01)
 ```
+6dc96dc | 2026-05-01 05:08:04 +0000 | fix: H-01/H-02 — remove stale service file ref, update gate verdict to 4/31
+615d406 | 2026-05-01 04:52:06 +0000 | fix: T-D — align tv-webhook.service with live systemd config
+5c4139b | 2026-05-01 04:48:57 +0000 | fix: T-B — update integration tests and webhook_server to use APPROVAL_MANIFEST_PATH env var
+af7d451 | 2026-04-30 08:14:53 +0000 | fix: restore correct DECISION_LANE_STATUS from origin/main
+82dd56d | 2026-04-30 08:14:25 +0000 | resolve: accept updated DECISION_LANE_STATUS from main
+85900ed | 2026-04-30 16:10:49 +0530 | docs: R-03 — strip raw gate-check terminal dump from STRATEGY_PROMOTION_CRITERIA.md
+3dbda59 | 2026-04-30 16:05:33 +0530 | fix: P-04 — heartbeat stale display and false stuck alert
+865d010 | 2026-04-30 15:48:07 +0530 | feat: Wallace — automated governance checker plugged into backtest pipeline
+f8bb6e8 | 2026-04-30 15:18:25 +0530 | fix: daily P&L fills all 7 calendar days; notional reads from JSON not hardcoded
+8470c86 | 2026-04-30 14:14:34 +0530 | fix: P-01 — hard 403 manifest gate + fail-closed on manifest load error
+006184b | 2026-04-30 13:43:26 +0530 | docs: update DECISION_LANE_STATUS — empty lane, R-03 demotion, old counts moot
 4354c58 | 2026-04-29 17:40:59 +0530 | fix: R-03 — demote CCI Trend and Donchian Trend; trail bug + Python OOS fail
 ab5587b | 2026-04-29 17:11:48 +0530 | fix: P-01/P-02/P-03/P-04 — auto-promoter gate, testnet gate, bak cleanup, telemetry field
 e447fa4 | 2026-04-29 16:35:43 +0530 | fix: tournament_4h_v4 stale position-sizing label
