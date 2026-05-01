@@ -1,6 +1,6 @@
 {
-  "version": 20,
-  "updated_at": "2026-04-29T00:00:00Z",
+  "version": 21,
+  "updated_at": "2026-05-01T07:30:00Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -14,17 +14,17 @@
       "operator": "harsh",
       "approved_at": "2026-04-07T10:23:25Z",
       "backtest_hash": "r04_fixed500_5y_oos30_trail4pct_20260501",
-      "label": "R04_PASS",
-      "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['LDOUSDT', 'ETHUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18. | R-03 2026-04-29: TRAIL BUG CONFIRMED \u2014 tv_first_40_CCI_Trend.pine uses trail_pct/100 extra division; effective TV trail=0.04% not 4%. TV metrics generated with bug active. Python OOS at TV-matching 0.04% trail: PF=0.702, ROI=-0.065%/day. PF delta=-0.438. Both PF<1 and negative ROI. Capital decision BLOCKED pending bug fix and re-validation. | R-04 2026-05-01: Trail bug fixed in Pine (CCI_Trend_Fixed.pine). OOS re-run: PF=3.998 Sharpe=9.03 DD=4.74% ROI/day=0.529% n=174. GATE 1 PASS. Shortlisted for tiny-capital promotion after 30-day paper window.",
+      "label": "R01_RETIRED",
+      "notes": "Realistic: ROI=5.91%, Sharpe=0.69, PF=1.14, MDD=-2.82%, OOS_ROI=3.1%, OOS_PF=1.25, 644 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['LDOUSDT', 'ETHUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18. | R-03 2026-04-29: TRAIL BUG CONFIRMED \u2014 tv_first_40_CCI_Trend.pine uses trail_pct/100 extra division; effective TV trail=0.04% not 4%. TV metrics generated with bug active. Python OOS at TV-matching 0.04% trail: PF=0.702, ROI=-0.065%/day. PF delta=-0.438. Both PF<1 and negative ROI. Capital decision BLOCKED pending bug fix and re-validation. | R-04 2026-05-01: Trail bug fixed in Pine (CCI_Trend_Fixed.pine). OOS re-run: PF=3.998 Sharpe=9.03 DD=4.74% ROI/day=0.529% n=174. GATE 1 PASS. Shortlisted for tiny-capital promotion after 30-day paper window. | R-01 2026-05-01: TV rerun at corrected 4% trail: PF=1.08. Python/TV gap too large (7x). Retired. Cannot be shortlisted for capital.",
       "approval_class": "paper_only",
-      "class_reason": "paper_only \u2014 R-04 Gate1 PASS (PF=3.998, Sharpe=9.03, DD=4.74%, ROI/day=0.529%, n=174). Pine trail bug fixed 2026-05-01. Monitoring paper before tiny-capital promotion.",
+      "class_reason": "R01_RETIRED 2026-05-01: TV rerun with corrected 4% trail yields PF=1.08 \u2014 below practical Gate 1 threshold. Large TV/Python gap (PF 3.998 Python vs 1.08 TV) indicates strategy behavior diverges from OOS assumptions. Retired per Garima R-01 decision.",
       "r03_python_oos_pf": 0.702,
       "r03_python_oos_roi_day": -0.065,
       "r03_tv_pf": 1.14,
       "r03_pf_delta": -0.438,
       "r03_trail_bug": "trail_pct/100 extra division \u2014 effective TV trail=0.04% not 4%",
       "r03_flagged_at": "2026-04-29T00:00:00Z",
-      "shortlist_priority": true,
+      "shortlist_priority": false,
       "r04_python_oos_pf": 3.998,
       "r04_python_oos_roi_day": 0.5288,
       "r04_python_oos_sharpe": 9.032,
@@ -33,7 +33,9 @@
       "r04_python_oos_n": 174,
       "r04_gate1_pass": true,
       "r04_validated_at": "2026-05-01T06:00:00Z",
-      "r04_pine_fix": "trail_pct/100 extra division removed; effective trail now 4% as intended"
+      "r04_pine_fix": "trail_pct/100 extra division removed; effective trail now 4% as intended",
+      "r01_tv_rerun_pf": 1.08,
+      "r01_retired_at": "2026-05-01T07:30:00Z"
     },
     {
       "strategy": "Donchian Trend",
@@ -47,17 +49,17 @@
       "operator": "harsh",
       "approved_at": "2026-04-07T10:23:28Z",
       "backtest_hash": "r04_fixed500_5y_oos30_trail4pct_20260501",
-      "label": "R04_PASS",
-      "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['ETHUSDT', 'SUIUSDT', 'LDOUSDT', 'LINKUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18. | R-03 2026-04-29: TRAIL BUG CONFIRMED \u2014 tv_first_35_Donchian_Trend.pine uses trail_pct/100 extra division; effective TV trail=0.04% not 4%. TV metrics generated with bug active. Python OOS at TV-matching 0.04% trail: PF=0.662, ROI=-0.071%/day. PF delta=-0.418. Both PF<1 and negative ROI. Capital decision BLOCKED pending bug fix and re-validation. | R-04 2026-05-01: Trail bug fixed in Pine (Donchian_Trend_Fixed.pine). OOS re-run: PF=7.175 Sharpe=12.91 DD=2.85% ROI/day=0.894% n=184. GATE 1 PASS. Shortlisted for tiny-capital promotion after 30-day paper window.",
+      "label": "R01_RETIRED",
+      "notes": "Realistic: ROI=3.26%, Sharpe=0.41, PF=1.08, MDD=-5.77%, OOS_ROI=4.65%, OOS_PF=1.49, 586 trades, $500 fixed, 0.1% slippage, 30% OOS | symbols expanded to wildcard 2026-04-13 | garima-symbols: ['ETHUSDT', 'SUIUSDT', 'LDOUSDT', 'LINKUSDT'] | Symbol locked to ETHUSDT per G-01 governance enforcement 2026-04-18. | R-03 2026-04-29: TRAIL BUG CONFIRMED \u2014 tv_first_35_Donchian_Trend.pine uses trail_pct/100 extra division; effective TV trail=0.04% not 4%. TV metrics generated with bug active. Python OOS at TV-matching 0.04% trail: PF=0.662, ROI=-0.071%/day. PF delta=-0.418. Both PF<1 and negative ROI. Capital decision BLOCKED pending bug fix and re-validation. | R-04 2026-05-01: Trail bug fixed in Pine (Donchian_Trend_Fixed.pine). OOS re-run: PF=7.175 Sharpe=12.91 DD=2.85% ROI/day=0.894% n=184. GATE 1 PASS. Shortlisted for tiny-capital promotion after 30-day paper window. | R-01 2026-05-01: TV rerun at corrected 4% trail: PF=0.93 (<1.0, hard fail). Python/TV gap enormous (7.7x). Retired.",
       "approval_class": "paper_only",
-      "class_reason": "paper_only \u2014 R-04 Gate1 PASS (PF=7.175, Sharpe=12.91, DD=2.85%, ROI/day=0.894%, n=184). Pine trail bug fixed 2026-05-01. Monitoring paper before tiny-capital promotion.",
+      "class_reason": "R01_RETIRED 2026-05-01: TV rerun with corrected 4% trail yields PF=0.93 \u2014 below 1.0, hard fail. Large TV/Python gap (PF 7.175 Python vs 0.93 TV). Retired per Garima R-01 decision.",
       "r03_python_oos_pf": 0.662,
       "r03_python_oos_roi_day": -0.071,
       "r03_tv_pf": 1.08,
       "r03_pf_delta": -0.418,
       "r03_trail_bug": "trail_pct/100 extra division \u2014 effective TV trail=0.04% not 4%",
       "r03_flagged_at": "2026-04-29T00:00:00Z",
-      "shortlist_priority": true,
+      "shortlist_priority": false,
       "r04_python_oos_pf": 7.175,
       "r04_python_oos_roi_day": 0.8944,
       "r04_python_oos_sharpe": 12.905,
@@ -66,7 +68,9 @@
       "r04_python_oos_n": 184,
       "r04_gate1_pass": true,
       "r04_validated_at": "2026-05-01T06:00:00Z",
-      "r04_pine_fix": "trail_pct/100 extra division removed; effective trail now 4% as intended"
+      "r04_pine_fix": "trail_pct/100 extra division removed; effective trail now 4% as intended",
+      "r01_tv_rerun_pf": 0.93,
+      "r01_retired_at": "2026-05-01T07:30:00Z"
     },
     {
       "strategy": "G19 Donchian Volume Surge",
@@ -290,20 +294,22 @@
       "strategy": "G83 DeMarker Donchian",
       "exchange": "binance",
       "symbols": [
-        "ETHUSDT",
-        "XRPUSDT"
+        "ETHUSDT"
       ],
       "timeframes": [
         "240"
       ],
       "operator": "garima",
       "approved_at": "2026-04-14T06:32:04Z",
-      "backtest_hash": "manual_approval_g83_demarker_donchian_202604140632",
-      "label": "ALPHA",
-      "notes": "[TV_BACKTEST_ONLY \u2014 infinite compounding artifact, pre-lookahead-fix] DeMarker 0.3 0.7 cross, TV PF 11-18 ETH, CAGR 324-549 pct",
+      "backtest_hash": "p07_oos_g83_demarker_donchian_ETHUSDT_4h_20260501",
+      "label": "P07_NOMINEE",
+      "notes": "[TV_BACKTEST_ONLY \u2014 infinite compounding artifact, pre-lookahead-fix] DeMarker 0.3 0.7 cross, TV PF 11-18 ETH, CAGR 324-549 pct | P-07 2026-05-01: Selected as paper window nominee. OOS PF=1.18, n=217, ETHUSDT 4H. Awaiting TV alert creation (P-09) to start paper window.",
       "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
-      "shortlist_priority": false
+      "class_reason": "P07_NOMINEE 2026-05-01: Python OOS PF=1.18 n=217 on ETHUSDT 4H. Gate 1 candidate. Paper window to start after P-09 TV alerts deployed. Symbol locked to ETHUSDT (XRPUSDT dropped \u2014 OOS data not validated this run).",
+      "shortlist_priority": true,
+      "p07_oos_pf": 1.18,
+      "p07_oos_n": 217,
+      "p07_nominated_at": "2026-05-01T07:30:00Z"
     },
     {
       "strategy": "G86 Klinger Donchian",
@@ -465,19 +471,22 @@
       "strategy": "G88 Vortex Donchian",
       "exchange": "binance",
       "symbols": [
-        "OPUSDT"
+        "XRPUSDT"
       ],
       "timeframes": [
         "240"
       ],
       "operator": "garima",
       "approved_at": "2026-04-16T06:33:23Z",
-      "backtest_hash": "manual_approval_g88_vortex_donchian_202604160633",
-      "label": "paper_only",
-      "notes": "PF=6.11, WR=80.7%, Sharpe=2.64, DSR>0",
+      "backtest_hash": "p07_oos_g88_vortex_donchian_XRPUSDT_4h_20260501",
+      "label": "P07_NOMINEE",
+      "notes": "PF=6.11, WR=80.7%, Sharpe=2.64, DSR>0 | P-07 2026-05-01: Selected as paper window nominee. OOS PF=1.10, n=325, XRPUSDT 4H. Awaiting TV alert creation (P-09) to start paper window.",
       "approval_class": "paper_only",
-      "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
-      "shortlist_priority": false
+      "class_reason": "P07_NOMINEE 2026-05-01: Python OOS PF=1.10 n=325 on XRPUSDT 4H. Gate 1 candidate. Paper window to start after P-09 TV alerts deployed. Symbol locked to XRPUSDT.",
+      "shortlist_priority": true,
+      "p07_oos_pf": 1.1,
+      "p07_oos_n": 325,
+      "p07_nominated_at": "2026-05-01T07:30:00Z"
     },
     {
       "strategy": "G89 Coppock Donchian",
@@ -617,6 +626,27 @@
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
       "shortlist_priority": false
+    },
+    {
+      "strategy": "G111 Supertrend Donchian",
+      "exchange": "binance",
+      "symbols": [
+        "SUIUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-05-01T07:30:00Z",
+      "backtest_hash": "p07_oos_g111_supertrend_donchian_SUIUSDT_4h_20260501",
+      "label": "P07_NOMINEE",
+      "notes": "P-07 2026-05-01: Python OOS PF=1.55, n=75, SUIUSDT 4H. Supertrend signal + Donchian channel filter. Selected as P-07 paper window nominee. Awaiting TV alert creation (P-09) to start paper window.",
+      "approval_class": "paper_only",
+      "class_reason": "P07_NOMINEE 2026-05-01: Python OOS PF=1.55 n=75 on SUIUSDT 4H. Gate 1 candidate. Paper window to start after P-09 TV alerts deployed.",
+      "shortlist_priority": true,
+      "p07_oos_pf": 1.55,
+      "p07_oos_n": 75,
+      "p07_nominated_at": "2026-05-01T07:30:00Z"
     }
   ]
 }
