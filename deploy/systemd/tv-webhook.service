@@ -1,14 +1,18 @@
 [Unit]
-Description=Gunicorn instance to serve TradingView Webhook
+Description=TradingView Webhook Bot — Gunicorn Webhook Server
 After=network.target
 
 [Service]
+Type=simple
 User=ubuntu
-Group=www-data
 WorkingDirectory=/home/ubuntu/tradingview_webhook_bot
-Environment="PATH=/home/ubuntu/tradingview_webhook_bot/venv/bin"
 EnvironmentFile=/etc/tradingbot/env_vars
-ExecStart=/home/ubuntu/tradingview_webhook_bot/venv/bin/gunicorn --workers 2 --threads 2 --worker-class gthread --timeout 60 --max-requests 1000 --max-requests-jitter 50 --bind unix:app.sock -m 007 wsgi:app
+ExecStartPre=-/usr/bin/pkill -f "gunicorn.*wsgi:app"
+ExecStart=/home/ubuntu/tradingview_webhook_bot/venv/bin/gunicorn --workers 4 --threads 4 --worker-class gthread --timeout 60 --max-requests 1000 --max-requests-jitter 50 --bind 127.0.0.1:5000 wsgi:app
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/ubuntu/tradingview_webhook_bot/logs/webhook.log
+StandardError=append:/home/ubuntu/tradingview_webhook_bot/logs/webhook.log
 
 [Install]
 WantedBy=multi-user.target
