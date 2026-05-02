@@ -1,6 +1,6 @@
 {
-  "version": 22,
-  "updated_at": "2026-05-01T09:40:00Z",
+  "version": 23,
+  "updated_at": "2026-05-02T04:56:51Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -303,13 +303,21 @@
       "approved_at": "2026-04-14T06:32:04Z",
       "backtest_hash": "p07_oos_g83_demarker_donchian_ETHUSDT_4h_20260501",
       "label": "P07_NOMINEE",
-      "notes": "[TV_BACKTEST_ONLY \u2014 infinite compounding artifact, pre-lookahead-fix] DeMarker 0.3 0.7 cross, TV PF 11-18 ETH, CAGR 324-549 pct | P-07 2026-05-01: Selected as paper window nominee. OOS PF=1.18, n=217, ETHUSDT 4H. Awaiting TV alert creation (P-09) to start paper window.",
+      "notes": "[TV_BACKTEST_ONLY \u2014 infinite compounding artifact, pre-lookahead-fix] DeMarker 0.3 0.7 cross, TV PF 11-18 ETH, CAGR 324-549 pct | P-07 2026-05-01: Selected as paper window nominee. OOS PF=1.18, n=217, ETHUSDT 4H. Awaiting TV alert creation (P-09) to start paper window. | P-W 2026-05-02: Paper window set to 20 days (reduced from 30d). Min gate: 7 signals in 20d. Status: PENDING_TV_ALERT (P-09). Target review: ~2026-05-22.",
       "approval_class": "paper_only",
       "class_reason": "P07_NOMINEE 2026-05-01: Python OOS PF=1.18 n=217 on ETHUSDT 4H. Gate 1 candidate. Paper window to start after P-09 TV alerts deployed. Symbol locked to ETHUSDT (XRPUSDT dropped \u2014 OOS data not validated this run).",
       "shortlist_priority": true,
       "p07_oos_pf": 1.18,
       "p07_oos_n": 217,
-      "p07_nominated_at": "2026-05-01T07:30:00Z"
+      "p07_nominated_at": "2026-05-01T07:30:00Z",
+      "paper_window_days": 20,
+      "paper_window_min_signals": 7,
+      "paper_window_total_min": 20,
+      "paper_window_status": "PENDING_TV_ALERT",
+      "paper_window_start": null,
+      "paper_window_target_end": null,
+      "paper_window_set_at": "2026-05-02T04:56:51Z",
+      "paper_window_note": "20-day window approved 2026-05-02. Reduced from 30d: OOS rate=0.397/day => ~7.9 expected signals in 20d. Min gate: 7 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after P-09 TV alert created."
     },
     {
       "strategy": "G86 Klinger Donchian",
@@ -480,13 +488,21 @@
       "approved_at": "2026-04-16T06:33:23Z",
       "backtest_hash": "p07_oos_g88_vortex_donchian_XRPUSDT_4h_20260501",
       "label": "P07_NOMINEE",
-      "notes": "PF=6.11, WR=80.7%, Sharpe=2.64, DSR>0 | P-07 2026-05-01: Selected as paper window nominee. OOS PF=1.10, n=325, XRPUSDT 4H. Awaiting TV alert creation (P-09) to start paper window.",
+      "notes": "PF=6.11, WR=80.7%, Sharpe=2.64, DSR>0 | P-07 2026-05-01: Selected as paper window nominee. OOS PF=1.10, n=325, XRPUSDT 4H. Awaiting TV alert creation (P-09) to start paper window. | P-W 2026-05-02: Paper window set to 20 days (reduced from 30d). Min gate: 10 signals in 20d. Status: PENDING_TV_ALERT (P-09). Target review: ~2026-05-22.",
       "approval_class": "paper_only",
       "class_reason": "P07_NOMINEE 2026-05-01: Python OOS PF=1.10 n=325 on XRPUSDT 4H. Gate 1 candidate. Paper window to start after P-09 TV alerts deployed. Symbol locked to XRPUSDT.",
       "shortlist_priority": true,
       "p07_oos_pf": 1.1,
       "p07_oos_n": 325,
-      "p07_nominated_at": "2026-05-01T07:30:00Z"
+      "p07_nominated_at": "2026-05-01T07:30:00Z",
+      "paper_window_days": 20,
+      "paper_window_min_signals": 10,
+      "paper_window_total_min": 20,
+      "paper_window_status": "PENDING_TV_ALERT",
+      "paper_window_start": null,
+      "paper_window_target_end": null,
+      "paper_window_set_at": "2026-05-02T04:56:51Z",
+      "paper_window_note": "20-day window approved 2026-05-02. Reduced from 30d: OOS rate=0.594/day => ~11.9 expected signals in 20d. Min gate: 10 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after P-09 TV alert created."
     },
     {
       "strategy": "G89 Coppock Donchian",
@@ -640,7 +656,7 @@
       "approved_at": "2026-05-01T07:30:00Z",
       "backtest_hash": "p07_oos_g111_supertrend_donchian_LINKUSDT_4h_20260501",
       "label": "P07_NOMINEE",
-      "notes": "P-07 2026-05-01: Python OOS PF=1.55, n=75, SUIUSDT 4H. Supertrend signal + Donchian channel filter. Selected as P-07 paper window nominee. Awaiting TV alert creation (P-09) to start paper window. | P-10 2026-05-01: Asset switched SUIUSDT\u2192LINKUSDT per Sainath decision. SUI rejected (75 OOS trades < 100 gate). LINK: PF=1.40, n=151, meets gate.",
+      "notes": "P-07 2026-05-01: Python OOS PF=1.55, n=75, SUIUSDT 4H. Supertrend signal + Donchian channel filter. Selected as P-07 paper window nominee. Awaiting TV alert creation (P-09) to start paper window. | P-10 2026-05-01: Asset switched SUIUSDT\u2192LINKUSDT per Sainath decision. SUI rejected (75 OOS trades < 100 gate). LINK: PF=1.40, n=151, meets gate. | P-W 2026-05-02: Paper window set to 20 days (reduced from 30d). Min gate: 5 signals in 20d. Status: PENDING_TV_ALERT (P-09). Target review: ~2026-05-22.",
       "approval_class": "paper_only",
       "class_reason": "P07_NOMINEE 2026-05-01: Python OOS PF=1.40 n=151 on LINKUSDT 4H. SUIUSDT (PF=1.55 n=75) rejected \u2014 sub-100 OOS trades violates packet gate. LINKUSDT meets gate (n=151 \u2265100). Paper window to start after P-09 TV alert.",
       "shortlist_priority": true,
@@ -651,7 +667,15 @@
       "p10_sui_rejected_reason": "OOS trades=75 < packet gate of \u2265100",
       "p10_link_oos_pf": 1.4,
       "p10_link_oos_n": 151,
-      "p10_decided_at": "2026-05-01T09:40:00Z"
+      "p10_decided_at": "2026-05-01T09:40:00Z",
+      "paper_window_days": 20,
+      "paper_window_min_signals": 5,
+      "paper_window_total_min": 20,
+      "paper_window_status": "PENDING_TV_ALERT",
+      "paper_window_start": null,
+      "paper_window_target_end": null,
+      "paper_window_set_at": "2026-05-02T04:56:51Z",
+      "paper_window_note": "20-day window approved 2026-05-02. Reduced from 30d: OOS rate=0.276/day => ~5.5 expected signals in 20d. Min gate: 5 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after P-09 TV alert created."
     }
   ]
 }
