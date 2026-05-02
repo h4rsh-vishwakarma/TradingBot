@@ -1,4 +1,4 @@
-// v1 2026-05-02
+// v2 2026-05-02
 //@version=5
 strategy("G111 Supertrend + Donchian — 4H Webhook [BOT]",
      overlay=true,
@@ -33,15 +33,18 @@ don_mid  = (don_high + don_low) / 2
 long_cond = flip_bull and close > don_mid
 exit_cond = flip_bear or (in_uptrend[1] and st_dir == 1)
 
-// ─── STRATEGY ─────────────────────────────────────────────────────────────────
+// ─── STRATEGY + ALERTS ────────────────────────────────────────────────────────
+// TV alert condition: "Any alert() function call"
 if long_cond and strategy.position_size == 0
     strategy.entry("Long", strategy.long)
     strategy.exit("Long_Exit", "Long",
          loss   = strategy.position_avg_price * sl_pct / syminfo.mintick,
          profit = strategy.position_avg_price * tp_pct / syminfo.mintick)
+    alert('{"symbol":"' + symbol_id + '","action":"buy","strategy":"G111_Supertrend_Donchian","timeframe":"4h","price":"' + str.tostring(close) + '","sl_pct":1.5,"tp_pct":12.0,"secret":"squeeze_tradingview_cluster_2026_secure"}', alert.freq_once_per_bar_close)
 
 if exit_cond and strategy.position_size > 0
     strategy.close("Long")
+    alert('{"symbol":"' + symbol_id + '","action":"sell","strategy":"G111_Supertrend_Donchian","timeframe":"4h","price":"' + str.tostring(close) + '","sl_pct":1.5,"tp_pct":12.0,"secret":"squeeze_tradingview_cluster_2026_secure"}', alert.freq_once_per_bar_close)
 
 // ─── VISUALS ──────────────────────────────────────────────────────────────────
 plot(don_high, "Don High", color.new(color.blue,   60))
@@ -50,7 +53,3 @@ plot(don_mid,  "Don Mid",  color.new(color.purple,  60), style=plot.style_circle
 plot(st_line,  "Supertrend", in_uptrend ? color.new(color.green, 20) : color.new(color.red, 20), linewidth=2)
 plotshape(long_cond, "LONG", shape.triangleup,   location.belowbar, color.lime, size=size.small)
 plotshape(exit_cond and strategy.position_size > 0, "EXIT", shape.triangledown, location.abovebar, color.red, size=size.small)
-
-// ─── ALERTS ───────────────────────────────────────────────────────────────────
-alertcondition(long_cond, "G111 LONG 4H", '{"symbol":"{{ticker}}","action":"buy","strategy":"G111_Supertrend_Donchian","timeframe":"4h","price":"{{close}}","sl_pct":1.5,"tp_pct":12.0,"secret":"squeeze_tradingview_cluster_2026_secure"}')
-alertcondition(exit_cond, "G111 EXIT 4H", '{"symbol":"{{ticker}}","action":"sell","strategy":"G111_Supertrend_Donchian","timeframe":"4h","price":"{{close}}","sl_pct":1.5,"tp_pct":12.0,"secret":"squeeze_tradingview_cluster_2026_secure"}')

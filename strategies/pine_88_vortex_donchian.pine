@@ -1,4 +1,4 @@
-// v1 2026-05-02
+// v2 2026-05-02
 //@version=5
 strategy("G88 Vortex + Donchian — 4H Webhook [BOT]",
      overlay=true,
@@ -45,15 +45,18 @@ vrd = vcd or vcd[1] or vcd[2]
 long_cond  = vru and close > don_high[1] and close > ema50 and adx_val > adx_min and rsi < 72
 exit_cond  = vi_plus < vi_minus
 
-// ─── STRATEGY ─────────────────────────────────────────────────────────────────
+// ─── STRATEGY + ALERTS ────────────────────────────────────────────────────────
+// TV alert condition: "Any alert() function call"
 if long_cond and strategy.position_size == 0
     strategy.entry("Long", strategy.long)
     strategy.exit("Long_Exit", "Long",
          loss   = strategy.position_avg_price * sl_pct / syminfo.mintick,
          profit = strategy.position_avg_price * tp_pct / syminfo.mintick)
+    alert('{"symbol":"' + symbol_id + '","action":"buy","strategy":"G88_Vortex_Donchian","timeframe":"4h","price":"' + str.tostring(close) + '","sl_pct":1.5,"tp_pct":12.0,"secret":"squeeze_tradingview_cluster_2026_secure"}', alert.freq_once_per_bar_close)
 
 if exit_cond and strategy.position_size > 0
     strategy.close("Long")
+    alert('{"symbol":"' + symbol_id + '","action":"sell","strategy":"G88_Vortex_Donchian","timeframe":"4h","price":"' + str.tostring(close) + '","sl_pct":1.5,"tp_pct":12.0,"secret":"squeeze_tradingview_cluster_2026_secure"}', alert.freq_once_per_bar_close)
 
 // ─── VISUALS ──────────────────────────────────────────────────────────────────
 plot(don_high, "Don High", color.new(color.blue,  60))
@@ -61,7 +64,3 @@ plot(don_low,  "Don Low",  color.new(color.blue,  60))
 plot(ema50,    "EMA50",    color.new(color.orange, 40))
 plotshape(long_cond, "LONG", shape.triangleup,   location.belowbar, color.lime, size=size.small)
 plotshape(exit_cond and strategy.position_size > 0, "EXIT", shape.triangledown, location.abovebar, color.red, size=size.small)
-
-// ─── ALERTS ───────────────────────────────────────────────────────────────────
-alertcondition(long_cond, "G88 LONG 4H", '{"symbol":"{{ticker}}","action":"buy","strategy":"G88_Vortex_Donchian","timeframe":"4h","price":"{{close}}","sl_pct":1.5,"tp_pct":12.0,"secret":"squeeze_tradingview_cluster_2026_secure"}')
-alertcondition(exit_cond, "G88 EXIT 4H", '{"symbol":"{{ticker}}","action":"sell","strategy":"G88_Vortex_Donchian","timeframe":"4h","price":"{{close}}","sl_pct":1.5,"tp_pct":12.0,"secret":"squeeze_tradingview_cluster_2026_secure"}')
