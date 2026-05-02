@@ -1,0 +1,84 @@
+{
+  "recorded_at": "2026-05-02T05:31:42.566230+00:00",
+  "tracked_count": 11,
+  "tracked_entries": [
+    {
+      "label": "webhook_server",
+      "path": "/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/core/webhook_server.py",
+      "exists": true,
+      "sha256": "176b1eeca9aae5b1562eb5d78dea90200e558893f0e1ed346c281ea634e1760b",
+      "size": 37546
+    },
+    {
+      "label": "orchestrator",
+      "path": "/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/core/orchestrator.py",
+      "exists": true,
+      "sha256": "728f622cdec2540ff6c80eee89986b41d1b07d54f2e9098dcc1edd90219488aa",
+      "size": 79740
+    },
+    {
+      "label": "position_manager",
+      "path": "/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/core/position_manager.py",
+      "exists": true,
+      "sha256": "a992e2b34519ea31797d6aa67fd8d0f638fc74afe3bda3dd0c31c0aab21de842",
+      "size": 9739
+    },
+    {
+      "label": "risk_manager",
+      "path": "/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/core/risk_manager.py",
+      "exists": true,
+      "sha256": "66216f9ae9f94d5bb30ba82b7803746fd8c916e80b096648b098c81ae784229a",
+      "size": 10157
+    },
+    {
+      "label": "execution_engine",
+      "path": "/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/exchange/execution_engine.py",
+      "exists": true,
+      "sha256": "b07eb10ba005fe9546aa3f69f90214fbfe9a6ac46991cdac0dabae4c7bd648fb",
+      "size": 11549
+    },
+    {
+      "label": "reconciler",
+      "path": "/home/ubuntu/tradingview_webhook_bot/tradingview_webhook_bot/recon/reconciler.py",
+      "exists": true,
+      "sha256": "03c617ee24e960bfb1a4a19f4450808542e6a4376931431de3c9e54335ff422d",
+      "size": 5977
+    },
+    {
+      "label": "approval_manifest",
+      "path": "/home/ubuntu/tradingview_webhook_bot/config/approved_strategies.json",
+      "exists": true,
+      "sha256": "cbe2728d3cd7ae19ac78e6848edaef63d396dd71bf596098d911ae28ffb070e1",
+      "size": 28560
+    },
+    {
+      "label": "env_vars",
+      "path": "/etc/tradingbot/env_vars",
+      "exists": true,
+      "sha256": "75f1c1699f45c5481106ee3859c62a8a30a25f66d1576493bdae98d1f9249cad",
+      "size": 4441
+    },
+    {
+      "label": "webhook_service",
+      "path": "/etc/systemd/system/tradingbot-webhook.service",
+      "exists": true,
+      "sha256": "438a2f55071270d8a45c990f76ded39dc92e082ce95e035a05b3d20bb4e82418",
+      "size": 694
+    },
+    {
+      "label": "orchestrator_service",
+      "path": "/etc/systemd/system/tradingbot-orchestrator.service",
+      "exists": true,
+      "sha256": "f741bdd1f290fc7e26099caa838e7cb68857b13e93487815a71c2076ec7c5ef8",
+      "size": 611
+    },
+    {
+      "label": "telegram_service",
+      "path": "/etc/systemd/system/tradingbot-telegram.service",
+      "exists": true,
+      "sha256": "b3f2ad98ad5ca91c0f633db87179339f89fb4fd97dc30fb7b51a1c31396f2f3d",
+      "size": 623
+    }
+  ],
+  "refresh_reason": "Baseline refreshed 2026-05-02: two authorized changes since last baseline. (1) webhook_server.py: commit 34692b8 P-01 deny-list added \u2014 authorized CEO audit fix. (2) approval_manifest: manifest v23 \u2014 20-day paper window gates set. Both changes are committed, reviewed, and governance-authorized. No unauthorized modifications detected."
+}
