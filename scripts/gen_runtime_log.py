@@ -4,6 +4,9 @@ import subprocess, json, sqlite3, os
 from datetime import datetime, timezone, timedelta
 
 os.chdir('/home/ubuntu/tradingview_webhook_bot')
+import sys
+if '/home/ubuntu/tradingview_webhook_bot' not in sys.path:
+    sys.path.insert(0, '/home/ubuntu/tradingview_webhook_bot')
 
 now = datetime.now(timezone.utc)
 today = now.strftime('%Y-%m-%d')

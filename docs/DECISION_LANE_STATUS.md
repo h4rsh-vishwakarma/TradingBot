@@ -39,14 +39,17 @@ Gate 1 (Python OOS) → Gate 2 (30-day paper window) → Gate 3 (Sainath sign-of
 
 ---
 
-## Gate Verdict (live as of 2026-05-01)
+## Gate Verdict (live as of 2026-05-02 18:45 IST)
 
 ```
-VERDICT: NO-GO  (4 of 31 gates FAILED)
+VERDICT: NO-GO  (7 of 32 gates FAILED)
+[FAIL] CI has no '|| true' bypass -- Found || true in ci.yml
+[FAIL] Manifest entries have provenance (hash + notes) -- Missing provenance fields
 [FAIL] Manifest scope is explicit and limited -- 0 candidate_for_tiny_capital; 31 paper_only
-[FAIL] Candidate paper-lane inventory verified -- No candidate_for_tiny_capital rows in inventory
-[FAIL] Approved-lane signals fired during paper window -- 0 decision-lane signals recorded
-[FAIL] Decision-lane ETHUSDT signal active (<72h) -- No decision-lane signal ever recorded
+[FAIL] Candidate paper-lane inventory verified -- No candidate_for_tiny_capital rows found in inventory report
+[FAIL] Execution-plane freeze intact -- execution diff = unknown; tracked=0; age=7.6h
+[FAIL] Approved-lane signals fired during paper window -- 0 approved-lane signal(s) recorded since 2026-04-07
+[FAIL] Decision-lane ETHUSDT signal active (<72h) -- No ETHUSDT decision-lane signal ever recorded in execution_metrics
 ```
 
 All 4 remaining FAIL gates are structural. They clear only when P-07 nominees complete the full

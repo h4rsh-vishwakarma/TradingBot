@@ -264,7 +264,7 @@ def run_scan():
         send_alert(_build_message("HOURLY HEARTBEAT ALERT", "Attention needed", checklist_lines, issues))
     else:
         send_alert(_build_message("HOURLY LIVE CONFIRMATION", "Bot is live and healthy", checklist_lines, []))
-        logger.info("All systems nominal. Hourly checklist sent.")
+        logger.info("Infrastructure nominal (services up, DLQ clean). Full governance verdict in hourly_heartbeat_report. Hourly checklist sent.")
 
 
 if __name__ == "__main__":

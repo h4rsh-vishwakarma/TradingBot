@@ -26,9 +26,10 @@ paper-window evidence on the production exchange.
 | Commission | 0.04% taker (Binance Futures) |
 | Out-of-sample split | 30% held out (time-ordered, no leakage) |
 | Minimum total trades (full period) | 100 |
-| Minimum OOS trades | 30 |
+| Minimum OOS trades | 50 |
 | OOS Sharpe | ≥ 0.5 |
 | OOS Profit Factor | ≥ 1.05 |
+| IS/OOS Profit Factor ratio | ≤ 4× (OOS PF must be ≥ 25% of IS PF) |
 | Max drawdown (full period) | ≤ 25% |
 | Lookahead bias | Must be explicitly verified absent |
 | Backtest hash | Required in manifest  field |

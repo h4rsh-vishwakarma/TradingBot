@@ -611,6 +611,40 @@ def decision_lane_recency_check(candidates, warn_after_hours: float = 72.0):
     return age_h <= warn_after_hours, detail
 
 
+
+def is_oos_ratio_gate(approvals: list[dict]) -> tuple[bool, str]:
+    """Gate: IS/OOS Profit Factor ratio must be ≤ 4× for non-retired/non-withdrawn strategies.
+    Prevents overfitting candidates from reaching paper window nomination.
+    Retroactive evidence: G83 (12.3×), G88 (78.6×), G111 (8.4×) — all failed this check.
+    Populate field p07_is_oos_pf_ratio in manifest entry before any shortlist nomination.
+    """
+    violations = []
+    no_data = []
+    for a in approvals:
+        label = str(a.get("label", "")).upper()
+        if any(s in label for s in ("RETIRED", "WITHDRAWN", "PERSONAL")):
+            continue
+        if a.get("approval_class") not in ("paper_only", "candidate_for_tiny_capital"):
+            continue
+        if not a.get("shortlist_priority") and a.get("approval_class") == "paper_only":
+            continue
+        ratio = a.get("p07_is_oos_pf_ratio") or a.get("is_oos_pf_ratio")
+        if ratio is None:
+            no_data.append(str(a.get("strategy", "?")))
+            continue
+        try:
+            ratio = float(ratio)
+        except (ValueError, TypeError):
+            continue
+        if ratio > 4.0:
+            violations.append(f"{a.get('strategy','?')}: {ratio:.1f}x")
+
+    if violations:
+        return False, f"IS/OOS PF ratio >4x — overfitting detected: {'; '.join(violations)}"
+    if no_data:
+        return True, f"Pass — {len(no_data)} shortlisted strateg(ies) lack p07_is_oos_pf_ratio field (add before nomination): {', '.join(no_data)}"
+    return True, "All shortlisted strategies pass ≤4x IS/OOS ratio check"
+
 def main() -> int:
     load_env_file()
 
@@ -732,6 +766,9 @@ def main() -> int:
 
     conc_ok, conc_detail = family_concentration_gate(candidates)
     check("Candidate family/symbol concentration within limits", conc_ok, conc_detail)
+    # IS/OOS overfitting gate — retroactive evidence: G83/G88/G111 all failed (8–79x ratio)
+    oos_ratio_ok, oos_ratio_detail = is_oos_ratio_gate(approvals)
+    check("IS/OOS PF ratio <= 4x (overfitting gate)", oos_ratio_ok, oos_ratio_detail)
 
     _decision_lane_names = {"CCI Trend", "Donchian Trend", "CCI_Trend", "Donchian_Trend"}
     blocked_raw = os.getenv("BLOCKED_STRATEGY_NAMES", "")

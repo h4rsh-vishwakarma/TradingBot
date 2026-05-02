@@ -1,6 +1,6 @@
-# Runtime Log — 2026-05-01
+# Runtime Log — 2026-05-02
 
-> Auto-generated — last updated `2026-05-01T05:10:02Z`
+> Auto-generated — last updated `2026-05-02T13:15:00Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,15 +8,15 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (4 of 31 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (7 of 32 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-05-01T05:10:02Z |
+| Last run | 2026-05-02T13:15:00Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
-| Version | v19 |
-| Updated | 2026-04-29T00:00:00Z |
+| Version | v24 |
+| Updated | 2026-05-02T11:38:00Z |
 | Total candidates | 0 |
 | ALPHA (live-ready) | 0 |
 | RESEARCH (no Pine yet) | 0 |
@@ -41,16 +41,16 @@
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 6 |
-| Completed | 6 |
-| Last signal | 2026-05-01 03:19 UTC |
-| Last strategy | G27 CCI Donchian Wide / MAGICUSDT |
+| Signals received | 4 |
+| Completed | 4 |
+| Last signal | 2026-05-02 08:00 UTC |
+| Last strategy | G94 Pivot Point Reclaim / SUIUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260501_0505 |
+| Last heartbeat file | heartbeat_20260502_1305 |
 | Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
@@ -79,8 +79,23 @@ _No outstanding operational issues._
 | Dashboard | https://tradingbot.operatorbrief.xyz/ | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
-## Commits Today (2026-05-01)
+## Commits Today (2026-05-02)
 ```
+e0e0511 | 2026-05-02 11:43:58 +0530 | feat: add G83/G111 IS/OOS backtest — DeMarker + Supertrend signal functions
+7cba581 | 2026-05-02 11:16:13 +0530 | fix: P-02/P-03/P-04 — Pine scripts v3: $500 notional, 0.15% commission, secret placeholder, add G83
+da343b9 | 2026-05-02 05:32:05 +0000 | fix: refresh execution freeze baseline — P-01 deny-list + manifest v23 authorized
+8fedea3 | 2026-05-02 10:35:36 +0530 | fix: pine G83/G88/G111 v2 — replace alertcondition() with alert() for strategy() scripts
+66bf53d | 2026-05-02 04:57:04 +0000 | fix: manifest v23 — 20-day paper window for G83/G88/G111 with min signal gates
+7138ef4 | 2026-05-02 10:14:34 +0530 | fix: T-02/T-03/T-04/T-07 — pine G88/G111, freeze flag, backtest results
+4ec86ef | 2026-05-01 15:34:13 +0530 | chore: add download_futures_5y.py — replace spot OHLCV with Binance Futures data
+0fa6abd | 2026-05-01 15:16:24 +0530 | fix: P-10 — manifest v22: G111 asset SUIUSDT→LINKUSDT; P-09 authorized
+8365a42 | 2026-05-01 15:07:46 +0530 | fix: P-11/P-12/P-13 — deny-list production test, P07 heartbeat section, deploy archive
+7836695 | 2026-05-01 11:48:56 +0530 | fix: P-08 — manifest v21: retire CCI/Donchian (R01), add G83/G88/G111 P07 nominees
+34692b8 | 2026-05-01 06:02:59 +0000 | fix: P-01/P-02/P-05 — CEO audit response batch 1
+6aacfbb | 2026-05-01 05:44:50 +0000 | docs: G-series CEO audit responses — G-01 quarantine, G-04 confirmed, G-05 key fix pending
+4bceefc | 2026-05-01 05:28:05 +0000 | docs: H-06 — stale position quarantine sign-off evidence bundle for Sainath
+89cd660 | 2026-05-01 05:20:17 +0000 | chore: add R-04 backtest scripts, results, and docs refresh 2026-05-01
+f63ee6b | 2026-05-01 05:19:13 +0000 | fix: H-03 — R-04 Pine trail bug fixed; CCI Trend + Donchian Trend re-validated Gate1 PASS
 6dc96dc | 2026-05-01 05:08:04 +0000 | fix: H-01/H-02 — remove stale service file ref, update gate verdict to 4/31
 615d406 | 2026-05-01 04:52:06 +0000 | fix: T-D — align tv-webhook.service with live systemd config
 5c4139b | 2026-05-01 04:48:57 +0000 | fix: T-B — update integration tests and webhook_server to use APPROVAL_MANIFEST_PATH env var

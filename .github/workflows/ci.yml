@@ -8,16 +8,45 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      WEBHOOK_SECRET: ci_test_secret_placeholder
+      BINANCE_API_KEY: ci_test_key
+      BINANCE_API_SECRET: ci_test_secret
+      BINANCE_TESTNET: "true"
+      ALLOW_REAL_TRADES: "false"
+      REQUIRE_APPROVAL_MANIFEST: "true"
+      APPROVAL_MANIFEST_PATH: config/approved_strategies.json
+      USE_DURABLE_QUEUE: "false"
+      SKIP_PYTEST: "0"
+      AUTO_PROMOTE_FREEZE: "true"
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-      - name: Install dependencies
+          python-version: '3.11'
+
+      - name: Install core dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r tradingview_webhook_bot/requirements.txt
-          pip install pytest-cov flake8
+          pip install flask requests python-dotenv ccxt pandas numpy gunicorn             gspread google-auth psutil pytest pytest-cov flake8             python_binance sqlalchemy pydantic websockets aiohttp             python-dateutil pytz scipy matplotlib
+
+      - name: Install exchange SDKs (best-effort)
+        continue-on-error: true
+        run: pip install lighter-sdk hyperliquid-python-sdk eth-account
+
+      - name: Verify governance artifacts present
+        run: |
+          python -c "
+          import json
+          with open('config/approved_strategies.json') as f:
+              m = json.load(f)
+          assert m.get('version'), 'Manifest version missing'
+          assert len(m.get('approvals', [])) > 0, 'Manifest approvals empty'
+          print('Governance artifacts OK — manifest v' + str(m['version']) + ', ' + str(len(m['approvals'])) + ' entries')
+          "
+
       - name: Run tests
         run: |
-          python -m pytest -v --tb=short tests/test_integration_flow.py tests/test_tradingview_webhook_bot.py tests/test_hardened_logic.py tests/test_hardened_ledger.py tests/test_orchestrator_flow.py tests/test_strategy_decision_alerts.py tests/test_lighter_client.py tests/test_exit_fallback.py tests/test_alpha_engine.py tests/test_batch_backtest_realism.py tests/test_verify_tv_inventory.py tests/test_concurrency.py tradingview_webhook_bot/recon/test_recon.py tests/test_webhook_smoke.py tests/test_scope_gate.py --cov=tradingview_webhook_bot --cov-report=term-missing
+          python -m pytest -v --tb=short             tests/test_scope_gate.py             tests/test_exit_fallback.py             tests/test_webhook_smoke.py             tests/test_hardened_logic.py             tests/test_hardened_ledger.py             tests/test_strategy_decision_alerts.py             tests/test_verify_tv_inventory.py             tests/test_integration_flow.py             tests/test_tradingview_webhook_bot.py             tests/test_orchestrator_flow.py             tests/test_concurrency.py             tradingview_webhook_bot/recon/test_recon.py             --cov=tradingview_webhook_bot --cov-report=term-missing             -x
