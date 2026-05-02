@@ -1,4 +1,6 @@
 {
+  "AUTO_PROMOTE_FREEZE": true,
+  "FREEZE_SET_DATE": "2026-04-29",
   "strategy_name": "multi_strategy",
   "virtual_balance": 1000.0,
   "logging": {

@@ -50,7 +50,10 @@ def download_futures_5y(symbol: str) -> None:
         out.rename(backup)
 
     header = "timestamp,open,high,low,close,volume"
-    lines = [header] + [f"{r[0]},{r[1]},{r[2]},{r[3]},{r[4]},{r[5]}" for r in rows]
+    lines = [header]
+    for r in rows:
+        ts = datetime.datetime.utcfromtimestamp(int(r[0]) / 1000).strftime("%Y-%m-%d %H:%M:%S+00:00")
+        lines.append(f"{ts},{r[1]},{r[2]},{r[3]},{r[4]},{r[5]}")
     out.write_text("\n".join(lines))
 
     first_dt = datetime.datetime.utcfromtimestamp(int(rows[0][0]) / 1000).strftime("%Y-%m-%d")
