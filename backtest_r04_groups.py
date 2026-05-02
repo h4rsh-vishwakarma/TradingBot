@@ -132,6 +132,27 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     rc = roc11 + roc14
     weights = np.arange(1, 11)
     df["coppock"] = rc.rolling(10).apply(lambda x: np.dot(x, weights) / weights.sum(), raw=True)
+    # DeMarker 14-period (EMA of dem_max / (dem_max + dem_min))
+    dem_max = h.diff().clip(lower=0)
+    dem_min = (-l.diff()).clip(lower=0)
+    dema_p  = dem_max.ewm(span=14, adjust=False).mean()
+    dema_m  = dem_min.ewm(span=14, adjust=False).mean()
+    df["demarker14"] = dema_p / (dema_p + dema_m + 1e-9)
+    # Supertrend ATR-10 Factor-3.0 (Wilder RMA, iterative)
+    atr10  = tr.ewm(alpha=1/10, adjust=False).mean()
+    hl2    = (h + l) / 2
+    bu_raw = (hl2 + 3.0 * atr10).values
+    bl_raw = (hl2 - 3.0 * atr10).values
+    c_arr  = c.values
+    n2 = len(df)
+    st_up = np.zeros(n2); st_lo = np.zeros(n2); st_d = np.ones(n2, dtype=int)
+    for i in range(n2):
+        if i == 0:
+            st_up[i] = bu_raw[i]; st_lo[i] = bl_raw[i]; st_d[i] = 1; continue
+        st_up[i] = bu_raw[i] if (bu_raw[i] < st_up[i-1] or c_arr[i-1] > st_up[i-1]) else st_up[i-1]
+        st_lo[i] = bl_raw[i] if (bl_raw[i] > st_lo[i-1] or c_arr[i-1] < st_lo[i-1]) else st_lo[i-1]
+        st_d[i]  = (-1 if c_arr[i] > st_up[i] else 1) if st_d[i-1] == 1 else (1 if c_arr[i] < st_lo[i] else -1)
+    df["st10_3_dir"] = pd.Series(st_d, index=df.index)
     return df
 
 
@@ -461,6 +482,30 @@ def sig_g100(df):
     return le, se, 0.015, 0.12, 0.04, lx, sx
 
 
+def sig_g83(df):
+    c       = df["close"]
+    dem     = df["demarker14"]
+    don_mid = (df["don20_hi"] + df["don20_lo"]) / 2
+    dem_xo  = (dem > 0.3) & (dem.shift(1) <= 0.3)   # crossover oversold line
+    dem_xu  = (dem < 0.7) & (dem.shift(1) >= 0.7)   # crossunder overbought line
+    no_sig  = pd.Series(False, index=df.index)
+    le = dem_xo & (c > don_mid)
+    lx = dem_xu & (c < don_mid)
+    return le, no_sig, 0.02, 0.06, 0.015, lx, no_sig
+
+
+def sig_g111(df):
+    c       = df["close"]
+    st_dir  = df["st10_3_dir"]               # -1 = bullish, 1 = bearish (Pine V5 convention)
+    don_mid = (df["don20_hi"] + df["don20_lo"]) / 2
+    flip_bull = (st_dir == -1) & (st_dir.shift(1) == 1)
+    flip_bear = (st_dir == 1)  & (st_dir.shift(1) == -1)
+    no_sig  = pd.Series(False, index=df.index)
+    le = flip_bull & (c > don_mid)
+    lx = flip_bear
+    return le, no_sig, 0.015, 0.12, 0.04, lx, no_sig
+
+
 TV_PF = {
     "G15 Aroon Donchian Breakout":   15.29,
     "G19 Donchian Volume Surge":     18.97,
@@ -477,6 +522,8 @@ TV_PF = {
     "G95 Inside Bar Breakout":       13.00,
     "G99 Chande Momentum BB":        13.00,
     "G100 HigherHigh Structure":      8.71,
+    "G83 DeMarker Donchian":         18.62,
+    "G111 Supertrend Donchian":      10.07,
 }
 
 REGISTRY = {
@@ -495,6 +542,8 @@ REGISTRY = {
     "G95 Inside Bar Breakout":      (sig_g95,  "ETHUSDT"),
     "G99 Chande Momentum BB":       (sig_g99,  "ETHUSDT"),
     "G100 HigherHigh Structure":    (sig_g100, "SUIUSDT"),
+    "G83 DeMarker Donchian":        (sig_g83,  "ETHUSDT"),
+    "G111 Supertrend Donchian":     (sig_g111, "LINKUSDT"),
 }
 
 GROUP_B = {"G15","G19","G27","G28","G45","G68"}
