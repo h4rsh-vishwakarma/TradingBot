@@ -1,0 +1,51 @@
+// v3 2026-05-02  P-02: fixed $500 notional + 0.15% commission; P-03: secret placeholder
+//@version=5
+strategy("G83 DeMarker + Donchian — 4H Webhook [BOT]",
+     overlay=true,
+     default_qty_type=strategy.cash,
+     default_qty_value=500,
+     initial_capital=10000,
+     commission_type=strategy.commission.percent,
+     commission_value=0.15)
+
+// ─── INPUTS ───────────────────────────────────────────────────────────────────
+dem_len    = input.int(14,  "DeMarker Period")
+dem_ob     = input.float(0.7, "Overbought Level")
+dem_os     = input.float(0.3, "Oversold Level")
+don_len    = input.int(20,  "Donchian Period")
+sl_pct     = input.float(2.0, "Stop Loss %",   step=0.1) / 100
+tp_pct     = input.float(6.0, "Take Profit %", step=0.5) / 100
+symbol_id  = input.string("ETHUSDT", "Symbol for alert payload")
+
+// ─── DEMARKER ─────────────────────────────────────────────────────────────────
+dem_max  = math.max(high - high[1], 0)
+dem_min  = math.max(low[1] - low,   0)
+demarker = ta.ema(dem_max, dem_len) / math.max(ta.ema(dem_max, dem_len) + ta.ema(dem_min, dem_len), 0.001)
+
+// ─── DONCHIAN CHANNEL ─────────────────────────────────────────────────────────
+don_high  = ta.highest(high, don_len)
+don_low   = ta.lowest(low,   don_len)
+don_mid_l = (don_high + don_low) / 2
+
+// ─── SIGNALS ──────────────────────────────────────────────────────────────────
+long_cond  = ta.crossover(demarker, dem_os) and close > don_mid_l
+short_cond = ta.crossunder(demarker, dem_ob) and close < don_mid_l
+
+// ─── STRATEGY ─────────────────────────────────────────────────────────────────
+// TV alert condition: "Any alert() function call"
+if long_cond
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long_Exit", "Long",
+         loss   = strategy.position_avg_price * sl_pct / syminfo.mintick,
+         profit = strategy.position_avg_price * tp_pct / syminfo.mintick)
+    alert('{"symbol":"' + symbol_id + '","action":"buy","strategy":"G83_DeMarker_Donchian","timeframe":"4h","price":"' + str.tostring(close) + '","sl_pct":2.0,"tp_pct":6.0,"secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
+
+if short_cond
+    strategy.close("Long")
+    alert('{"symbol":"' + symbol_id + '","action":"sell","strategy":"G83_DeMarker_Donchian","timeframe":"4h","price":"' + str.tostring(close) + '","sl_pct":2.0,"tp_pct":6.0,"secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
+
+// ─── VISUALS ──────────────────────────────────────────────────────────────────
+plot(don_high, "Don High", color.new(color.blue, 60))
+plot(don_low,  "Don Low",  color.new(color.blue, 60))
+plotshape(long_cond,  "LONG", shape.triangleup,   location.belowbar, color.lime, size=size.small)
+plotshape(short_cond, "EXIT", shape.triangledown,  location.abovebar, color.red,  size=size.small)

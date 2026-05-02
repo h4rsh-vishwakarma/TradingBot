@@ -1,12 +1,12 @@
-// v2 2026-05-02
+// v3 2026-05-02  P-02: fixed $500 notional + 0.15% commission; P-03: secret placeholder
 //@version=5
 strategy("G111 Supertrend + Donchian — 4H Webhook [BOT]",
      overlay=true,
-     default_qty_type=strategy.percent_of_equity,
-     default_qty_value=10,
+     default_qty_type=strategy.cash,
+     default_qty_value=500,
      initial_capital=10000,
      commission_type=strategy.commission.percent,
-     commission_value=0.05)
+     commission_value=0.15)
 
 // ─── INPUTS ───────────────────────────────────────────────────────────────────
 atr_len   = input.int(10,    "Supertrend ATR Period")
@@ -40,11 +40,11 @@ if long_cond and strategy.position_size == 0
     strategy.exit("Long_Exit", "Long",
          loss   = strategy.position_avg_price * sl_pct / syminfo.mintick,
          profit = strategy.position_avg_price * tp_pct / syminfo.mintick)
-    alert('{"symbol":"' + symbol_id + '","action":"buy","strategy":"G111_Supertrend_Donchian","timeframe":"4h","price":"' + str.tostring(close) + '","sl_pct":1.5,"tp_pct":12.0,"secret":"squeeze_tradingview_cluster_2026_secure"}', alert.freq_once_per_bar_close)
+    alert('{"symbol":"' + symbol_id + '","action":"buy","strategy":"G111_Supertrend_Donchian","timeframe":"4h","price":"' + str.tostring(close) + '","sl_pct":1.5,"tp_pct":12.0,"secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
 
 if exit_cond and strategy.position_size > 0
     strategy.close("Long")
-    alert('{"symbol":"' + symbol_id + '","action":"sell","strategy":"G111_Supertrend_Donchian","timeframe":"4h","price":"' + str.tostring(close) + '","sl_pct":1.5,"tp_pct":12.0,"secret":"squeeze_tradingview_cluster_2026_secure"}', alert.freq_once_per_bar_close)
+    alert('{"symbol":"' + symbol_id + '","action":"sell","strategy":"G111_Supertrend_Donchian","timeframe":"4h","price":"' + str.tostring(close) + '","sl_pct":1.5,"tp_pct":12.0,"secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
 
 // ─── VISUALS ──────────────────────────────────────────────────────────────────
 plot(don_high, "Don High", color.new(color.blue,   60))
