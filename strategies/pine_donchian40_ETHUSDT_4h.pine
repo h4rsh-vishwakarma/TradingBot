@@ -1,0 +1,65 @@
+// ═══════════════════════════════════════════════════════════════════
+// Donchian_40_ETHUSDT_4h — Gate 1 OOS PASS 2026-05-04
+// IS/OOS=0.878x  OOS PF=1.7335  OOS n=51
+// Logic mirrors gate1_oos_discovery.py exactly (no lookahead)
+// ═══════════════════════════════════════════════════════════════════
+//@version=5
+strategy("Donchian_40_ETHUSDT_4h — 4H Webhook [BOT]",
+     overlay=true,
+     default_qty_type=strategy.cash,
+     default_qty_value=500,
+     initial_capital=10000,
+     commission_type=strategy.commission.percent,
+     commission_value=0.15)
+
+// ─── INPUTS ───────────────────────────────────────────────────────
+don_len    = input.int(40, "Donchian Period (window)")
+adx_thresh = input.float(20.0, "ADX Threshold")
+symbol_id  = input.string("ETHUSDT", "Symbol for alert payload")
+
+// ─── DONCHIAN CHANNEL (shift(1) = no lookahead, matches Python) ───
+upper      = ta.highest(high, don_len)[1]        // prev 40-bar high
+lower      = ta.lowest(low,   don_len)[1]         // prev 40-bar low
+exit_upper = ta.highest(high, don_len / 2)[1]     // prev 20-bar high
+exit_lower = ta.lowest(low,   don_len / 2)[1]     // prev 20-bar low
+
+// ─── TREND FILTER: EMA200 ─────────────────────────────────────────
+ema200 = ta.ema(close, 200)
+
+// ─── TREND FILTER: ADX(14) ────────────────────────────────────────
+[diplus, diminus, adx] = ta.dmi(14, 14)
+
+trend_up   = close > ema200 and adx > adx_thresh
+trend_down = close < ema200 and adx > adx_thresh
+
+// ─── SIGNALS ──────────────────────────────────────────────────────
+long_entry  = close > upper and trend_up
+short_entry = close < lower and trend_down
+long_exit   = close < exit_lower
+short_exit  = close > exit_upper
+
+// ─── STRATEGY EXECUTION ───────────────────────────────────────────
+if long_entry
+    strategy.entry("Long", strategy.long)
+    alert('{"symbol":"' + symbol_id + '","action":"buy","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
+
+if short_entry
+    strategy.entry("Short", strategy.short)
+    alert('{"symbol":"' + symbol_id + '","action":"sell","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
+
+if long_exit and strategy.position_size > 0 and not short_entry
+    strategy.close("Long")
+    alert('{"symbol":"' + symbol_id + '","action":"close_long","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
+
+if short_exit and strategy.position_size < 0 and not long_entry
+    strategy.close("Short")
+    alert('{"symbol":"' + symbol_id + '","action":"close_short","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
+
+// ─── VISUALS ──────────────────────────────────────────────────────
+plot(upper,       "Don High (40)",   color.new(color.blue,   50))
+plot(lower,       "Don Low (40)",    color.new(color.blue,   50))
+plot(exit_upper,  "Exit High (20)",  color.new(color.orange, 70))
+plot(exit_lower,  "Exit Low (20)",   color.new(color.orange, 70))
+plot(ema200,      "EMA 200",         color.new(color.white,  40))
+plotshape(long_entry,  "LONG",  shape.triangleup,   location.belowbar, color.lime, size=size.small)
+plotshape(short_entry, "SHORT", shape.triangledown, location.abovebar, color.red,  size=size.small)
