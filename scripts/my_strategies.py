@@ -23,7 +23,11 @@ def apply_strategy(df, strategy_id, optimize=True, mult=3.0, length=14):
     strong_trend = adx > 18 # Standardized for 3Y
 
     # --- CATEGORY 1: Trend Following (Supertrend, SMA, Ribbon, EMA) ---
-    if any(k in id_upper for k in ["SUPERTREND", "ATR", "SMA", "EMA", "RIBBON", "CROSS"]):
+    if any(k in id_upper for k in [
+        "SUPERTREND", "ATR", "SMA", "EMA", "RIBBON", "CROSS",
+        "ICHIMOKU", "KELTNER", "PSAR", "PARABOLIC", "DONCHIAN",
+        "TREND", "BREAKOUT", "BARUPDN", "CHANNEL",
+    ]):
         atr = (high - low).rolling(int(length)).mean()
         # Variance based on ID to force unique trades
         adj_mult = mult * 1.1 if "RIBBON" in id_upper else mult
@@ -33,15 +37,24 @@ def apply_strategy(df, strategy_id, optimize=True, mult=3.0, length=14):
         raw_sig = np.where(close > upper.shift(1), 1, np.where(close < lower.shift(1), -1, 0))
         return np.where((raw_sig == 1) & (close > ema_200), 1, np.where((raw_sig == -1) & (close < ema_200), -1, 0)) if optimize else raw_sig
 
-    # --- CATEGORY 2: Mean Reversion / ML (Lorentzian, Squeeze, Reversion) ---
-    elif any(k in id_upper for k in ["SQUEEZE", "REVERSION", "LORENTZIAN", "ML", "MATRIX"]):
+    # --- CATEGORY 2: Mean Reversion / Oscillators ---
+    elif any(k in id_upper for k in [
+        "SQUEEZE", "REVERSION", "LORENTZIAN", "ML", "MATRIX",
+        "RSI", "CCI", "STOCH", "BOLLINGER", "BB", "PERCENT",
+        "MEAN", "REVERT", "OVERSOLD", "OVERBOUGHT",
+    ]):
         basis = close.rolling(int(length)).mean()
         dev = mult * close.rolling(int(length)).std()
         raw_sig = np.where(close < basis - dev, 1, np.where(close > basis + dev, -1, 0))
         return raw_sig
 
-    # --- CATEGORY 3: Volume & Momentum (OBV, WaveTrend, MACD) ---
-    elif any(k in id_upper for k in ["OBV", "WAVETREND", "MACD", "MOMENTUM", "FLOW"]):
+    # --- CATEGORY 3: Volume & Momentum ---
+    elif any(k in id_upper for k in [
+        "OBV", "WAVETREND", "MACD", "MOMENTUM", "FLOW",
+        "VOLUME", "VWAP", "VWMA", "KLINGER", "CMO", "TSI",
+        "FISHER", "ROC", "UO", "AROON", "VORTEX", "DEMARKER",
+        "PIVOT", "INSIDE", "STRUCTURE", "COPPOCK",
+    ]):
         # OBV-based momentum
         obv = (np.sign(close.diff()) * df['volume']).fillna(0).cumsum()
         obv_ema = obv.rolling(int(length)).mean()

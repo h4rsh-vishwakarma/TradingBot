@@ -119,6 +119,29 @@ def strategy_tournament():
     if not results:
         raise RuntimeError("Tournament produced zero results — DATA_FILES may be empty or all strategies errored. Not writing CSV to avoid silent gate bypass.")
     final_df = pd.DataFrame(results).sort_values(by=["Daily_ROI_%"], ascending=False)
+
+    # Data quality guard: detect fallback convergence.
+    # If >40% of rows share the identical Daily_ROI_% value, every strategy
+    # hit the FALLBACK case in apply_strategy (unrecognized name).
+    # Write the CSV but log a prominent warning so the daily report reflects
+    # the quality issue rather than silently broadcasting fabricated data.
+    if len(final_df) > 0:
+        roi_counts = final_df["Daily_ROI_%"].value_counts()
+        top_roi_pct = roi_counts.iloc[0] / len(final_df) if len(roi_counts) > 0 else 0
+        if top_roi_pct > 0.40:
+            warning_msg = (
+                "DATA QUALITY WARNING: {:.0f}% of tournament rows share "
+                "identical Daily_ROI_% ({}) — strategy names not recognized "
+                "by apply_strategy; fallback strategy applied to all. "
+                "Check my_strategies.py keyword coverage."
+            ).format(top_roi_pct * 100, roi_counts.index[0])
+            logger.warning(warning_msg)
+            print("\n\u26a0\ufe0f  " + warning_msg)
+            # Mark the output as suspect so downstream scripts can filter
+            final_df["Data_Quality"] = "FALLBACK_CONVERGENCE_WARNING"
+        else:
+            final_df["Data_Quality"] = "OK"
+
     final_df.to_csv(REPORT_PATH, index=False)
     
     print("\n🚀 --- TOP ALPHA STRATEGIES (TARGET 2% DAILY) --- 🚀")

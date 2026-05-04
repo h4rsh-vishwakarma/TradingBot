@@ -1,7 +1,7 @@
 # Decision Lane Status Report
-> **Last updated: 2026-05-01 (P-10 — manifest v22: G111 asset switched SUIUSDT→LINKUSDT; P-09 authorized)**
-> **Scope: EMPTY — 0 active candidates**
-> **Manifest v22** — 0 candidate_for_tiny_capital; 31 paper_only; 3 P07_NOMINEE; 2 R01_RETIRED
+> **Last updated: 2026-05-04 (H-P01 — synced to manifest v24; P-11 withdrawals reflected)**
+> **Scope: EMPTY — 0 active candidates, 0 P07 nominees**
+> **Manifest v24** — 0 candidate_for_tiny_capital; 31 paper_only; 0 P07_NOMINEE; 3 P07_WITHDRAWN; 2 R01_RETIRED
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
 
 ---
@@ -9,22 +9,22 @@
 ## Current State
 
 **DECISION LANE IS EMPTY.** No candidate_for_tiny_capital entries exist in the manifest.
-Capital discussion is not permitted until a replacement candidate completes the full promotion ladder:
-Gate 1 (Python OOS) → Gate 2 (30-day paper window) → Gate 3 (Sainath sign-off).
+No P-07 nominees remain — all three were withdrawn per Sainath P-11 (2026-05-02) due to IS/OOS ratio failures.
+Capital discussion is not permitted until a new candidate completes the full promotion ladder:
+Gate 1 (Python OOS + IS/OOS ≤4x + TV rerun) → Gate 2 (20–30-day paper window) → Gate 3 (Sainath sign-off).
 
 ---
 
-## P-07 Nominees (paper window pending P-09 TV alerts)
+## P-07 Nominees — ALL WITHDRAWN (P-11, 2026-05-02)
 
-| Strategy | Symbol | TF | Python OOS PF | OOS n | Gate 1 | Paper Window |
-|----------|--------|----|--------------|-------|--------|-------------|
-| G83 DeMarker Donchian | ETHUSDT | 4H | 1.18 | 217 | PASS | NOT STARTED — awaiting P-09 TV alert |
-| G88 Vortex Donchian | XRPUSDT | 4H | 1.10 | 325 | PASS | NOT STARTED — awaiting P-09 TV alert |
-| G111 Supertrend Donchian | **LINKUSDT** | 4H | **1.40** | **151** | PASS | NOT STARTED — awaiting P-09 TV alert |
+| Strategy | Symbol | IS PF | OOS PF | IS/OOS Ratio | Withdrawal Reason |
+|----------|--------|-------|--------|--------------|-------------------|
+| G83 DeMarker Donchian | ETHUSDT | 6.38 | 0.52 | 12.3x | IS/OOS ratio 12.3x > 4x hard gate; OOS PF=0.52 <1.0 |
+| G88 Vortex Donchian | XRPUSDT | 24.36 | 0.31 | 78.6x | IS/OOS ratio 78.6x > 4x hard gate; OOS PF=0.31 <1.0 |
+| G111 Supertrend Donchian | LINKUSDT | 7.54 | 0.90 | 8.4x | IS/OOS ratio 8.4x > 4x hard gate; OOS PF=0.90 <1.0 |
 
-**Asset note (P-10, 2026-05-01):** G111 originally nominated on SUIUSDT (PF=1.55, n=75). Sainath rejected SUI — 75 OOS trades violates the packet's own ≥100 gate. Switched to LINKUSDT (PF=1.40, n=151, meets gate). Manifest v22.
-
-**P-09 is authorized.** Harsh must manually create TV alerts for all 3 nominees. Paper window = 30 days from first live signal per strategy. Target capital review: ~2026-06-01.
+All three withdrawn per Sainath P-11 decision (2026-05-02). No TV alerts created. No carry-forward to capital.
+Next cycle: Garima must produce new Gate 1 nominees with IS/OOS ratio ≤4x and TV rerun PF confirmed before nomination.
 
 ---
 
@@ -32,32 +32,30 @@ Gate 1 (Python OOS) → Gate 2 (30-day paper window) → Gate 3 (Sainath sign-of
 
 | Strategy | Final Label | R-04 Python OOS PF | TV Rerun PF (corrected 4% trail) | Disposition |
 |----------|-------------|-------------------|----------------------------------|-------------|
-| CCI Trend (ETHUSDT 4H) | R01_RETIRED | 3.998 | 1.08 | Retired 2026-05-01 — TV/Python gap too large (3.7x), below practical gate |
+| CCI Trend (ETHUSDT 4H) | R01_RETIRED | 3.998 | 1.08 | Retired 2026-05-01 — TV/Python gap 3.7x, below practical gate |
 | Donchian Trend (ETHUSDT 4H) | R01_RETIRED | 7.175 | 0.93 | Retired 2026-05-01 — TV rerun PF<1.0 (hard fail), gap 7.7x |
 
-**History:** Both cleared Gate 1 on Python OOS (R-04, 2026-05-01) after trail bug fix. Garima's TV rerun with corrected 4% trail revealed large TV/Python divergence — CCI 1.08 (marginal), Donchian 0.93 (hard fail). Both retired per R-01 decision. Paper counts accumulated under buggy trail are moot.
+**History:** Both cleared Gate 1 on Python OOS (R-04, 2026-05-01) after trail bug fix. Garima TV rerun with corrected 4% trail revealed large TV/Python divergence. Both retired per R-01 decision.
 
 ---
 
-## Gate Verdict (live as of 2026-05-02 18:45 IST)
+## Gate Verdict
 
-```
-VERDICT: NO-GO  (7 of 32 gates FAILED)
-[FAIL] CI has no '|| true' bypass -- Found || true in ci.yml
-[FAIL] Manifest entries have provenance (hash + notes) -- Missing provenance fields
-[FAIL] Manifest scope is explicit and limited -- 0 candidate_for_tiny_capital; 31 paper_only
-[FAIL] Candidate paper-lane inventory verified -- No candidate_for_tiny_capital rows found in inventory report
-[FAIL] Execution-plane freeze intact -- execution diff = unknown; tracked=0; age=7.6h
-[FAIL] Approved-lane signals fired during paper window -- 0 approved-lane signal(s) recorded since 2026-04-07
-[FAIL] Decision-lane ETHUSDT signal active (<72h) -- No ETHUSDT decision-lane signal ever recorded in execution_metrics
-```
+See  for the live verdict (updated nightly at 02:40 UTC).
 
-All 4 remaining FAIL gates are structural. They clear only when P-07 nominees complete the full
-promotion ladder and a fresh paper window accumulates evidence.
+5 structural FAILs remain that clear only when a new candidate completes the full promotion ladder:
+- **Manifest scope:** 0 candidate_for_tiny_capital → clears when new nominee promoted
+- **Candidate paper-lane inventory:** empty → clears with new candidate
+- **Provenance fields missing:** partial → improving via manifest cleanup
+- **Approved-lane signals fired:** 0 → clears when live TV alert + paper window runs
+- **Decision-lane signal active:** never recorded → clears when candidate fires real TV signal
+
+Non-structural FAILs cleared today:
+- **Execution-plane freeze detected** → clearing via H-P02 baseline refresh (freeze triggered by P-11 manifest change)
 
 ---
 
-## Infra Fixes Applied 2026-05-01
+## Infra Fixes Applied 2026-05-01 to 2026-05-04
 
 | Fix | Commit | Impact |
 |-----|--------|--------|
@@ -65,20 +63,19 @@ promotion ladder and a fresh paper window accumulates evidence.
 | APPROVAL_MANIFEST_PATH env var in webhook_server + tests | T-B (5c4139b) | Integration tests pass; 403 gate testable in isolation |
 | Gunicorn service file aligned with live config | T-D (615d406) | Deploy artifact matches running config |
 | R-04 Pine trail bug fixed; manifest v20; R04_PASS labels | H-03 (f63ee6b) | CCI Trend + Donchian Trend cleared Gate 1 (since retired) |
-| Test/demo strategy hard-block added (before manifest check) | P-01 (34692b8) | Defense-in-depth: test/demo names rejected at boundary |
-| TV order-fill path uses APPROVAL_MANIFEST_PATH | P-01 (34692b8) | Consistent manifest path across all signal routes |
-| P-08: manifest v21 — CCI/Donchian retired, G83/G88/G111 nominated | P-08 (this commit) | Fresh nominee slate after R-01 retirements |
+| Test/demo strategy hard-block | P-01 (34692b8) | Defense-in-depth: test/demo names rejected at boundary |
+| P-08: manifest v21 — CCI/Donchian retired, G83/G88/G111 nominated | P-08 (8365a42) | Fresh nominee slate after R-01 retirements |
+| P-11: manifest v24 — G83/G88/G111 withdrawn (IS/OOS ratio fails) | 1d6a577 | Decision lane fully reset |
+| H-P01: DECISION_LANE_STATUS.md synced to manifest v24 | H-P01 (this commit) | Governance doc no longer shows stale nominees |
 
 ---
 
 ## Position Reconciliation (P-02, 2026-05-01)
 
-Two "open position" types visible in heartbeat — both are non-issues:
+- **Category A (stale testnet, RESOLVED):** 6 pre-governance positions manually closed 2026-04-13. Evidence:  (status=RESOLVED).
+- **Category B (paper_only activity, expected):** LDOUSDT/ETHUSDT entries from ML Lorentzian, G27, G92, G94 paper_only monitoring. Testnet paper trades only — no real capital.
 
-- **Category A (stale testnet, RESOLVED):** 6 pre-governance positions (BTCUSDT, SUIUSDT, AVAXUSDT, LDOUSDT, LINKUSDT, XRPUSDT) manually closed 2026-04-13. Evidence: `storage/stale_position_quarantine.json` (status=RESOLVED).
-- **Category B (paper_only activity, expected):** LDOUSDT/ETHUSDT entries from ML Lorentzian, G27, G92, G94, CCI Trend paper_only monitoring. These are testnet paper trades from approved manifest entries — no real capital. Expected behavior.
-
-Full reconciliation: `storage/reports/position_reconciliation_2026-05-01.md`
+Full reconciliation: 
 
 ---
 
@@ -86,10 +83,12 @@ Full reconciliation: `storage/reports/position_reconciliation_2026-05-01.md`
 
 | Gate | Requirement | ETA |
 |------|-------------|-----|
-| **P-09 — TV alerts** | Harsh creates TV alerts for G83/ETH 4H, G88/XRP 4H, G111/SUI 4H | ASAP (manual TradingView UI action) |
-| Gate 2 — Paper window start | First live signal fires after TV alert creation | After P-09 |
-| Gate 2 — Paper window complete | 30 days of clean paper signals | ~2026-06-01 |
-| Gate 3 — Sainath sign-off | Review paper evidence + request candidate_for_tiny_capital promotion | After 2026-06-01 |
+| **G-R02 — IS/OOS gate upstream** | Garima adds IS/OOS ≤4x gate to strategy_promotion.py | 2026-05-04 |
+| **Gate 1 — New nominees** | Garima: Python OOS + IS/OOS ≤4x + TV rerun on quarantined candidates or auto_alpha_discoveries | ~2026-05-06 |
+| **Nomination** | Garima proposes 1–2 nominees; Sainath approval required | After Gate 1 |
+| **P-09 equivalent — TV alerts** | Harsh creates TV alerts for approved nominees | After nomination |
+| **Gate 2 — Paper window** | 20–30 days of clean live paper signals (real TradingView webhooks) | ~3–4 weeks after TV alerts |
+| **Gate 3 — Sainath sign-off** | Review paper evidence + candidate_for_tiny_capital promotion request | After Gate 2 |
 
 ---
 

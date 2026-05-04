@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-05-02T05:31:42.566230+00:00",
+  "recorded_at": "2026-05-04T05:09:51+00:00",
   "tracked_count": 11,
   "tracked_entries": [
     {
@@ -48,8 +48,8 @@
       "label": "approval_manifest",
       "path": "/home/ubuntu/tradingview_webhook_bot/config/approved_strategies.json",
       "exists": true,
-      "sha256": "cbe2728d3cd7ae19ac78e6848edaef63d396dd71bf596098d911ae28ffb070e1",
-      "size": 28560
+      "sha256": "80d070675436fc8609ae28cf9cde68e77368dc507c70acb7eb706035ee8912fd",
+      "size": 30558
     },
     {
       "label": "env_vars",
@@ -79,6 +79,5 @@
       "sha256": "b3f2ad98ad5ca91c0f633db87179339f89fb4fd97dc30fb7b51a1c31396f2f3d",
       "size": 623
     }
-  ],
-  "refresh_reason": "Baseline refreshed 2026-05-02: two authorized changes since last baseline. (1) webhook_server.py: commit 34692b8 P-01 deny-list added \u2014 authorized CEO audit fix. (2) approval_manifest: manifest v23 \u2014 20-day paper window gates set. Both changes are committed, reviewed, and governance-authorized. No unauthorized modifications detected."
+  ]
 }
