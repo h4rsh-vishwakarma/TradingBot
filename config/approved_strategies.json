@@ -1,6 +1,6 @@
 {
-  "version": 24,
-  "updated_at": "2026-05-04T00:00:00Z",
+  "version": 25,
+  "updated_at": "2026-05-04T05:40:00Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -690,6 +690,42 @@
       "p11_withdrawn_at": "2026-05-02T11:38:00Z",
       "p11_decision": "Option A: Withdraw from governed P07 lane per Sainath P-11 decision",
       "p11_withdrawal_reason": "IS/OOS PF ratio 8.4x exceeds 4x hard reject gate. Python IS PF=7.54, OOS PF=0.9, OOS trades=43 (<50 minimum). No carry-forward eligibility to candidate_for_tiny_capital."
+    },
+    {
+      "strategy": "Donchian_40_ETHUSDT_4h",
+      "exchange": "binance",
+      "symbols": [
+        "ETHUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-05-04T05:32:15Z",
+      "backtest_hash": "gate1_oos_donchian40_ETHUSDT_4h_20260504T053215Z",
+      "label": "P07_NOMINEE",
+      "notes": "Gate 1 OOS PASS 2026-05-04. Donchian channel breakout (window=40) with EMA200 + ADX(>20) trend filter. IS: PF=1.5214 ROI=+9.68% WR=39.2% MDD=-2.05% n=120 (2019-12-31 to 2024-05-08). OOS: PF=1.7335 ROI=+3.93% WR=51.0% MDD=-1.07% n=51 (2024-05-08 to 2026-03-20). IS/OOS ratio=0.878x -- OOS outperformed IS, strong generalization signal. Gate 1 evidence: storage/gate1_results/gate1_oos_20260504T053215Z.json. Governance: $500 fixed notional, 0.15%/side commission, 30% OOS holdout. Nominated for P-07 paper window 2026-05-04.",
+      "approval_class": "paper_only",
+      "class_reason": "P07_NOMINEE 2026-05-04: Gate 1 OOS PASS. OOS PF=1.7335 IS/OOS=0.878x OOS n=51. Entering paper window. Requires Sainath Gate-3 sign-off before any capital.",
+      "shortlist_priority": true,
+      "gate1_pass": true,
+      "gate1_is_pf": 1.5214,
+      "gate1_oos_pf": 1.7335,
+      "gate1_oos_roi_pct": 3.93,
+      "gate1_oos_wr": 51.0,
+      "gate1_oos_mdd_pct": -1.07,
+      "gate1_oos_n": 51,
+      "gate1_is_oos_ratio": 0.878,
+      "gate1_is_period": "2019-12-31 to 2024-05-08",
+      "gate1_oos_period": "2024-05-08 to 2026-03-20",
+      "gate1_validated_at": "2026-05-04T05:32:15Z",
+      "gate1_evidence_file": "storage/gate1_results/gate1_oos_20260504T053215Z.json",
+      "paper_window_days": 30,
+      "paper_window_min_signals": 5,
+      "paper_window_status": "PENDING_TV_ALERT",
+      "paper_window_start": null,
+      "paper_window_target_end": null,
+      "paper_window_note": "30-day paper window. OOS rate ~0.29 signals/day => ~8.7 expected signals in 30d. Min gate: 5 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after TV alert is created."
     }
   ]
 }
