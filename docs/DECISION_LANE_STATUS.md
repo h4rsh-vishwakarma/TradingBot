@@ -1,17 +1,29 @@
 # Decision Lane Status Report
-> **Last updated: 2026-05-04 (H-P01 — synced to manifest v24; P-11 withdrawals reflected)**
-> **Scope: EMPTY — 0 active candidates, 0 P07 nominees**
-> **Manifest v24** — 0 candidate_for_tiny_capital; 31 paper_only; 0 P07_NOMINEE; 3 P07_WITHDRAWN; 2 R01_RETIRED
+> **Last updated: 2026-05-04 (G-3 — manifest v25; Donchian_40_ETHUSDT_4h nominated)**
+> **Scope: 1 P07_NOMINEE (paper window PENDING_TV_ALERT)**
+> **Manifest v25** — 0 candidate_for_tiny_capital; 32 paper_only; 1 P07_NOMINEE; 3 P07_WITHDRAWN; 2 R01_RETIRED
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
 
 ---
 
 ## Current State
 
-**DECISION LANE IS EMPTY.** No candidate_for_tiny_capital entries exist in the manifest.
-No P-07 nominees remain — all three were withdrawn per Sainath P-11 (2026-05-02) due to IS/OOS ratio failures.
-Capital discussion is not permitted until a new candidate completes the full promotion ladder:
-Gate 1 (Python OOS + IS/OOS ≤4x + TV rerun) → Gate 2 (20–30-day paper window) → Gate 3 (Sainath sign-off).
+**1 active P07 nominee: `Donchian_40_ETHUSDT_4h`** — Gate 1 PASS (2026-05-04), paper window PENDING_TV_ALERT.
+No candidate_for_tiny_capital entries exist yet. Capital discussion remains blocked until Gate 2 (paper window) and Gate 3 (Sainath sign-off) complete.
+Promotion ladder: Gate 1 ✓ → Gate 2 (30-day paper window) → Gate 3 (Sainath sign-off) → candidate_for_tiny_capital.
+
+---
+
+## P-07 Active Nominees
+
+| Strategy | Symbol | Gate 1 IS PF | Gate 1 OOS PF | IS/OOS Ratio | OOS n | Status |
+|----------|--------|-------------|--------------|--------------|-------|--------|
+| Donchian_40_ETHUSDT_4h | ETHUSDT | 1.5214 | 1.7335 | 0.878x | 51 | PENDING_TV_ALERT |
+
+Gate 1 evidence: `storage/gate1_results/gate1_oos_20260504T053215Z.json`
+Governance: $500 fixed notional, 0.15%/side commission, 30% OOS holdout (2024-05-08 to 2026-03-20).
+OOS outperformed IS (ratio <1x) -- strong generalization. 30-day paper window begins on first TV alert.
+**Next action: create TradingView alert for ETHUSDT 4H Donchian breakout (window=40) with EMA200 + ADX(>20) filter.**
 
 ---
 
@@ -66,6 +78,7 @@ Non-structural FAILs cleared today:
 | Test/demo strategy hard-block | P-01 (34692b8) | Defense-in-depth: test/demo names rejected at boundary |
 | P-08: manifest v21 — CCI/Donchian retired, G83/G88/G111 nominated | P-08 (8365a42) | Fresh nominee slate after R-01 retirements |
 | P-11: manifest v24 — G83/G88/G111 withdrawn (IS/OOS ratio fails) | 1d6a577 | Decision lane fully reset |
+| G-3: manifest v25 — Donchian_40_ETHUSDT_4h nominated as P07_NOMINEE | 7848b3e | 1 active nominee, Gate 1 PASS |
 | H-P01: DECISION_LANE_STATUS.md synced to manifest v24 | H-P01 (this commit) | Governance doc no longer shows stale nominees |
 
 ---
@@ -83,10 +96,10 @@ Full reconciliation:
 
 | Gate | Requirement | ETA |
 |------|-------------|-----|
-| **G-R02 — IS/OOS gate upstream** | Garima adds IS/OOS ≤4x gate to strategy_promotion.py | 2026-05-04 |
-| **Gate 1 — New nominees** | Garima: Python OOS + IS/OOS ≤4x + TV rerun on quarantined candidates or auto_alpha_discoveries | ~2026-05-06 |
-| **Nomination** | Garima proposes 1–2 nominees; Sainath approval required | After Gate 1 |
-| **P-09 equivalent — TV alerts** | Harsh creates TV alerts for approved nominees | After nomination |
+| **G-R02 — DONE** | IS/OOS gate added to strategy_promotion.py (check_is_oos_gate) | 2026-05-04 |
+| **Gate 1 — DONE** | Donchian_40_ETHUSDT_4h: OOS PF=1.7335, IS/OOS=0.878x, OOS n=51. PASS. | 2026-05-04 |
+| **Nomination — DONE** | Donchian_40_ETHUSDT_4h nominated to manifest v25 | 2026-05-04 |
+| **P-09 — TV alert** | Harsh: create ETHUSDT 4H Donchian(40) alert with EMA200+ADX filter | **NEXT ACTION** |
 | **Gate 2 — Paper window** | 20–30 days of clean live paper signals (real TradingView webhooks) | ~3–4 weeks after TV alerts |
 | **Gate 3 — Sainath sign-off** | Review paper evidence + candidate_for_tiny_capital promotion request | After Gate 2 |
 
