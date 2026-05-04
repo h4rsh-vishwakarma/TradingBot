@@ -87,7 +87,7 @@ def load_manifest() -> tuple[dict, list[dict]]:
 
 
 def manifest_scope_summary(approvals: list[dict]) -> tuple[bool, str, list[dict]]:
-    valid_classes = {"paper_only", "candidate_for_tiny_capital", "personal_live"}
+    valid_classes = {"paper_only", "candidate_for_tiny_capital", "personal_live", "quarantined"}
     missing = []
     invalid = []
     candidates = []
