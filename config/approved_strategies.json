@@ -725,7 +725,11 @@
       "paper_window_status": "PENDING_TV_ALERT",
       "paper_window_start": null,
       "paper_window_target_end": null,
-      "paper_window_note": "30-day paper window. OOS rate ~0.29 signals/day => ~8.7 expected signals in 30d. Min gate: 5 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after TV alert is created."
+      "paper_window_note": "30-day paper window. OOS rate ~0.29 signals/day => ~8.7 expected signals in 30d. Min gate: 5 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after TV alert is created.",
+      "p07_is_oos_pf_ratio": 0.878,
+      "p07_is_pf": 1.5214,
+      "p07_oos_pf": 1.7335,
+      "p07_oos_n": 51
     }
   ]
 }
