@@ -1,6 +1,6 @@
-# Runtime Log — 2026-05-02
+# Runtime Log — 2026-05-05
 
-> Auto-generated — last updated `2026-05-02T13:15:00Z`
+> Auto-generated — last updated `2026-05-05T06:10:01Z`
 > GitHub repo: https://github.com/anythingai-labs/tradingview_webhook_bot
 
 ---
@@ -8,15 +8,15 @@
 ## Gate Check
 | Item | Value |
 |---|---|
-| Verdict | **VERDICT: NO-GO  (7 of 32 gates FAILED)** |
+| Verdict | **VERDICT: NO-GO  (4 of 32 gates FAILED)** |
 | Gates passed | ? |
-| Last run | 2026-05-02T13:15:00Z |
+| Last run | 2026-05-05T06:10:01Z |
 
 ## Manifest — `config/approved_strategies.json`
 | Item | Value |
 |---|---|
-| Version | v24 |
-| Updated | 2026-05-02T11:38:00Z |
+| Version | v26 |
+| Updated | 2026-05-05T06:08:46Z |
 | Total candidates | 0 |
 | ALPHA (live-ready) | 0 |
 | RESEARCH (no Pine yet) | 0 |
@@ -34,23 +34,23 @@
 ## Decision-Lane Scoreboard (ETHUSDT 4H)
 | Strategy | Closed ETHUSDT Trades | Last ETHUSDT Signal |
 |---|---|---|
-| CCI Trend | 1/5 (NEED MORE) | 2026-04-30T09:42 UTC |
-| Donchian Trend | 0/5 (NEED MORE) | 2026-04-25T05:17 UTC |
+| CCI Trend | 1/5 (NEED MORE) | 2026-05-04T16:00 UTC |
+| Donchian Trend | 0/5 (NEED MORE) | 2026-05-04T04:00 UTC |
 > Gate requires 5 closed ETHUSDT trades per strategy. OK = threshold met.
 
 ## Signal Pipeline — Last 24h
 | Item | Value |
 |---|---|
-| Signals received | 4 |
-| Completed | 4 |
-| Last signal | 2026-05-02 08:00 UTC |
-| Last strategy | G94 Pivot Point Reclaim / SUIUSDT |
+| Signals received | 20 |
+| Completed | 20 |
+| Last signal | 2026-05-05 04:00 UTC |
+| Last strategy | G94 Pivot Point Reclaim / ETHUSDT |
 | 401 unauthorized (today) | 0 (0 plain-text, 0 JSON) |
 
 ## Heartbeat
 | Item | Value |
 |---|---|
-| Last heartbeat file | heartbeat_20260502_1305 |
+| Last heartbeat file | heartbeat_20260505_0605 |
 | Verdict | ACTION NEEDED |
 | Cron schedule | every hour at :05 UTC |
 
@@ -79,8 +79,19 @@ _No outstanding operational issues._
 | Dashboard | https://tradingbot.operatorbrief.xyz/ | UP |
 | Orchestrator | process on EC2 | RUNNING |
 
-## Commits Today (2026-05-02)
+## Commits Today (2026-05-05)
 ```
+3fb9ae7 | 2026-05-05 04:22:42 +0000 | fix: audit P-03/P-04/P-07/P-08 -- gate logic, freeze baseline, env_vars
+e7d3e11 | 2026-05-04 06:09:03 +0000 | fix: add p07_is_oos_pf_ratio field to Donchian_40_ETHUSDT_4h manifest entry
+147219a | 2026-05-04 05:55:11 +0000 | feat: pine_donchian40_ETHUSDT_4h v2 -- secret set, ready to deploy
+5c0aabb | 2026-05-04 05:52:05 +0000 | feat: add Pine script for Donchian_40_ETHUSDT_4h P07 paper window
+f16344b | 2026-05-04 05:36:22 +0000 | docs: update DECISION_LANE_STATUS.md for manifest v25 -- 1 active P07 nominee
+7848b3e | 2026-05-04 05:35:14 +0000 | feat: manifest v25 -- nominate Donchian_40_ETHUSDT_4h as P07_NOMINEE paper_only
+729c332 | 2026-05-04 05:15:01 +0000 | fix: H-P06b -- add quarantined to valid approval_class in gate check (clears invalid class warning)
+9ee168f | 2026-05-04 05:13:15 +0000 | fix: H-P01/H-P02/H-P03/H-P04 -- governance doc v24, freeze baseline refresh, tournament data quality guard, strategy keyword coverage
+e3b8897 | 2026-05-02 13:18:09 +0000 | merge: resolve approved_strategies.json conflict — take remote v24 (P-11 withdrawals already committed in 1d6a577)
+1fd24e9 | 2026-05-02 13:17:16 +0000 | fix: H-01/H-04/H-06/H-08/H-09 — audit remediation batch
+1d6a577 | 2026-05-02 11:53:14 +0530 | fix: P11-01/P11-03 — manifest v24: withdraw G83/G88/G111 from P07 per Sainath P-11
 e0e0511 | 2026-05-02 11:43:58 +0530 | feat: add G83/G111 IS/OOS backtest — DeMarker + Supertrend signal functions
 7cba581 | 2026-05-02 11:16:13 +0530 | fix: P-02/P-03/P-04 — Pine scripts v3: $500 notional, 0.15% commission, secret placeholder, add G83
 da343b9 | 2026-05-02 05:32:05 +0000 | fix: refresh execution freeze baseline — P-01 deny-list + manifest v23 authorized

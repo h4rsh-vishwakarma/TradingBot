@@ -1,0 +1,304 @@
+{
+  "run_at": "20260505T060710Z",
+  "governance": {
+    "notional_usd": 500,
+    "commission_pct": 0.15,
+    "oos_split": 0.3,
+    "adx_threshold": 20,
+    "gates": {
+      "oos_pf_min": 1.0,
+      "oos_trades_min": 50,
+      "is_oos_ratio_max": 4.0
+    }
+  },
+  "passed": [
+    {
+      "label": "PSAR_VolSurge/LINKUSDT",
+      "strategy": "44 psar volume surge 4h",
+      "symbol": "LINKUSDT",
+      "mult": 3.54,
+      "length": 22,
+      "sl_pct": 0.015,
+      "tp_pct": 0.06,
+      "status": "PASS",
+      "fail_reasons": [],
+      "is_pf": 0.9326,
+      "is_n": 372,
+      "is_roi_pct": -33.6831,
+      "is_wr": 24.19,
+      "is_mdd_pct": -64.6716,
+      "oos_pf": 1.0685,
+      "oos_n": 155,
+      "oos_roi_pct": 13.9792,
+      "oos_wr": 26.45,
+      "oos_mdd_pct": -40.9511,
+      "is_oos_ratio": 0.8728,
+      "governance": {
+        "notional_usd": 500,
+        "commission_pct": 0.15,
+        "oos_split": 0.3,
+        "adx_threshold": 20
+      }
+    }
+  ],
+  "failed": [
+    {
+      "label": "PSAR_VolSurge/DOTUSDT",
+      "fail_reasons": [
+        "OOS PF=0.8466 <= 1.0"
+      ]
+    },
+    {
+      "label": "PSAR_VolSurge/AVAXUSDT",
+      "fail_reasons": [
+        "OOS PF=0.9182 <= 1.0"
+      ]
+    },
+    {
+      "label": "PSAR_VolSurge/SOLUSDT",
+      "fail_reasons": [
+        "OOS PF=0.9824 <= 1.0"
+      ]
+    },
+    {
+      "label": "Keltner_Break/DOTUSDT",
+      "fail_reasons": [
+        "OOS PF=0.6865 <= 1.0"
+      ]
+    },
+    {
+      "label": "Keltner_Break/LINKUSDT",
+      "fail_reasons": [
+        "OOS PF=0.5924 <= 1.0"
+      ]
+    },
+    {
+      "label": "Keltner_Break/AVAXUSDT",
+      "fail_reasons": [
+        "OOS PF=0.6965 <= 1.0"
+      ]
+    }
+  ],
+  "skipped": [
+    "PSAR_VolSurge/XRPUSDT",
+    "Keltner_Break/XRPUSDT"
+  ],
+  "all_results": [
+    {
+      "label": "PSAR_VolSurge/DOTUSDT",
+      "strategy": "44 psar volume surge 4h",
+      "symbol": "DOTUSDT",
+      "mult": 3.54,
+      "length": 22,
+      "sl_pct": 0.015,
+      "tp_pct": 0.06,
+      "status": "FAIL",
+      "fail_reasons": [
+        "OOS PF=0.8466 <= 1.0"
+      ],
+      "is_pf": 0.7804,
+      "is_n": 376,
+      "is_roi_pct": -113.9337,
+      "is_wr": 21.54,
+      "is_mdd_pct": -115.7325,
+      "oos_pf": 0.8466,
+      "oos_n": 168,
+      "oos_roi_pct": -35.9823,
+      "oos_wr": 22.02,
+      "oos_mdd_pct": -61.9837,
+      "is_oos_ratio": 0.9218,
+      "governance": {
+        "notional_usd": 500,
+        "commission_pct": 0.15,
+        "oos_split": 0.3,
+        "adx_threshold": 20
+      }
+    },
+    {
+      "label": "PSAR_VolSurge/LINKUSDT",
+      "strategy": "44 psar volume surge 4h",
+      "symbol": "LINKUSDT",
+      "mult": 3.54,
+      "length": 22,
+      "sl_pct": 0.015,
+      "tp_pct": 0.06,
+      "status": "PASS",
+      "fail_reasons": [],
+      "is_pf": 0.9326,
+      "is_n": 372,
+      "is_roi_pct": -33.6831,
+      "is_wr": 24.19,
+      "is_mdd_pct": -64.6716,
+      "oos_pf": 1.0685,
+      "oos_n": 155,
+      "oos_roi_pct": 13.9792,
+      "oos_wr": 26.45,
+      "oos_mdd_pct": -40.9511,
+      "is_oos_ratio": 0.8728,
+      "governance": {
+        "notional_usd": 500,
+        "commission_pct": 0.15,
+        "oos_split": 0.3,
+        "adx_threshold": 20
+      }
+    },
+    {
+      "label": "PSAR_VolSurge/AVAXUSDT",
+      "strategy": "44 psar volume surge 4h",
+      "symbol": "AVAXUSDT",
+      "mult": 3.54,
+      "length": 22,
+      "sl_pct": 0.015,
+      "tp_pct": 0.06,
+      "status": "FAIL",
+      "fail_reasons": [
+        "OOS PF=0.9182 <= 1.0"
+      ],
+      "is_pf": 0.9266,
+      "is_n": 384,
+      "is_roi_pct": -37.9652,
+      "is_wr": 24.22,
+      "is_mdd_pct": -63.6078,
+      "oos_pf": 0.9182,
+      "oos_n": 171,
+      "oos_roi_pct": -19.0989,
+      "oos_wr": 22.81,
+      "oos_mdd_pct": -36.6008,
+      "is_oos_ratio": 1.0091,
+      "governance": {
+        "notional_usd": 500,
+        "commission_pct": 0.15,
+        "oos_split": 0.3,
+        "adx_threshold": 20
+      }
+    },
+    {
+      "label": "PSAR_VolSurge/XRPUSDT",
+      "status": "NO_DATA"
+    },
+    {
+      "label": "PSAR_VolSurge/SOLUSDT",
+      "strategy": "44 psar volume surge 4h",
+      "symbol": "SOLUSDT",
+      "mult": 3.54,
+      "length": 22,
+      "sl_pct": 0.015,
+      "tp_pct": 0.06,
+      "status": "FAIL",
+      "fail_reasons": [
+        "OOS PF=0.9824 <= 1.0"
+      ],
+      "is_pf": 0.7597,
+      "is_n": 435,
+      "is_roi_pct": -148.0988,
+      "is_wr": 20.69,
+      "is_mdd_pct": -181.9034,
+      "oos_pf": 0.9824,
+      "oos_n": 181,
+      "oos_roi_pct": -4.2428,
+      "oos_wr": 25.41,
+      "oos_mdd_pct": -59.9748,
+      "is_oos_ratio": 0.7733,
+      "governance": {
+        "notional_usd": 500,
+        "commission_pct": 0.15,
+        "oos_split": 0.3,
+        "adx_threshold": 20
+      }
+    },
+    {
+      "label": "Keltner_Break/XRPUSDT",
+      "status": "NO_DATA"
+    },
+    {
+      "label": "Keltner_Break/DOTUSDT",
+      "strategy": "24 keltner breakout",
+      "symbol": "DOTUSDT",
+      "mult": 2.57,
+      "length": 15,
+      "sl_pct": 0.01,
+      "tp_pct": 0.03,
+      "status": "FAIL",
+      "fail_reasons": [
+        "OOS PF=0.6865 <= 1.0"
+      ],
+      "is_pf": 0.6046,
+      "is_n": 826,
+      "is_roi_pct": -328.4971,
+      "is_wr": 22.64,
+      "is_mdd_pct": -331.3,
+      "oos_pf": 0.6865,
+      "oos_n": 318,
+      "oos_roi_pct": -97.4,
+      "oos_wr": 24.84,
+      "oos_mdd_pct": -108.1,
+      "is_oos_ratio": 0.8807,
+      "governance": {
+        "notional_usd": 500,
+        "commission_pct": 0.15,
+        "oos_split": 0.3,
+        "adx_threshold": 20
+      }
+    },
+    {
+      "label": "Keltner_Break/LINKUSDT",
+      "strategy": "24 keltner breakout",
+      "symbol": "LINKUSDT",
+      "mult": 2.57,
+      "length": 15,
+      "sl_pct": 0.01,
+      "tp_pct": 0.03,
+      "status": "FAIL",
+      "fail_reasons": [
+        "OOS PF=0.5924 <= 1.0"
+      ],
+      "is_pf": 0.5538,
+      "is_n": 931,
+      "is_roi_pct": -426.3,
+      "is_wr": 21.05,
+      "is_mdd_pct": -429.3,
+      "oos_pf": 0.5924,
+      "oos_n": 392,
+      "oos_roi_pct": -161.6,
+      "oos_wr": 22.19,
+      "oos_mdd_pct": -162.5,
+      "is_oos_ratio": 0.9348,
+      "governance": {
+        "notional_usd": 500,
+        "commission_pct": 0.15,
+        "oos_split": 0.3,
+        "adx_threshold": 20
+      }
+    },
+    {
+      "label": "Keltner_Break/AVAXUSDT",
+      "strategy": "24 keltner breakout",
+      "symbol": "AVAXUSDT",
+      "mult": 2.57,
+      "length": 15,
+      "sl_pct": 0.01,
+      "tp_pct": 0.03,
+      "status": "FAIL",
+      "fail_reasons": [
+        "OOS PF=0.6965 <= 1.0"
+      ],
+      "is_pf": 0.6504,
+      "is_n": 1019,
+      "is_roi_pct": -352.7,
+      "is_wr": 23.85,
+      "is_mdd_pct": -357.5,
+      "oos_pf": 0.6965,
+      "oos_n": 438,
+      "oos_roi_pct": -129.4,
+      "oos_wr": 25.11,
+      "oos_mdd_pct": -131.1,
+      "is_oos_ratio": 0.9338,
+      "governance": {
+        "notional_usd": 500,
+        "commission_pct": 0.15,
+        "oos_split": 0.3,
+        "adx_threshold": 20
+      }
+    }
+  ]
+}

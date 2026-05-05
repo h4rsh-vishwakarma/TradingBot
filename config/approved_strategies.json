@@ -1,6 +1,6 @@
 {
-  "version": 25,
-  "updated_at": "2026-05-04T05:40:00Z",
+  "version": 26,
+  "updated_at": "2026-05-05T06:08:46Z",
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -722,14 +722,54 @@
       "gate1_evidence_file": "storage/gate1_results/gate1_oos_20260504T053215Z.json",
       "paper_window_days": 30,
       "paper_window_min_signals": 5,
-      "paper_window_status": "PENDING_TV_ALERT",
-      "paper_window_start": null,
-      "paper_window_target_end": null,
-      "paper_window_note": "30-day paper window. OOS rate ~0.29 signals/day => ~8.7 expected signals in 30d. Min gate: 5 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after TV alert is created.",
+      "paper_window_status": "ACTIVE",
+      "paper_window_start": "2026-05-04T04:30:00Z",
+      "paper_window_target_end": "2026-06-03T04:30:00Z",
+      "paper_window_note": "30-day paper window. OOS rate ~0.29 signals/day => ~8.7 expected signals in 30d. Min gate: 5 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after TV alert is created. | Paper window ACTIVATED 2026-05-05: TV alert confirmed live by Harsh 2026-05-04 ~10:00 IST (04:30 UTC). paper_window_start set retroactively to alert deployment time.",
       "p07_is_oos_pf_ratio": 0.878,
       "p07_is_pf": 1.5214,
       "p07_oos_pf": 1.7335,
-      "p07_oos_n": 51
+      "p07_oos_n": 51,
+      "paper_window_activated_at": "2026-05-05T06:05:21Z"
+    },
+    {
+      "strategy": "PSAR_VolSurge_LINKUSDT_4h",
+      "exchange": "binance",
+      "symbols": [
+        "LINKUSDT"
+      ],
+      "timeframes": [
+        "240"
+      ],
+      "operator": "garima",
+      "approved_at": "2026-05-05T06:08:46Z",
+      "backtest_hash": "gate1_oos_psar_volsurge_LINKUSDT_4h_20260505T060710Z",
+      "label": "P07_NOMINEE",
+      "notes": "Gate 1 OOS PASS 2026-05-05. PSAR Volume Surge (mult=3.54, length=22) with SL=1.5% TP=6.0%. IS: PF=0.9326 ROI=-33.68% WR=24.2% MDD=-64.67% n=372 (IS period). OOS: PF=1.0685 ROI=+13.98% WR=26.4% MDD=-40.95% n=155 (OOS period). IS/OOS=0.873x. NOTE: IS PF<1.0 (strategy unprofitable in historical IS) and OOS MDD=-40.95% are weak characteristics \u2014 marginal Gate 1 pass. Sainath review required before any capital. Gate 1 evidence: storage/gate1_results/gate1_psar_keltner_20260505T060710Z.json. Governance: 500 fixed notional 0.15%/side 30% OOS holdout.",
+      "approval_class": "paper_only",
+      "class_reason": "P07_NOMINEE 2026-05-05: Gate 1 OOS PASS (marginal). OOS PF=1.0685 IS/OOS=0.873x n=155. Entering paper window. Requires Sainath Gate-3 sign-off before any capital.",
+      "shortlist_priority": true,
+      "gate1_pass": true,
+      "gate1_is_pf": 0.9326,
+      "gate1_oos_pf": 1.0685,
+      "gate1_oos_roi_pct": 13.98,
+      "gate1_oos_wr": 26.4,
+      "gate1_oos_mdd_pct": -40.95,
+      "gate1_oos_n": 155,
+      "gate1_is_oos_ratio": 0.873,
+      "gate1_validated_at": "2026-05-05T06:08:46Z",
+      "gate1_evidence_file": "storage/gate1_results/gate1_psar_keltner_20260505T060710Z.json",
+      "gate1_warning": "IS PF=0.9326 < 1.0 (strategy unprofitable in IS period); OOS MDD=-40.95% is high \u2014 treat as speculative nominee only",
+      "paper_window_days": 30,
+      "paper_window_min_signals": 5,
+      "paper_window_status": "PENDING_TV_ALERT",
+      "paper_window_start": null,
+      "paper_window_target_end": null,
+      "paper_window_note": "30-day paper window. PSAR fires less frequently than Donchian \u2014 min 5 signals over 30d. Sainath Gate-3 sign-off required. Starts on first live signal after TV alert created.",
+      "p07_is_oos_pf_ratio": 0.873,
+      "p07_is_pf": 0.9326,
+      "p07_oos_pf": 1.0685,
+      "p07_oos_n": 155
     }
   ]
 }
