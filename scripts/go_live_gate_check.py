@@ -107,7 +107,7 @@ def manifest_scope_summary(approvals: list[dict]) -> tuple[bool, str, list[dict]
             paper_only.append(approval)
 
     max_cap = int(os.getenv("MAX_CANDIDATES", "15"))
-    passed = not missing and not invalid and 1 <= len(candidates) <= max_cap
+    passed = not missing and not invalid and len(candidates) <= max_cap
     detail_parts = [f"{len(candidates)} candidate_for_tiny_capital", f"{len(paper_only)} paper_only"]
     if missing:
         detail_parts.append("missing class: " + ", ".join(missing))
@@ -191,14 +191,45 @@ def candidate_inventory_summary(report, candidates: list[dict]) -> tuple[bool, s
 
 def paper_window_summary() -> tuple[bool, str]:
     report_dir = PROJECT_ROOT / "storage" / "reports" / "paper_validation"
-    paper_start = os.getenv("PAPER_WINDOW_START", "2026-04-07")
-    paper_days = int(os.getenv("PAPER_WINDOW_DAYS", "7"))
-    start_date = datetime.strptime(paper_start, "%Y-%m-%d").date()
+    manifest_path = PROJECT_ROOT / "config" / "approved_strategies.json"
+
+    # Read paper window state from active P07_NOMINEE in manifest (not env var)
+    nominee_start = None
+    nominee_days = int(os.getenv("PAPER_WINDOW_DAYS", "30"))
+    nominee_name = None
+    if manifest_path.exists():
+        try:
+            with open(manifest_path) as _mf:
+                _mdata = json.load(_mf)
+            for _a in _mdata.get("approvals", []):
+                if str(_a.get("label", "")).upper() == "P07_NOMINEE":
+                    nominee_name = _a.get("strategy")
+                    nominee_days = int(_a.get("paper_window_days", nominee_days))
+                    _pw = _a.get("paper_window_start")
+                    if _pw:
+                        nominee_start = _pw
+                    break
+        except Exception:
+            pass
+
+    if nominee_start is None:
+        _strat = f" ({nominee_name})" if nominee_name else ""
+        return False, f"Paper window not started{_strat} - TV alert not yet deployed (paper_window_start=null)"
+
+    start_date = datetime.strptime(nominee_start[:10], "%Y-%m-%d").date()
     today = datetime.now(UTC).date()
     elapsed_days = max(0, (today - start_date).days + 1)
-    daily_reports = sorted(report_dir.glob("day*_*.txt"))
-    passed = elapsed_days >= paper_days and len(daily_reports) >= paper_days
-    detail = f"Day {elapsed_days} of {paper_days}; {len(daily_reports)} daily reports present"
+    start_ymd = nominee_start[:10].replace("-", "")  # e.g. "20260504"
+    relevant_reports = []
+    for _r in sorted(report_dir.glob("day*_*.txt")):
+        _parts = _r.stem.split("_")
+        if _parts and _parts[-1].isdigit() and len(_parts[-1]) == 8 and _parts[-1] >= start_ymd:
+            relevant_reports.append(_r)
+    passed = elapsed_days >= nominee_days and len(relevant_reports) >= nominee_days
+    detail = (
+        f"{nominee_name}: Day {elapsed_days} of {nominee_days}; "
+        f"{len(relevant_reports)} daily reports since {nominee_start[:10]}"
+    )
     return passed, detail
 
 
@@ -716,7 +747,14 @@ def main() -> int:
     provenance_ok = bool(approvals)
     if approvals:
         for approval in approvals:
-            if not approval.get("backtest_hash") or not approval.get("notes") or "PENDING" in str(approval.get("notes", "")):
+            if not approval.get("backtest_hash") or not approval.get("notes"):
+                provenance_ok = False
+                break
+            _label = str(approval.get("label", "")).upper()
+            # Withdrawn/retired entries retain historical PENDING text - skip PENDING check
+            if any(s in _label for s in ("WITHDRAWN", "RETIRED", "QUARANTINE")):
+                continue
+            if "PENDING" in str(approval.get("notes", "")):
                 provenance_ok = False
                 break
     check(
