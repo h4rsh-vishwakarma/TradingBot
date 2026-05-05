@@ -33,19 +33,19 @@ short_exit  = close > exit_upper
 
 if long_entry
     strategy.entry("Long", strategy.long)
-    alert('{"symbol":"' + symbol_id + '","action":"buy","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"squeeze_tradingview_cluster_2026_secure"}', alert.freq_once_per_bar_close)
+    alert('{"symbol":"' + symbol_id + '","action":"buy","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
 
 if short_entry
     strategy.entry("Short", strategy.short)
-    alert('{"symbol":"' + symbol_id + '","action":"sell","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"squeeze_tradingview_cluster_2026_secure"}', alert.freq_once_per_bar_close)
+    alert('{"symbol":"' + symbol_id + '","action":"sell","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
 
 if long_exit and strategy.position_size > 0 and not short_entry
     strategy.close("Long")
-    alert('{"symbol":"' + symbol_id + '","action":"close_long","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"squeeze_tradingview_cluster_2026_secure"}', alert.freq_once_per_bar_close)
+    alert('{"symbol":"' + symbol_id + '","action":"close_long","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
 
 if short_exit and strategy.position_size < 0 and not long_entry
     strategy.close("Short")
-    alert('{"symbol":"' + symbol_id + '","action":"close_short","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"squeeze_tradingview_cluster_2026_secure"}', alert.freq_once_per_bar_close)
+    alert('{"symbol":"' + symbol_id + '","action":"close_short","strategy":"Donchian_40_ETHUSDT_4h","timeframe":"4h","price":"' + str.tostring(close) + '","secret":"{{WEBHOOK_SECRET}}"}', alert.freq_once_per_bar_close)
 
 plot(upper,       "Don High (40)",   color.new(color.blue,   50))
 plot(lower,       "Don Low (40)",    color.new(color.blue,   50))

@@ -1,5 +1,5 @@
 {
-  "version": 27,
+  "version": 28,
   "updated_at": "2026-05-05T06:08:46Z",
   "approvals": [
     {
@@ -722,15 +722,15 @@
       "gate1_evidence_file": "storage/gate1_results/gate1_oos_20260504T053215Z.json",
       "paper_window_days": 30,
       "paper_window_min_signals": 5,
-      "paper_window_status": "ACTIVE",
-      "paper_window_start": "2026-05-04T04:30:00Z",
-      "paper_window_target_end": "2026-06-03T04:30:00Z",
-      "paper_window_note": "30-day paper window. OOS rate ~0.29 signals/day => ~8.7 expected signals in 30d. Min gate: 5 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after TV alert is created. | Paper window ACTIVATED 2026-05-05: TV alert confirmed live by Harsh 2026-05-04 ~10:00 IST (04:30 UTC). paper_window_start set retroactively to alert deployment time.",
+      "paper_window_status": "PENDING_TV_ALERT",
+      "paper_window_start": null,
+      "paper_window_target_end": null,
+      "paper_window_note": "Reset 2026-05-05 per Sainath audit P-03/P-04: signal_queue.db=0 bytes, no TV signals ever received. Paper window cannot be claimed as ACTIVE without verified first signal in signal_queue.db. Restart: deploy TV alert with rotated WEBHOOK_SECRET -> first signal -> set paper_window_start.",
       "p07_is_oos_pf_ratio": 0.878,
       "p07_is_pf": 1.5214,
       "p07_oos_pf": 1.7335,
       "p07_oos_n": 51,
-      "paper_window_activated_at": "2026-05-05T06:05:21Z"
+      "paper_window_activated_at": null
     },
     {
       "strategy": "PSAR_VolSurge_LINKUSDT_4h",

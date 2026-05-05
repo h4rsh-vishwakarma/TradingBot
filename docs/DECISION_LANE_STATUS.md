@@ -1,6 +1,6 @@
 # Decision Lane Status Report
 > **Last updated: 2026-05-05 (manifest v27; 1 P07_NOMINEE active)**
-> **Scope: 1 P07_NOMINEE (Donchian_40 paper window ACTIVE day 2/30)**
+> **Scope: 1 P07_NOMINEE (Donchian_40 paper window PENDING_TV_ALERT — awaiting first verified signal)**
 > **Manifest v27** — 0 candidate_for_tiny_capital; 33 paper_only; 1 P07_NOMINEE; 4 P07_WITHDRAWN; 2 R01_RETIRED
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
 
@@ -9,7 +9,7 @@
 ## Current State
 
 **1 active P07 nominee:**
-- `Donchian_40_ETHUSDT_4h` — Gate 1 PASS (2026-05-04), paper window **ACTIVE** (Day 2 of 30, started 2026-05-04T04:30Z)
+- `Donchian_40_ETHUSDT_4h` — Gate 1 PASS (2026-05-04), paper window **PENDING_TV_ALERT** — no verified signals yet (signal_queue.db empty)
 
 No candidate_for_tiny_capital entries exist yet. Capital discussion remains blocked until Gate 2 (paper window) and Gate 3 (Sainath sign-off) complete.
 Promotion ladder: Gate 1 ✓ → Gate 2 (30-day paper window) → Gate 3 (Sainath sign-off) → candidate_for_tiny_capital.
@@ -20,15 +20,12 @@ Promotion ladder: Gate 1 ✓ → Gate 2 (30-day paper window) → Gate 3 (Sainat
 
 | Strategy | Symbol | Gate 1 IS PF | Gate 1 OOS PF | IS/OOS Ratio | OOS n | Status |
 |----------|--------|-------------|--------------|--------------|-------|--------|
-| Donchian_40_ETHUSDT_4h | ETHUSDT | 1.5214 | 1.7335 | 0.878x | 51 | ACTIVE (Day 2/30) |
+| Donchian_40_ETHUSDT_4h | ETHUSDT | 1.5214 | 1.7335 | 0.878x | 51 | PENDING_TV_ALERT |
 
 Gate 1 evidence: `storage/gate1_results/gate1_oos_20260504T053215Z.json`
 Governance: $500 fixed notional, 0.15%/side commission, 30% OOS holdout (2024-05-08 to 2026-03-20).
-OOS outperformed IS (ratio <1x) — strong generalization. Paper window clock started 2026-05-04T04:30Z (TV alert deployed by Harsh).
+OOS outperformed IS (ratio <1x) — strong generalization. Paper window clock NOT STARTED — signal_queue.db empty (0 bytes). TV alert must be redeployed with rotated WEBHOOK_SECRET. Clock starts on first verified signal receipt.
 
-Gate 1 evidence (PSAR_VolSurge/LINKUSDT): `storage/gate1_results/gate1_psar_keltner_20260505T060710Z.json`
-⚠️ **Marginal pass:** IS PF=0.9326 < 1.0 (unprofitable in IS period); OOS MDD=-40.95% is high. OOS PF=1.0685 clears hard gate.
-**Next action: create TradingView alert for LINKUSDT 4H PSAR + Volume Surge strategy to start paper window clock.**
 
 ---
 
