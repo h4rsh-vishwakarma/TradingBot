@@ -1,5 +1,5 @@
 {
-  "version": 26,
+  "version": 27,
   "updated_at": "2026-05-05T06:08:46Z",
   "approvals": [
     {
@@ -744,11 +744,11 @@
       "operator": "garima",
       "approved_at": "2026-05-05T06:08:46Z",
       "backtest_hash": "gate1_oos_psar_volsurge_LINKUSDT_4h_20260505T060710Z",
-      "label": "P07_NOMINEE",
+      "label": "P07_WITHDRAWN_GATE_FAIL",
       "notes": "Gate 1 OOS PASS 2026-05-05. PSAR Volume Surge (mult=3.54, length=22) with SL=1.5% TP=6.0%. IS: PF=0.9326 ROI=-33.68% WR=24.2% MDD=-64.67% n=372 (IS period). OOS: PF=1.0685 ROI=+13.98% WR=26.4% MDD=-40.95% n=155 (OOS period). IS/OOS=0.873x. NOTE: IS PF<1.0 (strategy unprofitable in historical IS) and OOS MDD=-40.95% are weak characteristics \u2014 marginal Gate 1 pass. Sainath review required before any capital. Gate 1 evidence: storage/gate1_results/gate1_psar_keltner_20260505T060710Z.json. Governance: 500 fixed notional 0.15%/side 30% OOS holdout.",
       "approval_class": "paper_only",
       "class_reason": "P07_NOMINEE 2026-05-05: Gate 1 OOS PASS (marginal). OOS PF=1.0685 IS/OOS=0.873x n=155. Entering paper window. Requires Sainath Gate-3 sign-off before any capital.",
-      "shortlist_priority": true,
+      "shortlist_priority": false,
       "gate1_pass": true,
       "gate1_is_pf": 0.9326,
       "gate1_oos_pf": 1.0685,
@@ -762,14 +762,16 @@
       "gate1_warning": "IS PF=0.9326 < 1.0 (strategy unprofitable in IS period); OOS MDD=-40.95% is high \u2014 treat as speculative nominee only",
       "paper_window_days": 30,
       "paper_window_min_signals": 5,
-      "paper_window_status": "PENDING_TV_ALERT",
+      "paper_window_status": "WITHDRAWN",
       "paper_window_start": null,
       "paper_window_target_end": null,
       "paper_window_note": "30-day paper window. PSAR fires less frequently than Donchian \u2014 min 5 signals over 30d. Sainath Gate-3 sign-off required. Starts on first live signal after TV alert created.",
       "p07_is_oos_pf_ratio": 0.873,
       "p07_is_pf": 0.9326,
       "p07_oos_pf": 1.0685,
-      "p07_oos_n": 155
+      "p07_oos_n": 155,
+      "withdrawal_reason": "Sainath decision 2026-05-05: IS PF=0.9326 < 1.0 (unprofitable in IS period), OOS MDD=-40.95% too high \u2014 not suitable for paper window",
+      "withdrawn_at": "2026-05-05T06:30:00Z"
     }
   ]
 }
