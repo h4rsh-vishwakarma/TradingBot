@@ -1,16 +1,15 @@
 # Decision Lane Status Report
-> **Last updated: 2026-05-05 (manifest v26; 2 P07_NOMINEE active)**
-> **Scope: 2 P07_NOMINEE (Donchian_40 paper window ACTIVE day 2/30; PSAR_VolSurge PENDING_TV_ALERT)**
-> **Manifest v26** — 0 candidate_for_tiny_capital; 33 paper_only; 2 P07_NOMINEE; 3 P07_WITHDRAWN; 2 R01_RETIRED
+> **Last updated: 2026-05-05 (manifest v27; 1 P07_NOMINEE active)**
+> **Scope: 1 P07_NOMINEE (Donchian_40 paper window ACTIVE day 2/30)**
+> **Manifest v27** — 0 candidate_for_tiny_capital; 33 paper_only; 1 P07_NOMINEE; 4 P07_WITHDRAWN; 2 R01_RETIRED
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
 
 ---
 
 ## Current State
 
-**2 active P07 nominees:**
+**1 active P07 nominee:**
 - `Donchian_40_ETHUSDT_4h` — Gate 1 PASS (2026-05-04), paper window **ACTIVE** (Day 2 of 30, started 2026-05-04T04:30Z)
-- `PSAR_VolSurge_LINKUSDT_4h` — Gate 1 PASS (2026-05-05), paper window **PENDING_TV_ALERT** (marginal: IS PF<1.0, OOS MDD=-40.95%)
 
 No candidate_for_tiny_capital entries exist yet. Capital discussion remains blocked until Gate 2 (paper window) and Gate 3 (Sainath sign-off) complete.
 Promotion ladder: Gate 1 ✓ → Gate 2 (30-day paper window) → Gate 3 (Sainath sign-off) → candidate_for_tiny_capital.
@@ -22,7 +21,6 @@ Promotion ladder: Gate 1 ✓ → Gate 2 (30-day paper window) → Gate 3 (Sainat
 | Strategy | Symbol | Gate 1 IS PF | Gate 1 OOS PF | IS/OOS Ratio | OOS n | Status |
 |----------|--------|-------------|--------------|--------------|-------|--------|
 | Donchian_40_ETHUSDT_4h | ETHUSDT | 1.5214 | 1.7335 | 0.878x | 51 | ACTIVE (Day 2/30) |
-| PSAR_VolSurge_LINKUSDT_4h | LINKUSDT | 0.9326 ⚠️ | 1.0685 | 0.873x | 155 | PENDING_TV_ALERT |
 
 Gate 1 evidence: `storage/gate1_results/gate1_oos_20260504T053215Z.json`
 Governance: $500 fixed notional, 0.15%/side commission, 30% OOS holdout (2024-05-08 to 2026-03-20).
@@ -41,6 +39,7 @@ Gate 1 evidence (PSAR_VolSurge/LINKUSDT): `storage/gate1_results/gate1_psar_kelt
 | G83 DeMarker Donchian | ETHUSDT | 6.38 | 0.52 | 12.3x | IS/OOS ratio 12.3x > 4x hard gate; OOS PF=0.52 <1.0 |
 | G88 Vortex Donchian | XRPUSDT | 24.36 | 0.31 | 78.6x | IS/OOS ratio 78.6x > 4x hard gate; OOS PF=0.31 <1.0 |
 | G111 Supertrend Donchian | LINKUSDT | 7.54 | 0.90 | 8.4x | IS/OOS ratio 8.4x > 4x hard gate; OOS PF=0.90 <1.0 |
+| PSAR_VolSurge_LINKUSDT_4h | LINKUSDT | 0.93 | 1.07 | 0.87x | Sainath decision 2026-05-05: IS PF<1.0 + OOS MDD=-40.95% — not suitable for paper window |
 
 All three withdrawn per Sainath P-11 decision (2026-05-02). No TV alerts created. No carry-forward to capital.
 Next cycle: Garima must produce new Gate 1 nominees with IS/OOS ratio ≤4x and TV rerun PF confirmed before nomination.
@@ -87,7 +86,7 @@ Non-structural FAILs cleared today:
 | G-3: manifest v25 — Donchian_40_ETHUSDT_4h nominated as P07_NOMINEE | 7848b3e | 1 active nominee, Gate 1 PASS |
 | H-P01: DECISION_LANE_STATUS.md synced to manifest v24 | H-P01 (this commit) | Governance doc no longer shows stale nominees |
 | Paper window activated: Donchian_40 paper_window_start=2026-05-04T04:30Z | manifest v26 | 30-day clock running |
-| Gate 1 PSAR/Keltner run: PSAR_VolSurge/LINKUSDT PASS (OOS PF=1.07, marginal) | manifest v26 | 2nd P07_NOMINEE nominated |
+| Gate 1 PSAR/Keltner run: 1 PASS (LINKUSDT) / 8 FAIL — PSAR_VolSurge/LINKUSDT subsequently withdrawn per Sainath | manifest v27 | Gate 1 complete |
 | Stale positions closed: 6 testnet positions flattened (BTCUSDT, LDOUSDT closed via market orders) | 2026-05-05 | Quarantine complete |
 
 ---
@@ -109,7 +108,6 @@ Full reconciliation:
 | **Gate 1 — DONE** | Donchian_40_ETHUSDT_4h: OOS PF=1.7335, IS/OOS=0.878x, OOS n=51. PASS. | 2026-05-04 |
 | **Nomination — DONE** | Donchian_40_ETHUSDT_4h nominated to manifest v25 | 2026-05-04 |
 | **P-09 — TV alert — DONE** | Harsh deployed ETHUSDT 4H Donchian(40) alert (2026-05-04 10:00 IST). Paper window ACTIVE. | 2026-05-04 |
-| **P-10 — PSAR TV alert** | Harsh: create LINKUSDT 4H PSAR_VolSurge alert to start paper window clock | **NEXT ACTION** |
 | **Gate 2 — Paper window** | 20–30 days of clean live paper signals (real TradingView webhooks) | ~3–4 weeks after TV alerts |
 | **Gate 3 — Sainath sign-off** | Review paper evidence + candidate_for_tiny_capital promotion request | After Gate 2 |
 
