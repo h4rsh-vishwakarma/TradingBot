@@ -1,0 +1,122 @@
+{
+  "run_ts": "20260506T060958Z",
+  "governance": {
+    "fixed_notional": 500,
+    "commission_per_side": 0.0015,
+    "oos_split": 0.3,
+    "oos_pf_min": 1.5,
+    "oos_trades_min": 50,
+    "is_oos_ratio_max": 4.0,
+    "oos_mdd_max": -15.0
+  },
+  "results": [
+    {
+      "label": "Supertrend_ADX/ETHUSDT/1h",
+      "strategy": "Supertrend_ADX",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h",
+      "st_period": 10,
+      "st_mult": 3.0,
+      "adx_threshold": 20,
+      "sl_pct": 0.02,
+      "tp_pct": 0.06,
+      "status": "FAIL",
+      "fail_reasons": [
+        "OOS PF=0.9207 <= 1.5",
+        "OOS MDD=-68.82% < -15.0%"
+      ],
+      "is_pf": 0.7226,
+      "is_n": 777,
+      "is_roi_pct": -307.3791,
+      "is_wr": 25.23,
+      "is_mdd_pct": -313.2079,
+      "oos_pf": 0.9207,
+      "oos_n": 364,
+      "oos_roi_pct": -40.3986,
+      "oos_wr": 27.47,
+      "oos_mdd_pct": -68.8208,
+      "is_oos_ratio": 0.7848
+    },
+    {
+      "label": "Supertrend_ADX/DOTUSDT/4h",
+      "strategy": "Supertrend_ADX",
+      "symbol": "DOTUSDT",
+      "timeframe": "4h",
+      "st_period": 10,
+      "st_mult": 3.0,
+      "adx_threshold": 20,
+      "sl_pct": 0.02,
+      "tp_pct": 0.06,
+      "status": "FAIL",
+      "fail_reasons": [
+        "OOS PF=0.8023 <= 1.5",
+        "OOS MDD=-128.22% < -15.0%"
+      ],
+      "is_pf": 0.8345,
+      "is_n": 658,
+      "is_roi_pct": -184.6535,
+      "is_wr": 25.23,
+      "is_mdd_pct": -190.4787,
+      "oos_pf": 0.8023,
+      "oos_n": 314,
+      "oos_roi_pct": -106.7153,
+      "oos_wr": 24.2,
+      "oos_mdd_pct": -128.2153,
+      "is_oos_ratio": 1.0401
+    },
+    {
+      "label": "Supertrend_ADX/LINKUSDT/4h",
+      "strategy": "Supertrend_ADX",
+      "symbol": "LINKUSDT",
+      "timeframe": "4h",
+      "st_period": 10,
+      "st_mult": 3.0,
+      "adx_threshold": 20,
+      "sl_pct": 0.02,
+      "tp_pct": 0.06,
+      "status": "FAIL",
+      "fail_reasons": [
+        "OOS PF=0.8100 <= 1.5",
+        "OOS MDD=-126.44% < -15.0%"
+      ],
+      "is_pf": 0.8987,
+      "is_n": 722,
+      "is_roi_pct": -122.2107,
+      "is_wr": 26.45,
+      "is_mdd_pct": -137.1934,
+      "oos_pf": 0.81,
+      "oos_n": 317,
+      "oos_roi_pct": -102.5635,
+      "oos_wr": 24.29,
+      "oos_mdd_pct": -126.4376,
+      "is_oos_ratio": 1.1095
+    },
+    {
+      "label": "Supertrend_ADX/ETHUSDT/4h",
+      "strategy": "Supertrend_ADX",
+      "symbol": "ETHUSDT",
+      "timeframe": "4h",
+      "st_period": 10,
+      "st_mult": 3.0,
+      "adx_threshold": 20,
+      "sl_pct": 0.02,
+      "tp_pct": 0.06,
+      "status": "FAIL",
+      "fail_reasons": [
+        "OOS PF=0.9183 <= 1.5",
+        "OOS MDD=-84.76% < -15.0%"
+      ],
+      "is_pf": 0.8248,
+      "is_n": 1401,
+      "is_roi_pct": -416.9446,
+      "is_wr": 24.7,
+      "is_mdd_pct": -433.8126,
+      "oos_pf": 0.9183,
+      "oos_n": 517,
+      "oos_roi_pct": -69.5795,
+      "oos_wr": 26.69,
+      "oos_mdd_pct": -84.7617,
+      "is_oos_ratio": 0.8982
+    }
+  ]
+}

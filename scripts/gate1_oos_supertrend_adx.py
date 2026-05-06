@@ -114,8 +114,13 @@ def calculate_supertrend(df: pd.DataFrame, period: int = ST_PERIOD, mult: float 
     for i in range(1, n):
         if np.isnan(upper_basic.iloc[i]):
             continue
-        upper[i] = upper_basic.iloc[i] if (upper_basic.iloc[i] < upper[i-1] or closes[i-1] > upper[i-1]) else upper[i-1]
-        lower[i] = lower_basic.iloc[i] if (lower_basic.iloc[i] > lower[i-1] or closes[i-1] < lower[i-1]) else lower[i-1]
+        if np.isnan(upper[i-1]):
+            # Seed: first valid bar after ATR warm-up
+            upper[i] = upper_basic.iloc[i]
+            lower[i] = lower_basic.iloc[i]
+        else:
+            upper[i] = upper_basic.iloc[i] if (upper_basic.iloc[i] < upper[i-1] or closes[i-1] > upper[i-1]) else upper[i-1]
+            lower[i] = lower_basic.iloc[i] if (lower_basic.iloc[i] > lower[i-1] or closes[i-1] < lower[i-1]) else lower[i-1]
 
     # Direction
     direction = np.zeros(n, dtype=int)
