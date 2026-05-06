@@ -492,8 +492,11 @@ class WebhookServer:
                         return jsonify({'status': 'error', 'message': 'Placeholder secret rejected'}), 401
                     if received_secret != self.webhook_secret:
                         strategy_hint = str(data.get('strategy', payload.get('strategy', 'unknown')))
-                        logger.warning(f"❌ Unauthorized JSON attempt - strategy: {strategy_hint}")
-                        self._record_auth_failure(strategy_hint)
+                        if data.get('is_health_check'):
+                            logger.debug(f"HealthProbe auth check (expected mismatch)")
+                        else:
+                            logger.warning(f"❌ Unauthorized JSON attempt - strategy: {strategy_hint}")
+                            self._record_auth_failure(strategy_hint)
                         return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
 
                     signal_meta = _resolve_trade_signal(
