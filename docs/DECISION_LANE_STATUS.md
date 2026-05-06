@@ -92,10 +92,23 @@ Structural FAILs cleared today (2026-05-06):
 
 ---
 
-## Position Reconciliation (P-02, 2026-05-01)
+## Position Reconciliation (P-02, 2026-05-01) + P-07 ETHUSDT Short (2026-05-06)
 
 - **Category A (stale testnet, RESOLVED):** 6 pre-governance positions manually closed 2026-04-13. Evidence:  (status=RESOLVED).
 - **Category B (paper_only activity, expected):** LDOUSDT/ETHUSDT entries from ML Lorentzian, G27, G92, G94 paper_only monitoring. Testnet paper trades only — no real capital.
+
+**P-07 Decision (2026-05-06):** Open ETHUSDT SHORT from paper_only research signals — **FLATTEN / STALE-CLOSE**.
+
+| Item | Detail |
+|------|--------|
+| Position | ETHUSDT SHORT (paper_only monitoring, ML Lorentzian / G92 / G94 — exact source unresolved) |
+| Capital at risk | None — paper_only, no real funds |
+| Decision | Stale-close; do not carry forward |
+| Reason 1 | Donchian_40_ETHUSDT_4h is now ACTIVE in BUY direction — a stale paper SHORT on the same pair creates tracking confusion |
+| Reason 2 | ML Lorentzian cannot be Python-validated (closed-source TV libraries); no Gate 1 evidence on file |
+| Reason 3 | No paper window started for ML Lorentzian, G92, or G94 — these signals are research-grade only |
+| Action | Mark as closed in paper position tracker; no further monitoring or capital routing |
+| Decided by | Harsh (2026-05-06), per Sainath P-07 audit task |
 
 Full reconciliation: 
 

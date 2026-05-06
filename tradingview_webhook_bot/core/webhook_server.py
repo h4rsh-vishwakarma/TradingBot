@@ -470,9 +470,37 @@ class WebhookServer:
 
                     if received_secret in ("your_secret_key", "test", "secret", ""):
                         logger.warning(f'Rejected placeholder secret from {request.remote_addr}')
+                        _strat_hint = str(payload.get('strategy', data.get('strategy', 'unknown')))
+                        _ip = request.remote_addr
+                        def _alert_placeholder():
+                            try:
+                                self.telegram.send(
+                                    severity=AlertSeverity.WARNING,
+                                    title="AUTH FAILURE — Placeholder Secret",
+                                    message=(f"Rejected placeholder/test secret.\n"
+                                             f"<b>Strategy:</b> <code>{_strat_hint}</code>\n"
+                                             f"<b>IP:</b> <code>{_ip}</code>"),
+                                )
+                            except Exception:
+                                pass
+                        threading.Thread(target=_alert_placeholder, daemon=True).start()
                         return jsonify({'status': 'error', 'message': 'Placeholder secret rejected'}), 401
                     if received_secret != self.webhook_secret:
                         logger.warning(f"❌ Unauthorized JSON attempt")
+                        _strat_hint = str(payload.get('strategy', data.get('strategy', 'unknown')))
+                        _ip = request.remote_addr
+                        def _alert_json_auth():
+                            try:
+                                self.telegram.send(
+                                    severity=AlertSeverity.WARNING,
+                                    title="AUTH FAILURE — Invalid Secret (JSON)",
+                                    message=(f"Invalid webhook secret in JSON payload.\n"
+                                             f"<b>Strategy:</b> <code>{_strat_hint}</code>\n"
+                                             f"<b>IP:</b> <code>{_ip}</code>"),
+                                )
+                            except Exception:
+                                pass
+                        threading.Thread(target=_alert_json_auth, daemon=True).start()
                         return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
 
                     signal_meta = _resolve_trade_signal(
@@ -575,6 +603,20 @@ class WebhookServer:
                         )
                     elif not parsed_secret or parsed_secret != self.webhook_secret:
                         logger.warning("❌ Unauthorized plain text attempt — secret missing or mismatch")
+                        _pt_strat = parsed.get('strategy', 'unknown') if parsed else 'unknown'
+                        _pt_ip = request.remote_addr
+                        def _alert_plain_auth():
+                            try:
+                                self.telegram.send(
+                                    severity=AlertSeverity.WARNING,
+                                    title="AUTH FAILURE — Invalid Secret (Plain Text)",
+                                    message=(f"Invalid or missing secret in plain-text alert.\n"
+                                             f"<b>Strategy:</b> <code>{_pt_strat}</code>\n"
+                                             f"<b>IP:</b> <code>{_pt_ip}</code>"),
+                                )
+                            except Exception:
+                                pass
+                        threading.Thread(target=_alert_plain_auth, daemon=True).start()
                         return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
 
                     symbol = parsed['symbol']
