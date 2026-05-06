@@ -1,7 +1,7 @@
 # Decision Lane Status Report
-> **Last updated: 2026-05-05 (manifest v27; 1 P07_NOMINEE active)**
-> **Scope: 1 P07_NOMINEE (Donchian_40 paper window PENDING_TV_ALERT — awaiting first verified signal)**
-> **Manifest v27** — 0 candidate_for_tiny_capital; 33 paper_only; 1 P07_NOMINEE; 4 P07_WITHDRAWN; 2 R01_RETIRED
+> **Last updated: 2026-05-06 (manifest v30; 1 P07_NOMINEE active)**
+> **Scope: 1 P07_NOMINEE (Donchian_40 paper window ACTIVE — clock started 2026-05-06T12:00:07Z)**
+> **Manifest v30** — 0 candidate_for_tiny_capital; 33 paper_only; 1 P07_NOMINEE; 4 P07_WITHDRAWN; 2 R01_RETIRED
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
 
 ---
@@ -9,22 +9,22 @@
 ## Current State
 
 **1 active P07 nominee:**
-- `Donchian_40_ETHUSDT_4h` — Gate 1 PASS (2026-05-04), paper window **PENDING_TV_ALERT** — no verified signals yet (signal_queue.db empty)
+- `Donchian_40_ETHUSDT_4h` — Gate 1 PASS (2026-05-04), paper window **ACTIVE** — first verified signal received 2026-05-06T12:00:07Z (id=459, BUY ETHUSDT @$2408.99). 30-day window ends 2026-06-05T12:00:07Z.
 
 No candidate_for_tiny_capital entries exist yet. Capital discussion remains blocked until Gate 2 (paper window) and Gate 3 (Sainath sign-off) complete.
-Promotion ladder: Gate 1 ✓ → Gate 2 (30-day paper window) → Gate 3 (Sainath sign-off) → candidate_for_tiny_capital.
+Promotion ladder: Gate 1 ✓ → Gate 2 (30-day paper window, min 5 closed trades) → Gate 3 (Sainath sign-off) → candidate_for_tiny_capital.
 
 ---
 
 ## P-07 Active Nominees
 
-| Strategy | Symbol | Gate 1 IS PF | Gate 1 OOS PF | IS/OOS Ratio | OOS n | Status |
-|----------|--------|-------------|--------------|--------------|-------|--------|
-| Donchian_40_ETHUSDT_4h | ETHUSDT | 1.5214 | 1.7335 | 0.878x | 51 | PENDING_TV_ALERT |
+| Strategy | Symbol | Gate 1 IS PF | Gate 1 OOS PF | IS/OOS Ratio | OOS n | Status | Paper Window |
+|----------|--------|-------------|--------------|--------------|-------|--------|--------------|
+| Donchian_40_ETHUSDT_4h | ETHUSDT | 1.5214 | 1.7335 | 0.878x | 51 | **ACTIVE** | 2026-05-06 → 2026-06-05 |
 
 Gate 1 evidence: `storage/gate1_results/gate1_oos_20260504T053215Z.json`
 Governance: $500 fixed notional, 0.15%/side commission, 30% OOS holdout (2024-05-08 to 2026-03-20).
-OOS outperformed IS (ratio <1x) — strong generalization. Paper window clock NOT STARTED — signal_queue.db empty (0 bytes). TV alert must be redeployed with rotated WEBHOOK_SECRET. Clock starts on first verified signal receipt.
+OOS outperformed IS (ratio <1x) — strong generalization. Paper window clock STARTED on first verified signal (id=459, BUY ETHUSDT @$2408.99, 2026-05-06T12:00:07Z). Gate 2 minimum: 5 closed trades on ETHUSDT, PnL>0, 0 webhook errors. Gate 3: Sainath sign-off required before any capital.
 
 
 ---
@@ -58,14 +58,15 @@ Next cycle: Garima must produce new Gate 1 nominees with IS/OOS ratio ≤4x and 
 
 See  for the live verdict (updated nightly at 02:40 UTC).
 
-4 structural FAILs remain (all expected — paper window day 2):
-- **Manifest scope:** 0 candidate_for_tiny_capital → clears when new nominee promoted
-- **Candidate paper-lane inventory:** empty → clears with new candidate
-- **Approved-lane signals fired:** 0 → clears when live TV alert + paper window runs
-- **Decision-lane signal active:** never recorded → clears when candidate fires real TV signal
+3 structural FAILs remain (paper window day 1):
+- **Manifest scope:** 0 candidate_for_tiny_capital → clears when Gate 2+3 complete and nominee promoted
+- **Candidate paper-lane inventory:** 0 closed trades → clears as paper window accumulates trades (min 5 required)
+- **Candidate paper-lane PnL:** unresolved → clears when paper window closes with PnL>0
 
-Non-structural FAILs cleared today:
-- **Execution-plane freeze detected** → clearing via H-P02 baseline refresh (freeze triggered by P-11 manifest change)
+Structural FAILs cleared today (2026-05-06):
+- **Approved-lane signals fired:** ✅ id=459 BUY ETHUSDT @$2408.99 12:00:07Z — Sainath P-01 resolved
+- **Decision-lane signal active:** ✅ paper window started from verified signal — Sainath P-02 resolved
+- **auto_promote freeze layers:** ✅ all 3 layers confirmed in v29 — Sainath P-04 resolved
 
 ---
 
@@ -82,9 +83,12 @@ Non-structural FAILs cleared today:
 | P-11: manifest v24 — G83/G88/G111 withdrawn (IS/OOS ratio fails) | 1d6a577 | Decision lane fully reset |
 | G-3: manifest v25 — Donchian_40_ETHUSDT_4h nominated as P07_NOMINEE | 7848b3e | 1 active nominee, Gate 1 PASS |
 | H-P01: DECISION_LANE_STATUS.md synced to manifest v24 | H-P01 (this commit) | Governance doc no longer shows stale nominees |
-| Paper window activated: Donchian_40 paper_window_start=2026-05-04T04:30Z | manifest v26 | 30-day clock running |
+| Paper window activated: Donchian_40 paper_window_start=2026-05-04T04:30Z | manifest v26 | 30-day clock running (later reset — see v30) |
 | Gate 1 PSAR/Keltner run: 1 PASS (LINKUSDT) / 8 FAIL — PSAR_VolSurge/LINKUSDT subsequently withdrawn per Sainath | manifest v27 | Gate 1 complete |
 | Stale positions closed: 6 testnet positions flattened (BTCUSDT, LDOUSDT closed via market orders) | 2026-05-05 | Quarantine complete |
+| WEBHOOK_SECRET rotated, paper_window reset to null pending verified signal | manifest v28 | Secret hygiene; clock held pending real TV signal |
+| Governance freeze + 33 tests added (auto_promote 3-layer freeze confirmed) | manifest v29 (9fddf73) | Sainath P-04/P-05 resolved |
+| Paper window ACTIVATED on verified signal id=459 (BUY ETHUSDT @$2408.99 2026-05-06T12:00:07Z) | manifest v30 (3e6ebce) | Sainath P-01/P-02 resolved; Gate 2 clock running |
 
 ---
 
@@ -104,8 +108,9 @@ Full reconciliation:
 | **G-R02 — DONE** | IS/OOS gate added to strategy_promotion.py (check_is_oos_gate) | 2026-05-04 |
 | **Gate 1 — DONE** | Donchian_40_ETHUSDT_4h: OOS PF=1.7335, IS/OOS=0.878x, OOS n=51. PASS. | 2026-05-04 |
 | **Nomination — DONE** | Donchian_40_ETHUSDT_4h nominated to manifest v25 | 2026-05-04 |
-| **P-09 — TV alert — DONE** | Harsh deployed ETHUSDT 4H Donchian(40) alert (2026-05-04 10:00 IST). Paper window ACTIVE. | 2026-05-04 |
-| **Gate 2 — Paper window** | 20–30 days of clean live paper signals (real TradingView webhooks) | ~3–4 weeks after TV alerts |
+| **P-09 — TV alert — DONE** | Harsh deployed ETHUSDT 4H Donchian(40) alert; WEBHOOK_SECRET rotated in v28 | 2026-05-04 |
+| **Paper window ACTIVATED — DONE** | First verified signal id=459 (BUY ETHUSDT @$2408.99) received 2026-05-06T12:00:07Z. Manifest v30. | 2026-05-06 |
+| **Gate 2 — Paper window (IN PROGRESS)** | 30 days, ≥5 closed ETHUSDT trades, PnL>0, 0 webhook errors. Window: 2026-05-06 → 2026-06-05 | 2026-06-05 |
 | **Gate 3 — Sainath sign-off** | Review paper evidence + candidate_for_tiny_capital promotion request | After Gate 2 |
 
 ---
