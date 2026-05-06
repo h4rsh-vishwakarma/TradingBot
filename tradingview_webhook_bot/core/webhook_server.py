@@ -296,6 +296,9 @@ class WebhookServer:
 
         # Rate limiting state
         self._request_times = []
+        # Auth-failure rate tracking for stale-secret detection after rotations
+        self._auth_fail_times = []
+        self._auth_fail_last_alert = 0.0
 
         current_file = Path(__file__).resolve()
         project_root = current_file.parents[1]
@@ -317,6 +320,22 @@ class WebhookServer:
             return True
         self._request_times.append(now)
         return False
+
+    def _record_auth_failure(self, strategy_hint):
+        now = time.time()
+        self._auth_fail_times = [t for t in self._auth_fail_times if t > now - 60]
+        self._auth_fail_times.append(now)
+        if len(self._auth_fail_times) >= 3 and now - self._auth_fail_last_alert > 300:
+            self._auth_fail_last_alert = now
+            count = len(self._auth_fail_times)
+            try:
+                self.telegram.send(
+                    severity=AlertSeverity.WARNING,
+                    title='Warning: Webhook Auth Failures',
+                    message=f"{count} unauthorized attempts in 60s. Last strategy: {strategy_hint}. Cause: stale WEBHOOK_SECRET in TradingView alert.",
+                )
+            except Exception:
+                pass
 
     def _fetch_live_price(self, symbol):
         """Fetch live price from Binance mainnet (fast, cached)."""
@@ -472,7 +491,9 @@ class WebhookServer:
                         logger.warning(f'Rejected placeholder secret from {request.remote_addr}')
                         return jsonify({'status': 'error', 'message': 'Placeholder secret rejected'}), 401
                     if received_secret != self.webhook_secret:
-                        logger.warning(f"❌ Unauthorized JSON attempt")
+                        strategy_hint = str(data.get('strategy', payload.get('strategy', 'unknown')))
+                        logger.warning(f"❌ Unauthorized JSON attempt - strategy: {strategy_hint}")
+                        self._record_auth_failure(strategy_hint)
                         return jsonify({'status': 'error', 'message': 'Invalid secret'}), 401
 
                     signal_meta = _resolve_trade_signal(

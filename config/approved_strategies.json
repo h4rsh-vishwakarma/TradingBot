@@ -268,10 +268,11 @@
       "approved_at": "2026-04-14T06:58:50Z",
       "backtest_hash": "manual_approval_g79_fisher_donchian_202604140631",
       "label": "ALPHA",
-      "notes": "[TV_BACKTEST_ONLY \u2014 infinite compounding artifact, pre-lookahead-fix] [SHORTLIST_ELIMINATED \u2014 CORR=1.00 with G108 same trades, 2026-04-27] Fisher Transform cross. ETH: CAGR=3890%, ROI/day=1.01%, champion of batch. XRP: CAGR=2297%, PF=12-16. DOT excluded \u2014 17-26% DD across all G-family, unsafe.",
+      "notes": "[TV_BACKTEST_ONLY \u2014 infinite compounding artifact, pre-lookahead-fix] [SHORTLIST_ELIMINATED \u2014 CORR=1.00 with G108 same trades, 2026-04-27] Fisher Transform cross. ETH: CAGR=3890%, ROI/day=1.01%, champion of batch. XRP: CAGR=2297%, PF=12-16. DOT excluded \u2014 17-26% DD across all G-family, unsafe. | [DUPLICATE_ELIMINATED 2026-05-06: CORR=1.00 with G108 \u2014 identical trades. duplicate_of=G108. Not an independent candidate.]",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
-      "shortlist_priority": false
+      "shortlist_priority": false,
+      "duplicate_of": "G108"
     },
     {
       "strategy": "G80 UO Donchian",
