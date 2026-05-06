@@ -1,6 +1,12 @@
 {
-  "version": 28,
-  "updated_at": "2026-05-05T06:08:46Z",
+  "version": 29,
+  "updated_at": "2026-05-06T00:00:00Z",
+  "governance": {
+    "auto_promote_frozen": true,
+    "freeze_reason": "P-03 checkpoint: manifest-level freeze added 2026-05-06. Clear by setting auto_promote_frozen=false after Sainath Gate 3 sign-off.",
+    "frozen_at": "2026-05-06T00:00:00Z",
+    "frozen_by": "harsh"
+  },
   "approvals": [
     {
       "strategy": "CCI Trend",
