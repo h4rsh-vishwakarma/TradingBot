@@ -1,6 +1,6 @@
 {
-  "version": 29,
-  "updated_at": "2026-05-06T00:00:00Z",
+  "version": 30,
+  "updated_at": "2026-05-06T12:00:07Z",
   "governance": {
     "auto_promote_frozen": true,
     "freeze_reason": "P-03 checkpoint: manifest-level freeze added 2026-05-06. Clear by setting auto_promote_frozen=false after Sainath Gate 3 sign-off.",
@@ -728,15 +728,22 @@
       "gate1_evidence_file": "storage/gate1_results/gate1_oos_20260504T053215Z.json",
       "paper_window_days": 30,
       "paper_window_min_signals": 5,
-      "paper_window_status": "PENDING_TV_ALERT",
-      "paper_window_start": null,
-      "paper_window_target_end": null,
-      "paper_window_note": "Reset 2026-05-05 per Sainath audit P-03/P-04: signal_queue.db=0 bytes, no TV signals ever received. Paper window cannot be claimed as ACTIVE without verified first signal in signal_queue.db. Restart: deploy TV alert with rotated WEBHOOK_SECRET -> first signal -> set paper_window_start.",
+      "paper_window_status": "ACTIVE",
+      "paper_window_start": "2026-05-06T12:00:07Z",
+      "paper_window_target_end": "2026-06-05T12:00:07Z",
+      "paper_window_note": "Paper window ACTIVATED 2026-05-06 on first confirmed live signal (id=459, BUY ETHUSDT $2408.99, 12:00:07 UTC). 30-day window ends 2026-06-05. Min gate: 5 closed trades on approved symbol ETHUSDT. Sainath Gate-3 sign-off required before any capital.",
       "p07_is_oos_pf_ratio": 0.878,
       "p07_is_pf": 1.5214,
       "p07_oos_pf": 1.7335,
       "p07_oos_n": 51,
-      "paper_window_activated_at": null
+      "paper_window_activated_at": "2026-05-06T12:00:07Z",
+      "paper_window_first_signal": {
+        "signal_id": "id=459",
+        "action": "BUY",
+        "symbol": "ETHUSDT",
+        "price": 2408.99,
+        "timestamp": "2026-05-06T12:00:07Z"
+      }
     },
     {
       "strategy": "PSAR_VolSurge_LINKUSDT_4h",
