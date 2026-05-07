@@ -13,7 +13,9 @@
       "status": "CLOSED",
       "flattened": true,
       "flattened_at": "2026-05-05T06:07:26Z",
-      "flattened_method": "market_close_testnet_2026-05-05"
+      "flattened_method": "market_close_testnet_2026-05-05",
+      "ledger_zero_at": "2026-05-07T08:34:06+00:00",
+      "ledger_note": "Ledger quantity zeroed P-05 2026-05-07 (was -0.0047 @ 82471.6, different qty from original quarantine -0.0162 @ 71675.32 suggesting partial close occurred)"
     },
     {
       "key": "binance:SUIUSDT",
@@ -70,6 +72,32 @@
       "status": "CLOSED",
       "flattened": true,
       "flattened_at": "2026-05-05T06:07:26Z"
+    },
+    {
+      "key": "binance:ETHUSDT",
+      "symbol": "ETHUSDT",
+      "side": "SHORT",
+      "qty": -0.256,
+      "entry": 2321.78,
+      "note": "Stale pre-governance SHORT from paper_only strategy (NOT Donchian_40 which is BUY/LONG). No trade history after 2026-04-19. Zeroed in ledger 2026-05-07.",
+      "classification": "STALE_TESTNET_PRE_GOVERNANCE",
+      "status": "CLOSED",
+      "flattened": true,
+      "flattened_at": "2026-05-07T08:34:06+00:00",
+      "flattened_method": "ledger_zero_p05_reconciliation_2026-05-07"
+    },
+    {
+      "key": "binance:OPUSDT",
+      "symbol": "OPUSDT",
+      "side": "SHORT",
+      "qty": -2000.0,
+      "entry": 0.1488,
+      "note": "Unexpected stale SHORT on non-approved pair. Origin unknown (not from any governed strategy). Notional $297 testnet only. Zeroed in ledger 2026-05-07.",
+      "classification": "STALE_TESTNET_UNAPPROVED",
+      "status": "CLOSED",
+      "flattened": true,
+      "flattened_at": "2026-05-07T08:34:06+00:00",
+      "flattened_method": "ledger_zero_p05_reconciliation_2026-05-07"
     }
   ],
   "approved_lane_positions": [
@@ -77,5 +105,8 @@
   ],
   "action_required": "All positions manually closed on Binance Testnet 2026-04-13. No further action needed.",
   "flattened_at": "2026-04-13T07:18:30Z",
-  "status": "RESOLVED"
+  "status": "RESOLVED",
+  "last_reconciled_at": "2026-05-07T08:34:06+00:00",
+  "last_reconciled_by": "Harsh",
+  "reconciliation_note": "P-05 Sainath audit: stale pre-governance testnet positions zeroed. ETHUSDT NOT from Donchian_40 (Donchian_40 is BUY/LONG; position is SHORT). BTCUSDT already in quarantine but ledger not zeroed. OPUSDT unapproved pair."
 }

@@ -128,8 +128,12 @@ def load_p07_nominees() -> list[dict]:
         nominated_at = a.get("p07_nominated_at", "")
 
         # Check if any live signals exist for this nominee
+        manifest_window_status = a.get("paper_window_status", "")
+        manifest_window_start = a.get("paper_window_start", "")
+
         window_started = False
         first_signal_ts = None
+        window_from_manifest = False
         if SIGNAL_DB.exists():
             try:
                 strat_norm = re.sub(r"[^a-z0-9 ]+", " ", strategy.lower()).strip()
@@ -158,6 +162,17 @@ def load_p07_nominees() -> list[dict]:
             except Exception:
                 pass
 
+        # Fallback: if manifest says ACTIVE but no signals yet, use paper_window_start
+        if not window_started and manifest_window_status == "ACTIVE" and manifest_window_start:
+            try:
+                first_signal_ts = datetime.fromisoformat(
+                    manifest_window_start.replace("Z", "+00:00")
+                ).timestamp()
+                window_started = True
+                window_from_manifest = True
+            except Exception:
+                pass
+
         elapsed_days = None
         if window_started and first_signal_ts:
             elapsed_days = (datetime.now(UTC).timestamp() - first_signal_ts) / 86400
@@ -170,6 +185,8 @@ def load_p07_nominees() -> list[dict]:
             "window_started": window_started,
             "elapsed_days": elapsed_days,
             "first_signal_ts": first_signal_ts,
+            "window_from_manifest": window_from_manifest,
+            "manifest_window_status": manifest_window_status,
         })
     return nominees
 
@@ -606,6 +623,34 @@ def inventory_ready() -> bool:
         return False
 
 
+
+def load_system_state() -> dict:
+    """Collect repo HEAD, manifest version, manifest path, signal DB path."""
+    state: dict = {
+        "repo_head": "unknown",
+        "manifest_version": "unknown",
+        "manifest_path": str(MANIFEST_PATH),
+        "signal_db_path": str(SIGNAL_DB),
+        "signal_db_size": SIGNAL_DB.stat().st_size if SIGNAL_DB.exists() else 0,
+    }
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(PROJECT_ROOT), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode == 0:
+            state["repo_head"] = r.stdout.strip()
+    except Exception:
+        pass
+    try:
+        with open(MANIFEST_PATH) as _f:
+            _d = json.load(_f)
+        state["manifest_version"] = _d.get("version", _d.get("governance", {}).get("version", "?"))
+    except Exception:
+        pass
+    return state
+
+
 # ── Verdict + formatting ─────────────────────────────────────────────────────
 def load_paper_sim_summary() -> dict:
     """Load last saved paper_sim_results.json and return a compact summary."""
@@ -926,6 +971,16 @@ def format_report(ctx: dict) -> str:
         gate_clear = all(v["exits"] >= v["needed"] for v in lane_progress.values())
         gate_icon = "✅" if gate_clear else "❌"
 
+    sysstate = ctx.get("system_state", {})
+    sysstate_block = (
+        "\n\U0001f527 <b>System State</b>\n"
+        + "\u2022 Repo HEAD: <code>" + str(sysstate.get("repo_head", "?")) + "</code>\n"
+        + "\u2022 Manifest: v" + str(sysstate.get("manifest_version", "?"))
+        + " @ <code>" + str(sysstate.get("manifest_path", "?")) + "</code>\n"
+        + "\u2022 Signal DB: <code>" + str(sysstate.get("signal_db_path", "?")) + "</code>"
+        + " (" + str(sysstate.get("signal_db_size", 0)) + " bytes)\n"
+    )
+
     msg = (
         f"<b>HOURLY TRADING HEARTBEAT</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
@@ -951,6 +1006,7 @@ def format_report(ctx: dict) -> str:
         f"💰 <b>P&amp;L</b>\n"
         f"• Day P&amp;L: ${pnl['day_pnl']:+.2f}\n"
         f"• Paper Window P&amp;L: ${pnl['window_pnl']:+.2f}\n\n"
+        f"{sysstate_block}"
         f"🛡 <b>Risk / Integrity</b>\n"
         f"• Critical drifts today: {drifts['critical']}\n"
         f"• High drifts today: {drifts['high']}\n"
@@ -981,10 +1037,14 @@ def _p07_block(nominees: list[dict]) -> str:
         if n["window_started"] and n["elapsed_days"] is not None:
             days = int(n["elapsed_days"])
             remaining = max(0, 30 - days)
-            window_line = f"Day {days}/30 — {remaining}d remaining"
-            icon = "🟡"
+            if n.get("window_from_manifest"):
+                window_line = f"ACTIVE Day {days}/30 — {remaining}d remaining (no signal received yet)"
+                icon = "🟡"
+            else:
+                window_line = f"ACTIVE Day {days}/30 — {remaining}d remaining"
+                icon = "🟢"
         else:
-            window_line = "NOT STARTED — awaiting P-09 TV alert"
+            window_line = "NOT STARTED — paper_window_status not ACTIVE"
             icon = "⏳"
         lines.append(
             f"{icon} {n['strategy']} | {sym} | OOS PF={pf} n={oos_n} | {window_line}"
@@ -1043,6 +1103,7 @@ def main() -> int:
         "lane_progress": decision_lane_progress(),
         "freeze_expiry": auto_promote_freeze_check(),
         "p07_nominees": load_p07_nominees(),
+        "system_state": load_system_state(),
     }
 
     message = format_report(ctx)
