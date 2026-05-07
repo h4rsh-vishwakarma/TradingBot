@@ -1,6 +1,12 @@
 {
-  "version": 28,
-  "updated_at": "2026-05-05T06:08:46Z",
+  "version": 29,
+  "updated_at": "2026-05-06T00:00:00Z",
+  "governance": {
+    "auto_promote_frozen": true,
+    "freeze_reason": "P-03 checkpoint: manifest-level freeze added 2026-05-06. Clear by setting auto_promote_frozen=false after Sainath Gate 3 sign-off.",
+    "frozen_at": "2026-05-06T00:00:00Z",
+    "frozen_by": "harsh"
+  },
   "approvals": [
     {
       "strategy": "CCI Trend",
@@ -268,11 +274,10 @@
       "approved_at": "2026-04-14T06:58:50Z",
       "backtest_hash": "manual_approval_g79_fisher_donchian_202604140631",
       "label": "ALPHA",
-      "notes": "[TV_BACKTEST_ONLY \u2014 infinite compounding artifact, pre-lookahead-fix] [SHORTLIST_ELIMINATED \u2014 CORR=1.00 with G108 same trades, 2026-04-27] Fisher Transform cross. ETH: CAGR=3890%, ROI/day=1.01%, champion of batch. XRP: CAGR=2297%, PF=12-16. DOT excluded \u2014 17-26% DD across all G-family, unsafe. | [DUPLICATE_ELIMINATED 2026-05-06: CORR=1.00 with G108 \u2014 identical trades. duplicate_of=G108. Not an independent candidate.]",
+      "notes": "[TV_BACKTEST_ONLY \u2014 infinite compounding artifact, pre-lookahead-fix] [SHORTLIST_ELIMINATED \u2014 CORR=1.00 with G108 same trades, 2026-04-27] Fisher Transform cross. ETH: CAGR=3890%, ROI/day=1.01%, champion of batch. XRP: CAGR=2297%, PF=12-16. DOT excluded \u2014 17-26% DD across all G-family, unsafe.",
       "approval_class": "paper_only",
       "class_reason": "Defaulted to paper_only until explicitly promoted after paper validation.",
-      "shortlist_priority": false,
-      "duplicate_of": "G108"
+      "shortlist_priority": false
     },
     {
       "strategy": "G80 UO Donchian",
@@ -320,11 +325,15 @@
       "paper_window_start": null,
       "paper_window_target_end": null,
       "paper_window_set_at": "2026-05-02T04:56:51Z",
-      "paper_window_note": "20-day window approved 2026-05-02. Reduced from 30d: OOS rate=0.397/day => ~7.9 expected signals in 20d. Min gate: 7 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after P-09 TV alert created.",
+      "paper_window_note": "20-day window approved 2026-05-02. Reduced from 30d: OOS rate=0.397/day => ~7.9 expected signals in 20d. Min gate: 7 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after P-09 TV alert created. | P-09 NOTE: No TV alert was created. Withdrawn before P-09 step. paper_window_note retained for audit history only.",
       "no_carry_forward_to_capital": true,
       "p11_withdrawn_at": "2026-05-02T11:38:00Z",
       "p11_decision": "Option A: Withdraw from governed P07 lane per Sainath P-11 decision",
-      "p11_withdrawal_reason": "IS/OOS PF ratio 12.3x exceeds 4x hard reject gate. Python IS PF=6.38, OOS PF=0.52, OOS trades=36 (<50 minimum). No carry-forward eligibility to candidate_for_tiny_capital."
+      "p11_withdrawal_reason": "IS/OOS PF ratio 12.3x exceeds 4x hard reject gate. Python IS PF=6.38, OOS PF=0.52, OOS trades=36 (<50 minimum). No carry-forward eligibility to candidate_for_tiny_capital.",
+      "p09_alert_created": false,
+      "p09_alert_status": "NOT_CREATED \u2014 strategy withdrawn at P-11 (2026-05-02) before P-09 alert deployment step. No TradingView alert exists. No webhook traffic expected or possible.",
+      "p09_checked_at": "2026-05-07",
+      "p09_checked_by": "harsh"
     },
     {
       "strategy": "G86 Klinger Donchian",
@@ -509,11 +518,15 @@
       "paper_window_start": null,
       "paper_window_target_end": null,
       "paper_window_set_at": "2026-05-02T04:56:51Z",
-      "paper_window_note": "20-day window approved 2026-05-02. Reduced from 30d: OOS rate=0.594/day => ~11.9 expected signals in 20d. Min gate: 10 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after P-09 TV alert created.",
+      "paper_window_note": "20-day window approved 2026-05-02. Reduced from 30d: OOS rate=0.594/day => ~11.9 expected signals in 20d. Min gate: 10 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after P-09 TV alert created. | P-09 NOTE: No TV alert was created. Withdrawn before P-09 step. paper_window_note retained for audit history only.",
       "no_carry_forward_to_capital": true,
       "p11_withdrawn_at": "2026-05-02T11:38:00Z",
       "p11_decision": "Option A: Withdraw from governed P07 lane per Sainath P-11 decision",
-      "p11_withdrawal_reason": "IS/OOS PF ratio 78.6x exceeds 4x hard reject gate. Python IS PF=24.36, OOS PF=0.31, OOS trades=20 (<50 minimum). No carry-forward eligibility to candidate_for_tiny_capital."
+      "p11_withdrawal_reason": "IS/OOS PF ratio 78.6x exceeds 4x hard reject gate. Python IS PF=24.36, OOS PF=0.31, OOS trades=20 (<50 minimum). No carry-forward eligibility to candidate_for_tiny_capital.",
+      "p09_alert_created": false,
+      "p09_alert_status": "NOT_CREATED \u2014 strategy withdrawn at P-11 (2026-05-02) before P-09 alert deployment step. No TradingView alert exists. No webhook traffic expected or possible.",
+      "p09_checked_at": "2026-05-07",
+      "p09_checked_by": "harsh"
     },
     {
       "strategy": "G89 Coppock Donchian",
@@ -686,11 +699,15 @@
       "paper_window_start": null,
       "paper_window_target_end": null,
       "paper_window_set_at": "2026-05-02T04:56:51Z",
-      "paper_window_note": "20-day window approved 2026-05-02. Reduced from 30d: OOS rate=0.276/day => ~5.5 expected signals in 20d. Min gate: 5 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after P-09 TV alert created.",
+      "paper_window_note": "20-day window approved 2026-05-02. Reduced from 30d: OOS rate=0.276/day => ~5.5 expected signals in 20d. Min gate: 5 signals + paper PnL>0 + zero webhook errors. Sainath Gate-3 sign-off required before any capital. Starts on first live signal after P-09 TV alert created. | P-09 NOTE: No TV alert was created. Withdrawn before P-09 step. paper_window_note retained for audit history only.",
       "no_carry_forward_to_capital": true,
       "p11_withdrawn_at": "2026-05-02T11:38:00Z",
       "p11_decision": "Option A: Withdraw from governed P07 lane per Sainath P-11 decision",
-      "p11_withdrawal_reason": "IS/OOS PF ratio 8.4x exceeds 4x hard reject gate. Python IS PF=7.54, OOS PF=0.9, OOS trades=43 (<50 minimum). No carry-forward eligibility to candidate_for_tiny_capital."
+      "p11_withdrawal_reason": "IS/OOS PF ratio 8.4x exceeds 4x hard reject gate. Python IS PF=7.54, OOS PF=0.9, OOS trades=43 (<50 minimum). No carry-forward eligibility to candidate_for_tiny_capital.",
+      "p09_alert_created": false,
+      "p09_alert_status": "NOT_CREATED \u2014 strategy withdrawn at P-11 (2026-05-02) before P-09 alert deployment step. No TradingView alert exists. No webhook traffic expected or possible.",
+      "p09_checked_at": "2026-05-07",
+      "p09_checked_by": "harsh"
     },
     {
       "strategy": "Donchian_40_ETHUSDT_4h",
