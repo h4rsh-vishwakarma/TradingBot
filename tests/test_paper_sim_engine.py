@@ -209,7 +209,7 @@ def test_load_signals_missing_db(tmp_path, monkeypatch, caplog):
 def test_load_paper_only_approvals(tmp_path, monkeypatch):
     manifest = tmp_path / "approved_strategies.json"
     _make_manifest(manifest, [
-        {"strategy": "Alpha", "approval_class": "paper_only"},
+        {"strategy": "Alpha", "approval_class": "paper_only", "label": "P07_NOMINEE", "paper_window_status": "ACTIVE"},
         {"strategy": "Beta",  "approval_class": "candidate_for_tiny_capital"},
     ])
     monkeypatch.setattr(pse, "MANIFEST_PATH", manifest)
