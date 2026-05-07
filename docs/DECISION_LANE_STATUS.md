@@ -1,6 +1,6 @@
 # Decision Lane Status Report
-> **Last updated: 2026-05-07 (manifest v30; 1 P07_NOMINEE active)**
-> **Scope: 1 P07_NOMINEE (Donchian_40 paper window ACTIVE — clock started 2026-05-06T12:00:07Z)**
+> **Last updated: 2026-05-07 14:00 IST (manifest v30; commit 02cb78c; Sainath audit P-01→P-12 ALL CLOSED)**
+> **Scope: 1 P07_NOMINEE (Donchian_40 paper window ACTIVE — Day 0/30, clock started 2026-05-06T12:00:07Z)**
 > **Manifest v30** — 0 candidate_for_tiny_capital; 33 paper_only; 1 P07_NOMINEE; 5 P07_WITHDRAWN; 2 R01_RETIRED
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
 
@@ -123,13 +123,36 @@ Full reconciliation:
 | **Nomination — DONE** | Donchian_40_ETHUSDT_4h nominated to manifest v25 | 2026-05-04 |
 | **P-09 — TV alert — DONE** | Harsh deployed ETHUSDT 4H Donchian(40) alert; WEBHOOK_SECRET rotated in v28 | 2026-05-04 |
 | **Paper window ACTIVATED — DONE** | First verified signal id=459 (BUY ETHUSDT @$2408.99) received 2026-05-06T12:00:07Z. Manifest v30. | 2026-05-06 |
-| **Gate 2 — Paper window (IN PROGRESS)** | 30 days, ≥5 closed ETHUSDT trades, PnL>0, 0 webhook errors. Window: 2026-05-06 → 2026-06-05 | 2026-06-05 |
+| **Gate 2 — Paper window (IN PROGRESS)** | 30 days, ≥5 closed ETHUSDT trades, PnL>0, 0 webhook errors. Window: 2026-05-06 → 2026-06-05. **Current: Day 0, 2 signals, 0/5 closed trades.** Evidence: donchian40_gate2_ledger.csv | 2026-06-05 |
 | **Gate 3 — Sainath sign-off** | Review paper evidence + candidate_for_tiny_capital promotion request | After Gate 2 |
 
 ---
 
 *Historical fix logs, gate histories, and checkpoint assessments have been moved to commit history and RUNTIME_LOG.md.*
 *This file contains only current decision-lane state.*
+
+---
+
+## Sainath Audit P-01 → P-12 — ALL CLOSED (2026-05-07)
+
+Second audit issued by Sainath after manifest v30 activation. Garima closed P-08/P-09/P-10 (Pine side). Harsh closed P-01 through P-07 and P-12 (infra side) in session 2026-05-07.
+
+| Task | Owner | Status | Detail |
+|------|-------|--------|--------|
+| P-01 | Harsh | ✅ DONE | Server HEAD `21225b3`→`02cb78c` = GitHub HEAD; manifest v30; heartbeat path confirmed |
+| P-02 | Harsh | ✅ RESOLVED | signal_queue.db: 516 signals; 2 Donchian_40 BUY confirmed (2026-05-05 + 2026-05-06) |
+| P-03 | Harsh | ✅ DONE | Heartbeat: NOT STARTED → **ACTIVE Day 0/30**. Root cause: ignored manifest `paper_window_status`. Fix: manifest fallback in `load_p07_nominees()` |
+| P-04 | Harsh | ✅ DONE | Freeze diff resolved: 3 authorized changes documented + baseline refreshed. `execution diff = none` |
+| P-05 | Harsh | ✅ DONE | ETHUSDT SHORT (NOT DC40 — DC40 is LONG/BUY), BTCUSDT (quarantine stale), OPUSDT -2000 (unapproved). All zeroed in ledger. Open positions = 0 |
+| P-06 | Harsh | ✅ DONE | `storage/reports/donchian40_gate2_ledger.csv` created. Day 0, 2 signals, 0 closed trades, IN_PROGRESS |
+| P-07 | Harsh | ✅ DONE | Heartbeat System State block: Repo HEAD `02cb78c`, Manifest v30, Signal DB path+size |
+| P-08 | Garima | ✅ DONE | Pine audit completed |
+| P-09 | Garima | ✅ DONE | TV alert for Donchian_40_ETHUSDT_4h created and live |
+| P-10 | Garima | ✅ DONE | Signal flow verified |
+| P-11 | Harsh | ✅ DONE | Multi-asset Donchian_40 sweep: BNBUSDT PASS (OOS PF=1.1440), XRPUSDT PASS (OOS PF=1.9047), SOLUSDT FAIL, BTCUSDT FAIL |
+| P-12 | Harsh | ✅ DONE | `docs/DEPLOY_CHECKLIST.md` created — 8-step post-governance verification procedure |
+
+**Commit:** `02cb78c` — `fix: P-03/P-04/P-05/P-06/P-07/P-12 — Sainath audit batch fixes`
 
 ---
 
