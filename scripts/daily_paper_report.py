@@ -156,7 +156,11 @@ def get_signal_timestamps() -> dict:
         "last_approved": None,
     }
     approvals = _load_approvals()
-    candidate_approvals = [approval for approval in approvals if approval.get("approval_class") == "candidate_for_tiny_capital"] or approvals
+    candidate_approvals = [
+        a for a in approvals
+        if (a.get("approval_class") == "candidate_for_tiny_capital")
+        or (a.get("label") == "P07_NOMINEE" and a.get("paper_window_status") == "ACTIVE")
+    ] or approvals
     if not SIGNAL_DB.exists():
         return snapshot
 
@@ -281,7 +285,11 @@ def _load_scope() -> dict:
         approvals = data.get("approvals", []) or []
     except Exception:
         approvals = []
-    candidates = [a for a in approvals if a.get("approval_class") == "candidate_for_tiny_capital"]
+    candidates = [
+        a for a in approvals
+        if a.get("approval_class") == "candidate_for_tiny_capital"
+        or (a.get("label") == "P07_NOMINEE" and a.get("paper_window_status") == "ACTIVE")
+    ]
     strats = sorted({a.get("strategy", "") for a in candidates})
     syms = sorted({s for a in candidates for s in a.get("symbols", [])})
     tfs = sorted({t for a in candidates for t in a.get("timeframes", [])})
@@ -634,7 +642,7 @@ def main():
         f"🎯 <b>Scope</b>\n"
         f"• Approved lane: {scope_strats}\n"
         f"• Asset / TF: {scope_asset_tf}\n"
-        f"• Manifest class in scope: candidate_for_tiny_capital only\n\n"
+        f"• Manifest class in scope: P07_NOMINEE (ACTIVE paper window) + candidate_for_tiny_capital\n\n"
         f"📡 <b>Signals</b>\n"
         f"• Total received: {signal_stats['total']}\n"
         f"• Approved-lane signals: {approved_lane_signals}\n"

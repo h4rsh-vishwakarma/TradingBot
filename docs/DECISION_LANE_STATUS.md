@@ -1,7 +1,7 @@
 # Decision Lane Status Report
-> **Last updated: 2026-05-06 (manifest v30; 1 P07_NOMINEE active)**
+> **Last updated: 2026-05-07 (manifest v30; 1 P07_NOMINEE active)**
 > **Scope: 1 P07_NOMINEE (Donchian_40 paper window ACTIVE — clock started 2026-05-06T12:00:07Z)**
-> **Manifest v30** — 0 candidate_for_tiny_capital; 33 paper_only; 1 P07_NOMINEE; 4 P07_WITHDRAWN; 2 R01_RETIRED
+> **Manifest v30** — 0 candidate_for_tiny_capital; 33 paper_only; 1 P07_NOMINEE; 5 P07_WITHDRAWN; 2 R01_RETIRED
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
 
 ---

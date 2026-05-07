@@ -126,7 +126,12 @@ def _load_paper_only_approvals() -> list[dict]:
         with open(MANIFEST_PATH, encoding="utf-8") as fh:
             data = json.load(fh)
         approvals = data.get("approvals", [])
-        return [a for a in approvals if a.get("approval_class") == "paper_only"]
+        return [
+            a for a in approvals
+            if a.get("approval_class") == "paper_only"
+            and a.get("label") == "P07_NOMINEE"
+            and a.get("paper_window_status") == "ACTIVE"
+        ]
     except Exception as exc:
         logger.error(f"Cannot load manifest: {exc}")
         return []

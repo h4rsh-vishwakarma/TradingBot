@@ -1,0 +1,210 @@
+{
+  "run_at": "20260507T081710Z",
+  "governance_standard": {
+    "fixed_notional_usd": 500.0,
+    "commission_per_side_pct": 0.15,
+    "oos_split_pct": 30.0,
+    "is_oos_ratio_gate": 4.0,
+    "oos_pf_min": 1.0,
+    "oos_trades_min": 50
+  },
+  "summary": {
+    "total": 4,
+    "passed": 2,
+    "failed": 2,
+    "passed_ids": [
+      "Donchian_40_BNBUSDT",
+      "Donchian_40_XRPUSDT"
+    ]
+  },
+  "results": [
+    {
+      "hash": "dc40_SOLUSDT_4h",
+      "strategy": "Donchian_40",
+      "asset": "SOLUSDT",
+      "timeframe": "4h",
+      "window": 40,
+      "is_period": {
+        "start": "2020-08-11",
+        "end": "2024-07-14",
+        "bars": 8600
+      },
+      "oos_period": {
+        "start": "2024-07-14",
+        "end": "2026-03-20",
+        "bars": 3686
+      },
+      "is": {
+        "pf": 1.7186,
+        "roi_pct": 21.898,
+        "sharpe": 1.606,
+        "mdd_pct": -4.206,
+        "win_rate": 37.14,
+        "n_trades": 105,
+        "gross_profit": 5425.41,
+        "gross_loss": 3156.82
+      },
+      "oos": {
+        "pf": 0.9128,
+        "roi_pct": -1.275,
+        "sharpe": -0.253,
+        "mdd_pct": -3.482,
+        "win_rate": 41.18,
+        "n_trades": 51,
+        "gross_profit": 934.14,
+        "gross_loss": 1023.43
+      },
+      "is_oos_ratio": 1.883,
+      "gate1_pass": false,
+      "gate1_failures": [
+        "OOS PF=0.9128 < 1.0 (hard fail)"
+      ],
+      "governance": {
+        "fixed_notional_usd": 500.0,
+        "commission_per_side_pct": 0.15,
+        "oos_split_pct": 30.0,
+        "run_at": "20260507T081710Z"
+      }
+    },
+    {
+      "hash": "dc40_BTCUSDT_4h",
+      "strategy": "Donchian_40",
+      "asset": "BTCUSDT",
+      "timeframe": "4h",
+      "window": 40,
+      "is_period": {
+        "start": "2019-12-31",
+        "end": "2024-05-08",
+        "bars": 9537
+      },
+      "oos_period": {
+        "start": "2024-05-08",
+        "end": "2026-03-20",
+        "bars": 4088
+      },
+      "is": {
+        "pf": 1.8441,
+        "roi_pct": 12.55,
+        "sharpe": 1.828,
+        "mdd_pct": -2.379,
+        "win_rate": 37.74,
+        "n_trades": 106,
+        "gross_profit": 2915.38,
+        "gross_loss": 1580.91
+      },
+      "oos": {
+        "pf": 0.9994,
+        "roi_pct": -0.408,
+        "sharpe": -0.002,
+        "mdd_pct": -1.777,
+        "win_rate": 38.89,
+        "n_trades": 54,
+        "gross_profit": 575.39,
+        "gross_loss": 575.73
+      },
+      "is_oos_ratio": 1.845,
+      "gate1_pass": false,
+      "gate1_failures": [
+        "OOS PF=0.9994 < 1.0 (hard fail)"
+      ],
+      "governance": {
+        "fixed_notional_usd": 500.0,
+        "commission_per_side_pct": 0.15,
+        "oos_split_pct": 30.0,
+        "run_at": "20260507T081710Z"
+      }
+    },
+    {
+      "hash": "dc40_BNBUSDT_4h",
+      "strategy": "Donchian_40",
+      "asset": "BNBUSDT",
+      "timeframe": "4h",
+      "window": 40,
+      "is_period": {
+        "start": "2019-12-31",
+        "end": "2024-05-08",
+        "bars": 9537
+      },
+      "oos_period": {
+        "start": "2024-05-08",
+        "end": "2026-03-20",
+        "bars": 4088
+      },
+      "is": {
+        "pf": 1.8056,
+        "roi_pct": 17.78,
+        "sharpe": 0.982,
+        "mdd_pct": -5.512,
+        "win_rate": 34.19,
+        "n_trades": 117,
+        "gross_profit": 4181.85,
+        "gross_loss": 2316.07
+      },
+      "oos": {
+        "pf": 1.144,
+        "roi_pct": 0.451,
+        "sharpe": 0.338,
+        "mdd_pct": -2.853,
+        "win_rate": 41.18,
+        "n_trades": 51,
+        "gross_profit": 662.16,
+        "gross_loss": 578.81
+      },
+      "is_oos_ratio": 1.578,
+      "gate1_pass": true,
+      "gate1_failures": [],
+      "governance": {
+        "fixed_notional_usd": 500.0,
+        "commission_per_side_pct": 0.15,
+        "oos_split_pct": 30.0,
+        "run_at": "20260507T081710Z"
+      }
+    },
+    {
+      "hash": "dc40_XRPUSDT_4h",
+      "strategy": "Donchian_40",
+      "asset": "XRPUSDT",
+      "timeframe": "4h",
+      "window": 40,
+      "is_period": {
+        "start": "2019-12-31",
+        "end": "2024-05-08",
+        "bars": 9537
+      },
+      "oos_period": {
+        "start": "2024-05-08",
+        "end": "2026-03-20",
+        "bars": 4088
+      },
+      "is": {
+        "pf": 1.5163,
+        "roi_pct": 12.12,
+        "sharpe": 1.146,
+        "mdd_pct": -3.252,
+        "win_rate": 33.02,
+        "n_trades": 106,
+        "gross_profit": 3792.87,
+        "gross_loss": 2501.34
+      },
+      "oos": {
+        "pf": 1.9047,
+        "roi_pct": 10.708,
+        "sharpe": 0.69,
+        "mdd_pct": -4.368,
+        "win_rate": 27.78,
+        "n_trades": 54,
+        "gross_profit": 2339.55,
+        "gross_loss": 1228.28
+      },
+      "is_oos_ratio": 0.796,
+      "gate1_pass": true,
+      "gate1_failures": [],
+      "governance": {
+        "fixed_notional_usd": 500.0,
+        "commission_per_side_pct": 0.15,
+        "oos_split_pct": 30.0,
+        "run_at": "20260507T081710Z"
+      }
+    }
+  ]
+}

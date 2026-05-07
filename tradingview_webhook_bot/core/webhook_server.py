@@ -41,6 +41,49 @@ except ImportError:
 
 logger = setup_logger('webhook_server')
 
+# ── Signal idempotency: prevent duplicate TV alert processing ───────────────────
+_IDEM_DB_PATH = Path(__file__).resolve().parents[2] / "storage" / "idempotency.db"
+_IDEM_TTL_HOURS = int(os.getenv("SIGNAL_DEDUP_TTL_HOURS", "48"))
+
+def _idem_seen(signal_id: str) -> bool:
+    """Return True if this signal_id was already processed (within TTL)."""
+    try:
+        with __import__("sqlite3").connect(str(_IDEM_DB_PATH)) as conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS seen_signals "
+                "(signal_id TEXT PRIMARY KEY, seen_at TEXT)"
+            )
+            row = conn.execute(
+                "SELECT seen_at FROM seen_signals WHERE signal_id = ?", (signal_id,)
+            ).fetchone()
+            return row is not None
+    except Exception as _e:
+        logger.warning(f"Idempotency DB read failed (fail-open): {_e}")
+        return False  # fail open: process the signal if we can't check
+
+def _idem_mark(signal_id: str) -> None:
+    """Record signal_id as processed. Purge entries older than TTL."""
+    try:
+        import sqlite3
+        from datetime import timezone
+        now = datetime.now(timezone.utc).isoformat()
+        cutoff = (datetime.now(timezone.utc) - __import__("datetime").timedelta(hours=_IDEM_TTL_HOURS)).isoformat()
+        with sqlite3.connect(str(_IDEM_DB_PATH)) as conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS seen_signals "
+                "(signal_id TEXT PRIMARY KEY, seen_at TEXT)"
+            )
+            conn.execute(
+                "INSERT OR IGNORE INTO seen_signals (signal_id, seen_at) VALUES (?, ?)",
+                (signal_id, now)
+            )
+            conn.execute("DELETE FROM seen_signals WHERE seen_at < ?", (cutoff,))
+    except Exception as _e:
+        logger.warning(f"Idempotency DB write failed: {_e}")
+
+# ─────────────────────────────────────────────────────────────────────────────────
+
+
 # --- PLAIN TEXT PARSER FOR TRADINGVIEW DEFAULT ALERTS ---
 # Format: "Strategy Name | SYMBOL - Webhook (secret): order buy @ 0.003 filled on EXCHANGE:SYMBOL.P. New strategy position is 1"
 PLAIN_TEXT_PATTERN = re.compile(
@@ -713,6 +756,12 @@ class WebhookServer:
                     logger.warning(f"🚫 Signal rejected — not in manifest: strategy={strategy} symbol={symbol}")
                     return jsonify({'status': 'error', 'message': 'Strategy not authorized'}), 403
                 # --- End allowlist gate ---
+
+                # Idempotency gate: reject duplicate signal_ids within TTL window
+                if _idem_seen(signal_id):
+                    logger.info(f"Duplicate signal skipped (idempotency): {signal_id}")
+                    return jsonify({"status": "success", "message": "Duplicate signal ignored"}), 200
+                _idem_mark(signal_id)
 
                 # Route to exactly one queue — durable SQLite (primary) or legacy JSONL (fallback)
                 if os.getenv("USE_DURABLE_QUEUE", "true").lower() == "true":
