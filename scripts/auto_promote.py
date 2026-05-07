@@ -278,13 +278,35 @@ def check_and_promote():
     return promoted
 
 
-if __name__ == "__main__":
-    # Governance freeze guard (CEO audit A-07): block auto-promotion during checkpoint window.
-    # Remove this block only after Sainath checkpoint verdict is issued.
-    _freeze_flag = os.path.join(os.path.dirname(MANIFEST_PATH), ".auto_promote_freeze")
+def _is_frozen() -> tuple[bool, str]:
+    """Return (frozen, reason) checking all three freeze layers in priority order."""
+    # Layer 1: env_var (runtime override — fastest to check)
     _env_freeze = os.getenv("AUTO_PROMOTE_FREEZE", "true").lower()
-    if _env_freeze == "true" or os.path.exists(_freeze_flag):
-        msg = "[auto_promote] FREEZE ACTIVE — checkpoint in progress. No promotions written. Set AUTO_PROMOTE_FREEZE=false to override."
+    if _env_freeze == "true":
+        return True, "AUTO_PROMOTE_FREEZE=true in env_vars"
+
+    # Layer 2: filesystem sentinel flag
+    _freeze_flag = os.path.join(os.path.dirname(MANIFEST_PATH), ".auto_promote_freeze")
+    if os.path.exists(_freeze_flag):
+        return True, f".auto_promote_freeze sentinel file present at {_freeze_flag}"
+
+    # Layer 3: manifest-level governance flag (survives env_vars resets)
+    try:
+        _manifest = load_manifest()
+        _gov = _manifest.get("governance", {})
+        if _gov.get("auto_promote_frozen", False):
+            reason = _gov.get("freeze_reason", "governance.auto_promote_frozen=true in manifest")
+            return True, reason
+    except Exception as e:
+        return True, f"manifest read failed — blocking as safety default: {e}"
+
+    return False, ""
+
+
+if __name__ == "__main__":
+    _frozen, _freeze_reason = _is_frozen()
+    if _frozen:
+        msg = f"[auto_promote] FREEZE ACTIVE — {_freeze_reason}. No promotions written."
         print(msg)
         send_telegram(f"⚠️ <b>Auto-Promote BLOCKED</b>\n{msg}")
         sys.exit(0)

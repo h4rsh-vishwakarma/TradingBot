@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-05-05T06:11:54+00:00",
+  "recorded_at": "2026-05-05T11:40:22+00:00",
   "tracked_count": 11,
   "tracked_entries": [
     {
@@ -48,15 +48,15 @@
       "label": "approval_manifest",
       "path": "/home/ubuntu/tradingview_webhook_bot/config/approved_strategies.json",
       "exists": true,
-      "sha256": "181225eaa7433d0e015f3f4a44f7fb0860410907b34c616eb5929ab6b58fa4c7",
-      "size": 35272
+      "sha256": "7c39b24c7954d385085d6a880076c8f93a706f279f495ae00ab02d2088f77f89",
+      "size": 35321
     },
     {
       "label": "env_vars",
       "path": "/etc/tradingbot/env_vars",
       "exists": true,
-      "sha256": "6769b429e7a54fd673b816a7d5a3653bf6d571b211a25c893af7e778b7bd2c7b",
-      "size": 4691
+      "sha256": "2d4166cad768d89fd25ffdf7554811546be103e1f82b89500aae799ad93bcc2e",
+      "size": 4693
     },
     {
       "label": "webhook_service",

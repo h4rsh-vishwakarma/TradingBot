@@ -1,0 +1,20 @@
+{
+  "run_ts": "20260506T062639Z",
+  "symbol": "ETHUSDT",
+  "timeframe": "4h",
+  "sl_pct": 2.0,
+  "tp_pct": 6.0,
+  "results": [
+    {
+      "period": 7,
+      "mult": 1.5,
+      "is_n": 1301,
+      "is_pf": 0.79,
+      "is_mdd": -6282.89,
+      "oos_n": 444,
+      "oos_pf": 0.899,
+      "oos_mdd": -968.73,
+      "oos_roi_day": -0.0995,
+      "oos_wr": 27.0,
+      "ratio": 0.88,
+      "gate_pf": 

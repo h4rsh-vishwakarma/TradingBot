@@ -1,0 +1,1226 @@
+{
+  "run_ts": "20260506T110125Z",
+  "symbol": "ETHUSDT",
+  "tf": "4h",
+  "sl_pct": 2.0,
+  "tp_pct": 4.0,
+  "state_strategies": [
+    "EMA_21_55",
+    "EMA_9_21",
+    "Supertrend",
+    "MACD",
+    "RSI_50",
+    "PSAR",
+    "Vortex"
+  ],
+  "entry_strategies": [
+    "Williams_R",
+    "RSI_Rev",
+    "Donchian_40",
+    "CCI_20",
+    "BBands",
+    "Stoch",
+    "ADX_DI"
+  ],
+  "n_combos": 399,
+  "n_passes": 0,
+  "gate_config": {
+    "oos_pf_min": 1.5,
+    "oos_n_min": 30,
+    "is_oos_max": 4.0,
+    "mdd_max": -15.0
+  },
+  "top_50": [
+    {
+      "combo": "MACD + PSAR + [BBands]",
+      "state": [
+        "MACD",
+        "PSAR"
+      ],
+      "entry": [
+        "BBands"
+      ],
+      "n_components": 3,
+      "is_n": 3,
+      "is_pf": 1.827,
+      "oos_n": 1,
+      "oos_pf": Infinity,
+      "oos_mdd": 0.0,
+      "oos_roi_day": 0.3772,
+      "oos_wr": 100.0,
+      "ratio": 0.0,
+      "gate_pf": true,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "PSAR + [BBands]",
+      "state": [
+        "PSAR"
+      ],
+      "entry": [
+        "BBands"
+      ],
+      "n_components": 2,
+      "is_n": 18,
+      "is_pf": 1.614,
+      "oos_n": 4,
+      "oos_pf": 2.008,
+      "oos_mdd": -2.3,
+      "oos_roi_day": 0.0055,
+      "oos_wr": 75.0,
+      "ratio": 0.8,
+      "gate_pf": true,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + [RSI_Rev]",
+      "state": [
+        "Supertrend"
+      ],
+      "entry": [
+        "RSI_Rev"
+      ],
+      "n_components": 2,
+      "is_n": 7,
+      "is_pf": 0.307,
+      "oos_n": 2,
+      "oos_pf": 1.609,
+      "oos_mdd": -2.3,
+      "oos_roi_day": 0.2,
+      "oos_wr": 50.0,
+      "ratio": 0.19,
+      "gate_pf": true,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + PSAR + [BBands]",
+      "state": [
+        "Supertrend",
+        "PSAR"
+      ],
+      "entry": [
+        "BBands"
+      ],
+      "n_components": 3,
+      "is_n": 10,
+      "is_pf": 2.035,
+      "oos_n": 2,
+      "oos_pf": 1.609,
+      "oos_mdd": -2.3,
+      "oos_roi_day": 0.0034,
+      "oos_wr": 50.0,
+      "ratio": 1.26,
+      "gate_pf": true,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_9_21 + MACD + [Williams_R]",
+      "state": [
+        "EMA_9_21",
+        "MACD"
+      ],
+      "entry": [
+        "Williams_R"
+      ],
+      "n_components": 3,
+      "is_n": 27,
+      "is_pf": 0.961,
+      "oos_n": 11,
+      "oos_pf": 1.584,
+      "oos_mdd": -6.79,
+      "oos_roi_day": 0.0086,
+      "oos_wr": 36.4,
+      "ratio": 0.61,
+      "gate_pf": true,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_9_21 + MACD + [Stoch]",
+      "state": [
+        "EMA_9_21",
+        "MACD"
+      ],
+      "entry": [
+        "Stoch"
+      ],
+      "n_components": 3,
+      "is_n": 27,
+      "is_pf": 0.961,
+      "oos_n": 11,
+      "oos_pf": 1.584,
+      "oos_mdd": -6.79,
+      "oos_roi_day": 0.0086,
+      "oos_wr": 36.4,
+      "ratio": 0.61,
+      "gate_pf": true,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "MACD + Vortex + [Williams_R]",
+      "state": [
+        "MACD",
+        "Vortex"
+      ],
+      "entry": [
+        "Williams_R"
+      ],
+      "n_components": 3,
+      "is_n": 50,
+      "is_pf": 1.009,
+      "oos_n": 22,
+      "oos_pf": 1.225,
+      "oos_mdd": -8.77,
+      "oos_roi_day": 0.0065,
+      "oos_wr": 31.8,
+      "ratio": 0.82,
+      "gate_pf": false,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "MACD + Vortex + [Stoch]",
+      "state": [
+        "MACD",
+        "Vortex"
+      ],
+      "entry": [
+        "Stoch"
+      ],
+      "n_components": 3,
+      "is_n": 50,
+      "is_pf": 1.009,
+      "oos_n": 22,
+      "oos_pf": 1.225,
+      "oos_mdd": -8.77,
+      "oos_roi_day": 0.0065,
+      "oos_wr": 31.8,
+      "ratio": 0.82,
+      "gate_pf": false,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "MACD + PSAR + [Donchian_40]",
+      "state": [
+        "MACD",
+        "PSAR"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 350,
+      "is_pf": 0.863,
+      "oos_n": 138,
+      "oos_pf": 1.055,
+      "oos_mdd": -34.59,
+      "oos_roi_day": 0.0146,
+      "oos_wr": 38.4,
+      "ratio": 0.82,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "MACD + RSI_50 + [Donchian_40]",
+      "state": [
+        "MACD",
+        "RSI_50"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 346,
+      "is_pf": 0.876,
+      "oos_n": 137,
+      "oos_pf": 1.049,
+      "oos_mdd": -38.0,
+      "oos_roi_day": 0.0136,
+      "oos_wr": 39.4,
+      "ratio": 0.84,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_9_21 + MACD + [Donchian_40]",
+      "state": [
+        "EMA_9_21",
+        "MACD"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 345,
+      "is_pf": 0.869,
+      "oos_n": 137,
+      "oos_pf": 1.047,
+      "oos_mdd": -38.0,
+      "oos_roi_day": 0.0129,
+      "oos_wr": 39.4,
+      "ratio": 0.83,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + MACD + [Donchian_40]",
+      "state": [
+        "Supertrend",
+        "MACD"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 346,
+      "is_pf": 0.854,
+      "oos_n": 137,
+      "oos_pf": 1.047,
+      "oos_mdd": -38.0,
+      "oos_roi_day": 0.0129,
+      "oos_wr": 39.4,
+      "ratio": 0.82,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "RSI_50 + [RSI_Rev | Donchian_40]",
+      "state": [
+        "RSI_50"
+      ],
+      "entry": [
+        "RSI_Rev",
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 239,
+      "is_pf": 0.997,
+      "oos_n": 84,
+      "oos_pf": 1.046,
+      "oos_mdd": -19.6,
+      "oos_roi_day": 0.0077,
+      "oos_wr": 39.3,
+      "ratio": 0.95,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + [RSI_Rev | Donchian_40]",
+      "state": [
+        "Supertrend"
+      ],
+      "entry": [
+        "RSI_Rev",
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 244,
+      "is_pf": 0.945,
+      "oos_n": 84,
+      "oos_pf": 1.041,
+      "oos_mdd": -17.3,
+      "oos_roi_day": 0.0069,
+      "oos_wr": 39.3,
+      "ratio": 0.91,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "MACD + Vortex + [Donchian_40]",
+      "state": [
+        "MACD",
+        "Vortex"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 345,
+      "is_pf": 0.893,
+      "oos_n": 137,
+      "oos_pf": 1.032,
+      "oos_mdd": -36.72,
+      "oos_roi_day": 0.0084,
+      "oos_wr": 39.4,
+      "ratio": 0.87,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "MACD + [Donchian_40]",
+      "state": [
+        "MACD"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 2,
+      "is_n": 351,
+      "is_pf": 0.873,
+      "oos_n": 139,
+      "oos_pf": 1.028,
+      "oos_mdd": -34.32,
+      "oos_roi_day": 0.0073,
+      "oos_wr": 37.4,
+      "ratio": 0.85,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + [Donchian_40]",
+      "state": [
+        "Supertrend"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 2,
+      "is_n": 356,
+      "is_pf": 0.903,
+      "oos_n": 141,
+      "oos_pf": 0.999,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.0004,
+      "oos_wr": 38.3,
+      "ratio": 0.9,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_9_21 + Supertrend + [Donchian_40]",
+      "state": [
+        "EMA_9_21",
+        "Supertrend"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 355,
+      "is_pf": 0.907,
+      "oos_n": 141,
+      "oos_pf": 0.999,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.0004,
+      "oos_wr": 38.3,
+      "ratio": 0.91,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + RSI_50 + [Donchian_40]",
+      "state": [
+        "Supertrend",
+        "RSI_50"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 356,
+      "is_pf": 0.903,
+      "oos_n": 141,
+      "oos_pf": 0.999,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.0004,
+      "oos_wr": 38.3,
+      "ratio": 0.9,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + PSAR + [Donchian_40]",
+      "state": [
+        "Supertrend",
+        "PSAR"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 356,
+      "is_pf": 0.903,
+      "oos_n": 141,
+      "oos_pf": 0.999,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.0004,
+      "oos_wr": 38.3,
+      "ratio": 0.9,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + Vortex + [Donchian_40]",
+      "state": [
+        "Supertrend",
+        "Vortex"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 354,
+      "is_pf": 0.911,
+      "oos_n": 141,
+      "oos_pf": 0.999,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.0004,
+      "oos_wr": 38.3,
+      "ratio": 0.91,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "PSAR + Vortex + [Donchian_40]",
+      "state": [
+        "PSAR",
+        "Vortex"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 354,
+      "is_pf": 0.942,
+      "oos_n": 143,
+      "oos_pf": 0.993,
+      "oos_mdd": -36.72,
+      "oos_roi_day": -0.0019,
+      "oos_wr": 38.5,
+      "ratio": 0.95,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "RSI_50 + [Donchian_40]",
+      "state": [
+        "RSI_50"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 2,
+      "is_n": 356,
+      "is_pf": 0.925,
+      "oos_n": 142,
+      "oos_pf": 0.99,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.003,
+      "oos_wr": 38.0,
+      "ratio": 0.93,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "RSI_50 + PSAR + [Donchian_40]",
+      "state": [
+        "RSI_50",
+        "PSAR"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 356,
+      "is_pf": 0.922,
+      "oos_n": 142,
+      "oos_pf": 0.99,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.003,
+      "oos_wr": 38.0,
+      "ratio": 0.93,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_9_21 + [Donchian_40]",
+      "state": [
+        "EMA_9_21"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 2,
+      "is_n": 355,
+      "is_pf": 0.918,
+      "oos_n": 142,
+      "oos_pf": 0.987,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.0038,
+      "oos_wr": 38.0,
+      "ratio": 0.93,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_9_21 + RSI_50 + [Donchian_40]",
+      "state": [
+        "EMA_9_21",
+        "RSI_50"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 355,
+      "is_pf": 0.918,
+      "oos_n": 142,
+      "oos_pf": 0.987,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.0038,
+      "oos_wr": 38.0,
+      "ratio": 0.93,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_9_21 + PSAR + [Donchian_40]",
+      "state": [
+        "EMA_9_21",
+        "PSAR"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 355,
+      "is_pf": 0.918,
+      "oos_n": 142,
+      "oos_pf": 0.987,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.0038,
+      "oos_wr": 38.0,
+      "ratio": 0.93,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_9_21 + Vortex + [Donchian_40]",
+      "state": [
+        "EMA_9_21",
+        "Vortex"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 353,
+      "is_pf": 0.926,
+      "oos_n": 142,
+      "oos_pf": 0.987,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.0038,
+      "oos_wr": 38.0,
+      "ratio": 0.94,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "RSI_50 + Vortex + [Donchian_40]",
+      "state": [
+        "RSI_50",
+        "Vortex"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 354,
+      "is_pf": 0.931,
+      "oos_n": 142,
+      "oos_pf": 0.987,
+      "oos_mdd": -38.0,
+      "oos_roi_day": -0.0038,
+      "oos_wr": 38.0,
+      "ratio": 0.94,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_21_55 + EMA_9_21 + [BBands]",
+      "state": [
+        "EMA_21_55",
+        "EMA_9_21"
+      ],
+      "entry": [
+        "BBands"
+      ],
+      "n_components": 3,
+      "is_n": 47,
+      "is_pf": 0.528,
+      "oos_n": 19,
+      "oos_pf": 0.986,
+      "oos_mdd": -9.2,
+      "oos_roi_day": -0.0006,
+      "oos_wr": 36.8,
+      "ratio": 0.54,
+      "gate_pf": false,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "PSAR + [Donchian_40 | BBands]",
+      "state": [
+        "PSAR"
+      ],
+      "entry": [
+        "Donchian_40",
+        "BBands"
+      ],
+      "n_components": 3,
+      "is_n": 277,
+      "is_pf": 0.964,
+      "oos_n": 95,
+      "oos_pf": 0.984,
+      "oos_mdd": -32.21,
+      "oos_roi_day": -0.0029,
+      "oos_wr": 37.9,
+      "ratio": 0.98,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "PSAR + [Donchian_40]",
+      "state": [
+        "PSAR"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 2,
+      "is_n": 361,
+      "is_pf": 0.913,
+      "oos_n": 145,
+      "oos_pf": 0.975,
+      "oos_mdd": -34.84,
+      "oos_roi_day": -0.0069,
+      "oos_wr": 36.6,
+      "ratio": 0.94,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_9_21 + [RSI_Rev | Donchian_40]",
+      "state": [
+        "EMA_9_21"
+      ],
+      "entry": [
+        "RSI_Rev",
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 240,
+      "is_pf": 0.994,
+      "oos_n": 88,
+      "oos_pf": 0.971,
+      "oos_mdd": -24.2,
+      "oos_roi_day": -0.0052,
+      "oos_wr": 37.5,
+      "ratio": 1.02,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_21_55 + MACD + [Donchian_40]",
+      "state": [
+        "EMA_21_55",
+        "MACD"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 304,
+      "is_pf": 0.899,
+      "oos_n": 120,
+      "oos_pf": 0.965,
+      "oos_mdd": -40.1,
+      "oos_roi_day": -0.0087,
+      "oos_wr": 37.5,
+      "ratio": 0.93,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + MACD + [Williams_R]",
+      "state": [
+        "Supertrend",
+        "MACD"
+      ],
+      "entry": [
+        "Williams_R"
+      ],
+      "n_components": 3,
+      "is_n": 18,
+      "is_pf": 1.736,
+      "oos_n": 8,
+      "oos_pf": 0.965,
+      "oos_mdd": -9.2,
+      "oos_roi_day": -0.0006,
+      "oos_wr": 37.5,
+      "ratio": 1.8,
+      "gate_pf": false,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + MACD + [Stoch]",
+      "state": [
+        "Supertrend",
+        "MACD"
+      ],
+      "entry": [
+        "Stoch"
+      ],
+      "n_components": 3,
+      "is_n": 18,
+      "is_pf": 1.736,
+      "oos_n": 8,
+      "oos_pf": 0.965,
+      "oos_mdd": -9.2,
+      "oos_roi_day": -0.0006,
+      "oos_wr": 37.5,
+      "ratio": 1.8,
+      "gate_pf": false,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "Vortex + [Donchian_40]",
+      "state": [
+        "Vortex"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 2,
+      "is_n": 354,
+      "is_pf": 0.945,
+      "oos_n": 143,
+      "oos_pf": 0.96,
+      "oos_mdd": -38.26,
+      "oos_roi_day": -0.0115,
+      "oos_wr": 37.8,
+      "ratio": 0.98,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + [BBands]",
+      "state": [
+        "Supertrend"
+      ],
+      "entry": [
+        "BBands"
+      ],
+      "n_components": 2,
+      "is_n": 114,
+      "is_pf": 0.486,
+      "oos_n": 43,
+      "oos_pf": 0.957,
+      "oos_mdd": -28.03,
+      "oos_roi_day": -0.0034,
+      "oos_wr": 32.6,
+      "ratio": 0.51,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "MACD + [Donchian_40 | BBands]",
+      "state": [
+        "MACD"
+      ],
+      "entry": [
+        "Donchian_40",
+        "BBands"
+      ],
+      "n_components": 3,
+      "is_n": 277,
+      "is_pf": 0.927,
+      "oos_n": 97,
+      "oos_pf": 0.955,
+      "oos_mdd": -31.19,
+      "oos_roi_day": -0.0082,
+      "oos_wr": 35.1,
+      "ratio": 0.97,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_21_55 + Supertrend + [BBands]",
+      "state": [
+        "EMA_21_55",
+        "Supertrend"
+      ],
+      "entry": [
+        "BBands"
+      ],
+      "n_components": 3,
+      "is_n": 93,
+      "is_pf": 0.488,
+      "oos_n": 31,
+      "oos_pf": 0.938,
+      "oos_mdd": -18.97,
+      "oos_roi_day": -0.0045,
+      "oos_wr": 35.5,
+      "ratio": 0.52,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "RSI_50 + [Donchian_40 | BBands]",
+      "state": [
+        "RSI_50"
+      ],
+      "entry": [
+        "Donchian_40",
+        "BBands"
+      ],
+      "n_components": 3,
+      "is_n": 258,
+      "is_pf": 0.949,
+      "oos_n": 90,
+      "oos_pf": 0.935,
+      "oos_mdd": -26.5,
+      "oos_roi_day": -0.0127,
+      "oos_wr": 36.7,
+      "ratio": 1.01,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_9_21 + Supertrend + [BBands]",
+      "state": [
+        "EMA_9_21",
+        "Supertrend"
+      ],
+      "entry": [
+        "BBands"
+      ],
+      "n_components": 3,
+      "is_n": 42,
+      "is_pf": 0.416,
+      "oos_n": 12,
+      "oos_pf": 0.934,
+      "oos_mdd": -8.66,
+      "oos_roi_day": -0.0016,
+      "oos_wr": 33.3,
+      "ratio": 0.45,
+      "gate_pf": false,
+      "gate_n": false,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false
+    },
+    {
+      "combo": "MACD + [Williams_R | Donchian_40]",
+      "state": [
+        "MACD"
+      ],
+      "entry": [
+        "Williams_R",
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 383,
+      "is_pf": 0.924,
+      "oos_n": 138,
+      "oos_pf": 0.934,
+      "oos_mdd": -28.97,
+      "oos_roi_day": -0.0159,
+      "oos_wr": 34.1,
+      "ratio": 0.99,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "MACD + [Donchian_40 | Stoch]",
+      "state": [
+        "MACD"
+      ],
+      "entry": [
+        "Donchian_40",
+        "Stoch"
+      ],
+      "n_components": 3,
+      "is_n": 383,
+      "is_pf": 0.924,
+      "oos_n": 138,
+      "oos_pf": 0.934,
+      "oos_mdd": -28.97,
+      "oos_roi_day": -0.0159,
+      "oos_wr": 34.1,
+      "ratio": 0.99,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + [Donchian_40 | BBands]",
+      "state": [
+        "Supertrend"
+      ],
+      "entry": [
+        "Donchian_40",
+        "BBands"
+      ],
+      "n_components": 3,
+      "is_n": 359,
+      "is_pf": 0.772,
+      "oos_n": 132,
+      "oos_pf": 0.919,
+      "oos_mdd": -43.33,
+      "oos_roi_day": -0.0217,
+      "oos_wr": 34.8,
+      "ratio": 0.84,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "Supertrend + [RSI_Rev | BBands]",
+      "state": [
+        "Supertrend"
+      ],
+      "entry": [
+        "RSI_Rev",
+        "BBands"
+      ],
+      "n_components": 3,
+      "is_n": 114,
+      "is_pf": 0.486,
+      "oos_n": 44,
+      "oos_pf": 0.918,
+      "oos_mdd": -28.03,
+      "oos_roi_day": -0.0067,
+      "oos_wr": 31.8,
+      "ratio": 0.53,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_21_55 + [Donchian_40]",
+      "state": [
+        "EMA_21_55"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 2,
+      "is_n": 313,
+      "is_pf": 0.96,
+      "oos_n": 124,
+      "oos_pf": 0.916,
+      "oos_mdd": -47.0,
+      "oos_roi_day": -0.0221,
+      "oos_wr": 36.3,
+      "ratio": 1.05,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_21_55 + EMA_9_21 + [Donchian_40]",
+      "state": [
+        "EMA_21_55",
+        "EMA_9_21"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 312,
+      "is_pf": 0.965,
+      "oos_n": 124,
+      "oos_pf": 0.916,
+      "oos_mdd": -47.0,
+      "oos_roi_day": -0.0221,
+      "oos_wr": 36.3,
+      "ratio": 1.05,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_21_55 + Supertrend + [Donchian_40]",
+      "state": [
+        "EMA_21_55",
+        "Supertrend"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 313,
+      "is_pf": 0.96,
+      "oos_n": 124,
+      "oos_pf": 0.916,
+      "oos_mdd": -47.0,
+      "oos_roi_day": -0.0221,
+      "oos_wr": 36.3,
+      "ratio": 1.05,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    },
+    {
+      "combo": "EMA_21_55 + RSI_50 + [Donchian_40]",
+      "state": [
+        "EMA_21_55",
+        "RSI_50"
+      ],
+      "entry": [
+        "Donchian_40"
+      ],
+      "n_components": 3,
+      "is_n": 313,
+      "is_pf": 0.96,
+      "oos_n": 124,
+      "oos_pf": 0.916,
+      "oos_mdd": -47.0,
+      "oos_roi_day": -0.0221,
+      "oos_wr": 36.3,
+      "ratio": 1.05,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false
+    }
+  ],
+  "all_passes": []
+}
