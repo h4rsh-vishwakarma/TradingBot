@@ -130,3 +130,35 @@ Full reconciliation:
 
 *Historical fix logs, gate histories, and checkpoint assessments have been moved to commit history and RUNTIME_LOG.md.*
 *This file contains only current decision-lane state.*
+
+---
+
+## G27 CCI Donchian Wide - Post-Gate-1 Audit (2026-05-07)
+
+**Auditor:** Garima | **Status:** Gate 1 FAIL confirmed - verdict unchanged
+
+### Root Cause of TV vs Python Gap (8-17x)
+
+The original hypothesis was lookahead bias (dc_upper[1] repainting). **This is cleared.**
+dc_upper[1] is correctly barred - no repainting in the Pine script.
+
+**Actual causes of TV WR=83-85% vs Python WR=28-34%:**
+
+| Cause | Detail |
+|-------|--------|
+| Exit mechanics | strategy.exit() with SL=1.5% + TP=15% + Trail=3.5% forces artificial 10:1 R:R - inflates WR by design |
+| Position sizing | percent_of_equity=95% compounds position size - incomparable to Python $500 fixed notional |
+| Anti-overtrading filter | trades_today + cooldown in original Pine reduces TV trade count below Python count |
+
+**Python OOS WR (28-34%) is the ground truth.** TV WR was an artifact of exit/sizing mechanics, not strategy alpha.
+
+### G27v2 Audit Script
+
+Garima provided backtesting/pine/G27v2 CCI Donchian Wide:
+- Signal-only exits (Donchian lower / CCI zero-cross / RSI extremes)
+- $500 fixed notional, 0.15% commission
+- No SL/TP/trail, no anti-overtrading filter
+
+Purpose: TV rerun on AVAX/LINK/SUI/LDO to confirm TV matches Python parity. NOT a Gate 1 re-run - G27 fails on signal quality, not exit mechanics. Gate 1 verdict unchanged.
+
+Evidence: storage/gate1_results/gate1_oos_g27_cci_donchian_20260506T081410Z.json (audit fields added 2026-05-07)

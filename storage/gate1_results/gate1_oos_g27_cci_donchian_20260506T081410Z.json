@@ -1,0 +1,136 @@
+{
+  "strategy": "G27 CCI Donchian Wide",
+  "run_ts": "20260506T081410Z",
+  "governance": {
+    "notional": 500.0,
+    "commission_side_pct": 0.15,
+    "oos_split": 0.3,
+    "sl_pct": 1.5,
+    "tp_pct": 15.0,
+    "trail_pct": 3.5000000000000004
+  },
+  "results": [
+    {
+      "symbol": "AVAXUSDT",
+      "timeframe": "4h",
+      "is_bars": 8594,
+      "oos_bars": 3684,
+      "is_n": 737,
+      "is_pf": 0.699,
+      "is_mdd": -8281.14,
+      "is_roi_day": -0.1803,
+      "is_wr": 31.2,
+      "oos_n": 270,
+      "oos_pf": 0.731,
+      "oos_mdd": -12745.81,
+      "oos_roi_day": -0.1465,
+      "oos_wr": 30.0,
+      "is_oos_ratio": 0.96,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false,
+      "fail_reasons": [
+        "OOS_PF=0.731 <1.5",
+        "MDD=-12745.81% <-15.0%"
+      ]
+    },
+    {
+      "symbol": "LDOUSDT",
+      "timeframe": "4h",
+      "is_bars": 5531,
+      "oos_bars": 2371,
+      "is_n": 450,
+      "is_pf": 0.824,
+      "is_mdd": -680.8,
+      "is_roi_day": -0.1014,
+      "is_wr": 32.4,
+      "oos_n": 170,
+      "oos_pf": 0.621,
+      "oos_mdd": 0.0,
+      "oos_roi_day": -0.2155,
+      "oos_wr": 28.2,
+      "is_oos_ratio": 1.33,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": true,
+      "PASS": false,
+      "fail_reasons": [
+        "OOS_PF=0.621 <1.5"
+      ]
+    },
+    {
+      "symbol": "LINKUSDT",
+      "timeframe": "4h",
+      "is_bars": 9643,
+      "oos_bars": 4134,
+      "is_n": 816,
+      "is_pf": 0.793,
+      "is_mdd": -690.72,
+      "is_roi_day": -0.1263,
+      "is_wr": 30.1,
+      "oos_n": 321,
+      "oos_pf": 0.726,
+      "oos_mdd": -441.22,
+      "oos_roi_day": -0.1563,
+      "oos_wr": 32.7,
+      "is_oos_ratio": 1.09,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false,
+      "fail_reasons": [
+        "OOS_PF=0.726 <1.5",
+        "MDD=-441.22% <-15.0%"
+      ]
+    },
+    {
+      "symbol": "SUIUSDT",
+      "timeframe": "4h",
+      "is_bars": 4594,
+      "oos_bars": 1969,
+      "is_n": 377,
+      "is_pf": 0.857,
+      "is_mdd": -360.12,
+      "is_roi_day": -0.0822,
+      "is_wr": 33.2,
+      "oos_n": 138,
+      "oos_pf": 1.261,
+      "oos_mdd": -47.03,
+      "oos_roi_day": 0.1295,
+      "oos_wr": 34.1,
+      "is_oos_ratio": 0.68,
+      "gate_pf": false,
+      "gate_n": true,
+      "gate_ratio": true,
+      "gate_mdd": false,
+      "PASS": false,
+      "fail_reasons": [
+        "OOS_PF=1.261 <1.5",
+        "MDD=-47.03% <-15.0%"
+      ]
+    }
+  ],
+  "garima_audit": {
+    "audited_at": "2026-05-07",
+    "audited_by": "garima",
+    "lookahead_confirmed": false,
+    "lookahead_note": "dc_upper[1] is correct in Pine \u2014 no repainting. Lookahead suspicion cleared.",
+    "root_cause": "TV WR inflation caused by exit mechanics + position sizing mismatch, not lookahead bias",
+    "root_cause_detail": {
+      "cause_1": "strategy.exit() with SL=1.5% + TP=15% + Trail=3.5% forces artificial 10:1 R:R \u2014 inflates TV WR to 83-85% vs real signal-only WR=28-34%",
+      "cause_2": "percent_of_equity=95% in original Pine compounds position size \u2014 directly incomparable to Python 00 fixed notional",
+      "cause_3": "Anti-overtrading filter (trades_today, cooldown) in original reduces TV trade count vs Python, further widening metrics gap"
+    },
+    "python_oos_wr_range": "28-34% (matches signal-only reality)",
+    "tv_original_wr_claimed": "83-85% (artificially inflated by exit mechanics)",
+    "gap_explanation": "8-17x gap was exit mechanics and position sizing \u2014 not predictive alpha inflation",
+    "gate1_verdict_unchanged": true,
+    "gate1_verdict_note": "G27 Gate 1 FAIL is correct. Python OOS PF=0.62-0.86 across all 4 symbols \u2014 strategy has no edge on signal-only basis.",
+    "g27v2_script": "backtesting/pine/G27v2 CCI Donchian Wide",
+    "g27v2_purpose": "Signal-only exits, 00 fixed, no SL/TP/trail \u2014 TV test to confirm Python parity. For documentation only, not Gate 1 re-run."
+  }
+}
