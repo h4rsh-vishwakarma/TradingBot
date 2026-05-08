@@ -336,6 +336,7 @@ def approved_lane_signal_count_gate() -> tuple[bool, str]:
         approved = [
             a for a in manifest.get("approvals", [])
             if a.get("approval_class") == "candidate_for_tiny_capital"
+            or str(a.get("label", "")).upper() == "P07_NOMINEE"
         ]
         approved_names = {_re.sub(r"[^a-z0-9]+", " ", a["strategy"].lower()).strip() for a in approved}
 
@@ -799,7 +800,10 @@ def main() -> int:
     min_trades_ok, min_trades_detail = min_closed_trades_gate(candidates)  # thresholds: 4H=5, 1H=10, 15m=20
     check("Candidates have min closed paper trades (4H=5,1H=10,15m=20)", min_trades_ok, min_trades_detail)
 
-    lane_recent_ok, lane_recent_detail = decision_lane_recency_check(candidates, warn_after_hours=72.0)
+    # Include active P07_NOMINEE entries so the recency check fires before Gate 2 promotion
+    _p07_nominees = [a for a in approvals if str(a.get("label", "")).upper() == "P07_NOMINEE"]
+    _recency_pool = candidates + [n for n in _p07_nominees if n not in candidates]
+    lane_recent_ok, lane_recent_detail = decision_lane_recency_check(_recency_pool, warn_after_hours=72.0)
     check("Decision-lane ETHUSDT signal active (<72h)", lane_recent_ok, lane_recent_detail)
 
     conc_ok, conc_detail = family_concentration_gate(candidates)

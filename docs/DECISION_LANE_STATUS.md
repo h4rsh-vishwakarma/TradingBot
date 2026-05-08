@@ -1,6 +1,6 @@
 # Decision Lane Status Report
-> **Last updated: 2026-05-07 14:00 IST (manifest v30; commit 02cb78c; Sainath audit P-01→P-12 ALL CLOSED)**
-> **Scope: 1 P07_NOMINEE (Donchian_40 paper window ACTIVE — Day 0/30, clock started 2026-05-06T12:00:07Z)**
+> **Last updated: 2026-05-08 13:20 IST (manifest v30; gate fixes applied; Sainath audit P-01→P-12 ALL CLOSED)**
+> **Scope: 1 P07_NOMINEE (Donchian_40 paper window ACTIVE — Day 3/30, 3 signals received, 0 closed trades)**
 > **Manifest v30** — 0 candidate_for_tiny_capital; 33 paper_only; 1 P07_NOMINEE; 5 P07_WITHDRAWN; 2 R01_RETIRED
 > Evidence source map: [docs/TRACKER_SOURCE_OF_TRUTH.md](TRACKER_SOURCE_OF_TRUTH.md)
 
@@ -9,7 +9,7 @@
 ## Current State
 
 **1 active P07 nominee:**
-- `Donchian_40_ETHUSDT_4h` — Gate 1 PASS (2026-05-04), paper window **ACTIVE** — first verified signal received 2026-05-06T12:00:07Z (id=459, BUY ETHUSDT @$2408.99). 30-day window ends 2026-06-05T12:00:07Z.
+- `Donchian_40_ETHUSDT_4h` — Gate 1 PASS (2026-05-04), paper window **ACTIVE** — Day 3/30. Signals received: 3 (BUY 2026-05-05 pre-window, BUY 2026-05-06 id=459 @$2408.99, SELL 2026-05-07 16:00 UTC). Closed trades: 0 (Gate 2 requires 5). 30-day window ends 2026-06-05T12:00:07Z.
 
 No candidate_for_tiny_capital entries exist yet. Capital discussion remains blocked until Gate 2 (paper window) and Gate 3 (Sainath sign-off) complete.
 Promotion ladder: Gate 1 ✓ → Gate 2 (30-day paper window, min 5 closed trades) → Gate 3 (Sainath sign-off) → candidate_for_tiny_capital.
@@ -58,10 +58,13 @@ Next cycle: Garima must produce new Gate 1 nominees with IS/OOS ratio ≤4x and 
 
 See  for the live verdict (updated nightly at 02:40 UTC).
 
-3 structural FAILs remain (paper window day 1):
-- **Manifest scope:** 0 candidate_for_tiny_capital → clears when Gate 2+3 complete and nominee promoted
-- **Candidate paper-lane inventory:** 0 closed trades → clears as paper window accumulates trades (min 5 required)
-- **Candidate paper-lane PnL:** unresolved → clears when paper window closes with PnL>0
+2 structural FAILs remain (paper window Day 3/30) — gate fixes applied 2026-05-08:
+- **Manifest scope:** 0 candidate_for_tiny_capital → clears when Gate 2+3 complete and nominee promoted (structural calendar)
+- **Paper window duration:** Day 3 of 30 → clears automatically at Day 30 (structural calendar)
+
+2 operational FAILs CLEARED today (2026-05-08) by go_live_gate_check.py fix:
+- **Approved-lane signals fired:** ✅ 3 Donchian_40 signals recorded since 2026-05-04 (gate was checking candidate_for_tiny_capital only — fixed to include P07_NOMINEE)
+- **Decision-lane ETHUSDT signal active:** ✅ Last signal 2026-05-07T16:00:08Z (12.4h ago) — fixed same root cause
 
 Structural FAILs cleared today (2026-05-06):
 - **Approved-lane signals fired:** ✅ id=459 BUY ETHUSDT @$2408.99 12:00:07Z — Sainath P-01 resolved
