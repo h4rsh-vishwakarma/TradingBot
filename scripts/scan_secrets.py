@@ -60,6 +60,7 @@ def should_scan_assignments(path: Path) -> bool:
         return False
     return name.startswith(".env") or path.suffix.lower() in {
         ".ini",
+        ".env",
         ".json",
         ".toml",
         ".yaml",
