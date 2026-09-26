@@ -1,0 +1,22 @@
+services:
+  glue:
+    image: public.ecr.aws/glue/aws-glue-libs:5
+    working_dir: /home/hadoop/workspace
+    volumes:
+      - ./:/home/hadoop/workspace
+      - ${USERPROFILE}/.aws:/home/hadoop/.aws:ro
+    environment:
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      DISABLE_SSL: "true"
+    command: >-
+      spark-submit
+      --conf spark.sql.session.timeZone=UTC
+      glue/jobs/market_data_etl.py
+      --JOB_NAME local-market-data-etl
+      --INPUT_PATH file:///home/hadoop/workspace/tests/fixtures/raw/
+      --CURATED_PATH file:///home/hadoop/workspace/artifacts/local/curated/
+      --BASELINE_PATH file:///home/hadoop/workspace/artifacts/local/unpartitioned/
+      --DAILY_PATH file:///home/hadoop/workspace/artifacts/local/daily/
+      --QUARANTINE_PATH file:///home/hadoop/workspace/artifacts/local/quarantine/
+      --RUN_ID local-smoke

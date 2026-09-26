@@ -57,6 +57,16 @@ logs/
 .streamlit/
 .pytest_cache/
 pytest-cache-files-*/
+.coverage
+htmlcov/
+artifacts/
+data/raw/
+data/curated/
+data/quarantine/
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
 
 # Runtime data inside package storage
 tradingview_webhook_bot/storage/*.json
