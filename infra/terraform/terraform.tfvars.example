@@ -1,0 +1,4 @@
+aws_region         = "ap-south-1"
+project_name       = "trading-data-lake"
+alert_email        = ""
+log_retention_days = 14

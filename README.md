@@ -10,6 +10,13 @@
 
 Production-grade automated trading system that receives TradingView webhook alerts, validates them through a multi-layer safety pipeline, and executes trades on Binance Futures. Features a daily grid-search tournament that auto-discovers the best-performing strategies and deploys them.
 
+The repository also includes a separately runnable AWS analytics pipeline for
+public Binance historical klines. It provides checksum-based ingestion, Glue
+5.0/PySpark validation and quarantine, partitioned Parquet, Glue Data Catalog,
+Athena queries, CloudWatch monitoring, and Terraform infrastructure. Start with
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
+[`docs/RUN_DATA_LAKE.md`](docs/RUN_DATA_LAKE.md).
+
 **Core Loop:**
 1. TradingView Pine Script strategies fire webhook alerts on each candle close
 2. Webhook server validates, normalizes, and queues signals
