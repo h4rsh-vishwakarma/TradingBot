@@ -19,12 +19,15 @@
 
 ---
 
-## Files to Share with Harsh
+## SSH key handling
 
-1. **`harsh-key-ap-south-1.pem`** – SSH private key (this file)
-2. **`HARSH_ACCESS_AP_SOUTH_1.md`** – These instructions
+The original `harsh-key-ap-south-1.pem` was exposed in Git history and must be
+treated as compromised. Remove its public key from every server, generate a new
+credential, and transfer the replacement through an approved private channel.
 
-Share both **privately** (never via a public repo or public chat).
+Private keys must never be stored in this repository, pasted into issues or pull
+requests, or sent through public chat. Keep only these non-secret instructions in
+Git. Prefer AWS Systems Manager Session Manager when possible.
 
 ---
 
